@@ -28,8 +28,8 @@ def get_field_ids(fields, visname):
 
 
 
-visname = '12apr2018_avg.ms'
-base = 'cdfs_meerkat_1'
+visname = 'CDFS16_1_avg.ms'
+base = 'cdfs16_1_avg'
 dopolcal = 1  # Do polarisation calibration or no
 doplotcal = 0
 telescope = 'meerkat'
@@ -53,7 +53,7 @@ dpolfield      = fields.phase   # Field ID of the absolute pol angle calibrator
 xpolfield      = fields.pol     # Field ID of the pol leakage calibrator
 
 gainfields = str(fluxfield) + ',' + str(secondaryfield) + ',' + str(dpolfield)
-bpassfield = gainfields
+#bpassfield = gainfields
 
 preflag = True                # flag the data before calibration
 postflag = True               # flag the data again after calibration
@@ -78,7 +78,7 @@ if telescope.lower() == 'meerkat':
     splitchannels   = '10~1350'
     flagchannels    = '10~1350'
     badfreqranges   =['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz']
-    referenceant    ='m000'
+    referenceant    ='m005'
 
 elif telescope.lower() == 'gmrt':
     gainchannels    = '20~200'       # channel range to use for time-dependent gain calibration
@@ -101,6 +101,11 @@ splitspw    = '0:' + splitchannels
 gainspw     = '0:' + gainchannels
 flagspw     = '0:' + flagchannels
 
+
+mvis = visname.replace('.ms', '.mms')
+partition(vis=visname, outputvis=mvis, createmms=True, numsubms=52, datacolumn='DATA')
+visname = mvis
+
 # Backup the original flags
 flagmanager(vis=visname, mode='save', versionname='orig', comment='original flags',
         merge='replace')
@@ -111,9 +116,6 @@ if len(badfreqranges):
         badspw = '0:' + badfreq
         flagdata(vis=visname, mode='manual', spw=badspw)
 
-
-# Run flagging prior to any calibration - flag conservatively to only identify
-# the worst RFI at this point.
 if preflag:
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
@@ -162,8 +164,9 @@ if preflag:
 
 
 clearcal(visname)
+workdir = os.path.join(os.getcwd(), base)
+workdir = os.path.join(workdir, 'pipeline')
 
-workdir = '/data/users/krishna/' + base + '/pipeline/'
 if not os.path.isdir(workdir):
     os.makedirs(workdir)
 
@@ -180,7 +183,7 @@ logfile =  logdir+'calib_'+timestamp+'.log'
 casalog.setlogfile(logfile)
 process_start = time.time()
 
-caldir = procdir+base+'/'+'calib_out/'
+caldir = os.path.join(procdir, 'calib_out/')
 
 #----- remove any previous calibration output directories and split measurements sets.
 try:
@@ -199,10 +202,7 @@ xpolfile =  caldir+base + '.xcal'
 xdelfile =  caldir+base + '.xdel'
 fluxfile =  caldir+base + '.fluxscale'
 
-
-# --- Initial calibration - no polarisation.
-# This will get the data better behaved for a second round of RFI
-# flagging. Not interested in polarisation calibration at this stage.
+# --- Initial calibration - no polarisation. Only to identify outliers
 
 print " starting setjy for flux calibrator"
 setjy(vis=visname, field = fluxfield, spw = gainspw, scalebychan=True, standard='Perley-Butler 2010')
@@ -243,8 +243,6 @@ applycal(vis=visname, field=target, spw = gainspw, selectdata=False, calwt=False
         gaintable=[kcorrfile, bpassfile, fluxfile], gainfield=[kcorrfield,
             bpassfield, secondaryfield], parang=True)
 
-# Round two of flagging. Stricter thresholding for more sensitive detection,
-# since in principle the data is better behaved after calibration.
 if preflag:
     default(flagdata)
 
@@ -306,11 +304,9 @@ if preflag:
             name=visname + 'summary.split', action="apply", flagbackup=True,
             overwrite=True, writeflags=True)
 
+    clearcal(visname)
 
-# --- Actual calibration procedures - With polarisation and
-# the whole kitchen sink.
-
-clearcal(visname)
+# --- Actual calibration procedures
 
 print " starting setjy for flux calibrator"
 setjy(vis=visname, field = fluxfield, spw = splitspw, scalebychan=True, standard='Perley-Butler 2010')
@@ -334,7 +330,6 @@ gaincal(vis=visname, caltable = xdelfile, field = xdelfield, spw = gainspw,
         gainfield = [kcorrfield, bpassfield], append = False, parang = False)
 
 if dopolcal:
-    # Check polarisation basis, and calibrate accordingly.
     if polnbasis.lower() == 'linear':
         print '\n\n ++++++ Linear Feed Polarization calibration ++++++'
         gain1file   = caldir+base+'.g1cal'
@@ -394,6 +389,7 @@ if dopolcal:
 
         print "\n now re-solve for Q,U from the new gainfile\n -> %s" % gainfile
         Gain2QU = qufromgain(gainfile)
+        print GainQU[int(dpolfield)]
 
         print "starting \'Dflls\' polcal -> %s"  % dpolfile
         polcal(vis=visname, caltable = dtempfile, field = dpolfield, spw = gainspw, refant = '',
@@ -508,8 +504,6 @@ print "Applying calibrations..."
 if polnbasis.lower() == 'linear':
     xpolfile = xy0pfile
     xpolfield = dpolfield
-
-# Apply and split calibration solutions
 
 print " applying calibrations: primary calibrator"
 applycal(vis=visname, field = fluxfield, spw = splitspw, selectdata = False, calwt = False,
