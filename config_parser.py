@@ -19,7 +19,7 @@ def parse_args():
 def parse_config(filename):
     """
     Given an input config file, parses it to extract key-value pairs that
-    should represent task parameters and values respectively. 
+    should represent task parameters and values respectively.
     """
 
     import ConfigParser
@@ -38,11 +38,14 @@ def parse_config(filename):
 
         for option in config.options(section):
             # Evaluate to the right type()
-            taskvals[section][option] = ast.literal_eval(config.get(section, option))
+            taskvals[section][option] =\
+                            ast.literal_eval(config.get(section, option))
 
-
+    print(taskvals)
+    input()
     return taskvals
 
 if __name__ == '__main__':
     cliargs = parse_args()
     taskvals = parse_config(cliargs.config)
+    print(taskvals)
