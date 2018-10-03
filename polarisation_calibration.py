@@ -36,7 +36,7 @@ telescope = 'meerkat'
 polnbasis = 'linear'
 minbaselines = 4
 
-fluxcal = 'J0521+1638'
+fluxcal = 'J1939-6342'
 phasecal = 'J0240-2309'
 polangcal = 'J0240-2309'
 target = 'CDFS16'
@@ -59,8 +59,8 @@ preflag = True                # flag the data before calibration
 postflag = True               # flag the data again after calibration
 
 # Averaging Parameters for split
-specave = 1                        # number of frequency channels to average when splitting
-timeave = '0s'                     # time averaging interval in split
+specave = 2                        # number of frequency channels to average when splitting
+timeave = '8s'                     # time averaging interval in split
 
 # Min/max levels in Jy for a blanket clip over the MS
 clipfluxcal   = [0., 50.]
@@ -74,9 +74,9 @@ clipresid     = [0., 10.]
 # would suggest something like 3%.  Flux density at 0.6 GHz should be about 10 Jy.  So
 
 if telescope.lower() == 'meerkat':
-    gainchannels    = '10~1350'
-    splitchannels   = '10~1350'
-    flagchannels    = '10~1350'
+    gainchannels    = '50~1300'
+    splitchannels   = '50~1300'
+    flagchannels    = '50~1300'
     badfreqranges   =['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz']
     referenceant    ='m005'
 
@@ -101,14 +101,54 @@ splitspw    = '0:' + splitchannels
 gainspw     = '0:' + gainchannels
 flagspw     = '0:' + flagchannels
 
-
 mvis = visname.replace('.ms', '.mms')
-partition(vis=visname, outputvis=mvis, createmms=True, numsubms=52, datacolumn='DATA')
+partition(vis=visname, outputvis=mvis, createmms=True, datacolumn='DATA')
 visname = mvis
+
+clearcal(visname)
 
 # Backup the original flags
 flagmanager(vis=visname, mode='save', versionname='orig', comment='original flags',
         merge='replace')
+
+msmd.open(visname)
+fluxscans = msmd.scansforfield(int(fluxfield))
+print "Flux field scan no: %d" % fluxscans[0]
+antennas = msmd.antennasforscan(fluxscans[0])
+msmd.done()
+print "\n Antenna statistics on flux field"
+print " ant    median    rms"
+antamp=[]; antrms = []
+for ant in antennas:
+    ant = str(ant)
+    t = visstat2(vis=visname, field=fluxfield, antenna=ant, timeaverage=True, timebin='500min',
+                 timespan='state,scan',reportingaxes='field')
+    item = str(t.keys()[0])
+    amp = float(t[item]['median'])
+    rms = float(t[item]['rms'])
+    print "%3s  %8.3f %9.3f " % (ant, amp, rms)
+    antamp.append(amp)
+    antrms.append(rms)
+
+antamp = np.array(antamp)
+antrms = np.array(antrms)
+medamp = np.median(antamp)
+medrms = np.median(antrms)
+print "Median: %8.3f  %9.3f" % (medamp,medrms)
+goodrms=[]; goodamp=[]; goodant=[]
+for i in range(len(antamp)):
+    if (antamp[i] > medamp) and (antrms[i] < medrms):
+        goodant.append(antennas[i])
+        goodamp.append(antamp[i])
+        goodrms.append(antrms[i])
+goodrms = np.array(goodrms)
+j = np.argmin(goodrms)
+
+print "best antenna: %2s  amp = %7.2f, rms = %7.2f" % (goodant[j], goodamp[j], goodrms[j])
+print "1st good antenna: %2s  amp = %7.2f, rms = %7.2f" % (goodant[0], goodamp[0], goodrms[0])
+referenceant = str(goodant[0])
+print "setting reference antenna to: %s" % referenceant
+
 
 # Flag out the contaminated frequencies
 if len(badfreqranges):
@@ -116,23 +156,27 @@ if len(badfreqranges):
         badspw = '0:' + badfreq
         flagdata(vis=visname, mode='manual', spw=badspw)
 
+flagdata(vis=visname, mode='manual',
+            antenna = '20,49', action='apply', flagbackup=True,
+            savepars=False, writeflags=True)
+
 if preflag:
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
 
     flagdata(vis=visname, mode="clip", spw=flagspw, field=fluxfield,
             clipminmax=clipfluxcal, datacolumn="DATA",clipoutside=True,
-            clipzeros=True, extendpols=False, action="apply",flagbackup=True,
+            clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
     flagdata(vis=visname, mode="clip", spw=flagspw, field=secondaryfield,
             clipminmax=clipphasecal, datacolumn="DATA",clipoutside=True,
-            clipzeros=True, extendpols=False, action="apply",flagbackup=True,
+            clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
     flagdata(vis=visname, mode='tfcrop', field=gainfields, spw=flagspw, ntime='scan',
             timecutoff=5.0, freqcutoff=5.0, timefit='line', freqfit='line',
-            extendflags=False, timedevscale=5., freqdevscale=5., extendpols=False,
+            extendflags=False, timedevscale=5., freqdevscale=5., extendpols=True,
             growaround=False, action='apply', flagbackup=True, overwrite=True,
             writeflags=True, datacolumn='DATA')
 
@@ -145,12 +189,12 @@ if preflag:
 
     flagdata(vis=visname, mode="clip", spw=flagspw, field=targetfield,
             clipminmax=cliptarget, datacolumn="DATA",clipoutside=True,
-            clipzeros=True, extendpols=False, action="apply",flagbackup=True,
+            clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
     flagdata(vis=visname, mode='tfcrop', field=targetfield, spw=flagspw, ntime='scan',
             timecutoff=6.0, freqcutoff=6.0, timefit='poly', freqfit='poly',
-            extendflags=False, timedevscale=5., freqdevscale=5., extendpols=False,
+            extendflags=False, timedevscale=5., freqdevscale=5., extendpols=True,
             growaround=False, action='apply', flagbackup=True, overwrite=True,
             writeflags=True, datacolumn='DATA')
 
@@ -166,7 +210,6 @@ if preflag:
 clearcal(visname)
 workdir = os.path.join(os.getcwd(), base)
 workdir = os.path.join(workdir, 'pipeline')
-
 if not os.path.isdir(workdir):
     os.makedirs(workdir)
 
@@ -174,7 +217,7 @@ procdir = os.path.join(workdir, 'processing/')
 if not os.path.isdir(procdir):
     os.makedirs(procdir)
 
-logdir = procdir + 'logs/'
+logdir = os.path.join(procdir, 'logs/')
 if not os.path.isdir(logdir):
     os.makedirs(logdir)
 
@@ -210,7 +253,7 @@ setjy(vis=visname, field = fluxfield, spw = gainspw, scalebychan=True, standard=
 print " starting antenna-based delay (kcorr)\n -> %s" % kcorrfile
 gaincal(vis=visname, caltable = kcorrfile, field = kcorrfield, spw = gainspw,
         refant = referenceant,  minblperant = minbaselines, solnorm = False,  gaintype = 'K',
-        solint = '30min', combine = 'scan', parang = False, append = False)
+        solint = 'inf', combine = '', parang = False, append = False)
 
 print " starting bandpass -> %s" % bpassfile
 bandpass(vis=visname, caltable = bpassfile, field = bpassfield, spw = gainspw,
@@ -221,7 +264,7 @@ bandpass(vis=visname, caltable = bpassfile, field = bpassfield, spw = gainspw,
 print " starting gain calibration\n -> %s" % kcorrfile
 gaincal(vis=visname, caltable = gainfile, field = gainfields, spw = gainspw,
         refant = referenceant,  minblperant = minbaselines, solnorm = False,  gaintype = 'G',
-        solint = 'inf', combine = '', calmode='p',
+        solint = 'inf', combine = '', calmode='ap',
         gaintable=[kcorrfile, bpassfile], gainfield=[kcorrfield, bpassfield],
         parang = False, append = False)
 
@@ -314,7 +357,7 @@ setjy(vis=visname, field = fluxfield, spw = splitspw, scalebychan=True, standard
 print " starting antenna-based delay (kcorr)\n -> %s" % kcorrfile
 gaincal(vis=visname, caltable = kcorrfile, field = kcorrfield, spw = splitspw,
         refant = referenceant,  minblperant = minbaselines, solnorm = False,  gaintype = 'K',
-        solint = '10min', combine = 'scan', parang = False, append = False)
+        solint = '10min', combine = '', parang = False, append = False)
 
 print " starting bandpass -> %s" % bpassfile
 bandpass(vis=visname, caltable = bpassfile, field = bpassfield, spw = splitspw,
@@ -325,9 +368,9 @@ bandpass(vis=visname, caltable = bpassfile, field = bpassfield, spw = splitspw,
 print " starting cross hand delay -> %s" % xdelfile
 gaincal(vis=visname, caltable = xdelfile, field = xdelfield, spw = gainspw,
         refant = referenceant, smodel=[1., 0., 1., 0.], solint = 'inf',
-        minblperant = minbaselines, solnorm = False, gaintype = 'KCROSS', combine
-        = 'scan', calmode = 'ap', gaintable = [kcorrfile, bpassfile],
-        gainfield = [kcorrfield, bpassfield], append = False, parang = False)
+        minblperant = minbaselines, gaintype = 'KCROSS',
+        combine = 'scan', gaintable = [kcorrfile, bpassfile],
+        gainfield = [kcorrfield, bpassfield])
 
 if dopolcal:
     if polnbasis.lower() == 'linear':
@@ -340,15 +383,20 @@ if dopolcal:
         print " starting gaincal -> %s" % gainfile
         gaincal(vis=visname, caltable=gain1file, field=fluxfield, spw = gainspw,
                 refant=referenceant, solint='1min', minblperant=minbaselines, solnorm=False,
-                gaintype='G', calmode='ap', gaintable=[kcorrfile, bpassfile, xdelfile],
+                gaintype='G', gaintable=[kcorrfile, bpassfile, xdelfile],
                 gainfield = [kcorrfield, bpassfield, xdelfield],
                 append=False, parang=True)
 
         gaincal(vis=visname, caltable=gain1file, field=secondaryfield, spw = gainspw,
-                refant=referenceant, solint='1min', minblperant=minbaselines, solnorm=False,
-                gaintype='G', gaintable=[kcorrfile, bpassfile, xdelfile],
+                smodel=[1,0,0,0], refant=referenceant, solint='1min',
+                minblperant=minbaselines, solnorm=False, gaintype='G',
+                gaintable=[kcorrfile, bpassfile, xdelfile],
                 gainfield = [kcorrfield, bpassfield, xdelfield],
                 append=True, parang=True)
+
+        plotcal(caltable=gain1file, xaxis='time', yaxis='amp', poln='X',
+                field=secondaryfield, showgui=False, figfile = outdir+'initialgain.png',
+                markersize=3, plotsymbol='-', fontsize=8)
 
         print "\n Solve for Q, U from initial gain solution"
         GainQU = qufromgain(gain1file)  # implied polarization from instrumental response
@@ -535,6 +583,11 @@ print "Apply calibrations complete: %s" % marktime
 split(vis=visname, outputvis = base+'.' + target + '.ms', datacolumn='corrected',
          field = fields.target, spw = splitspw, keepflags=True, width = specave,
          timebin = timeave)
+
+split(vis=visname, outputvis = base+'.' + phasecal + '.ms', datacolumn='corrected',
+         field = fields.phase, spw = splitspw, keepflags=True, width = specave,
+         timebin = timeave)
+
 marktime = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime() )
 print "pipeline processing of field %s completed" % ms
 process_end = time.time()
