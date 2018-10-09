@@ -30,7 +30,7 @@ def get_field(MS,intent):
     else:
         return -1
 
-def split(MS, MMS, subms, column='data'):
+def split(MS, MMS, subms, column='DATA', freqs=None, chans=None):
 
     partition(vis=MS,outputvis=MMS,createmms=True,numsubms=subms,datacolumn=column)
 
@@ -53,4 +53,3 @@ def bpass(MMS,intent='CALIBRATE_BANDPASS',solint='inf',caltable='bandpass'):
 
     field = str(get_field(MMS,intent))
     bandpass(vis=MMS,field=field,solint=solint,caltable=caltable)
-
