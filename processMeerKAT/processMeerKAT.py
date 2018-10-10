@@ -242,7 +242,8 @@ def default_config(MS,filename,verbose=False):
     os.system(command)
 
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
+def main():
 
     args = parse_args()
     subms = args.nodes*args.ntasks_per_node

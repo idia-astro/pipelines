@@ -39,7 +39,7 @@ def parse_config(filename):
             taskvals[section][option] =\
                             ast.literal_eval(config.get(section, option))
 
-    return taskvals,config
+    return taskvals, config
 
 def overwrite_config(filename,additional_dict={},additional_sec=''):
 
@@ -56,7 +56,8 @@ def overwrite_config(filename,additional_dict={},additional_sec=''):
         config_file.close()
 
     else:
-        print '{0} section exists in {1}. Will not overwrite.'.format(additional_sec,filename)
+        print '{0} section exists in {1}. Will not overwrite.'.format(
+                                                    additional_sec,filename)
 
 
 if __name__ == '__main__':

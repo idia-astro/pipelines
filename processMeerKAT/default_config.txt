@@ -1,3 +1,12 @@
+[crosscal]
+minbaselines = 4
+preflag = True
+specave = 2
+timeave = '8s'
+spw = '0:860~1700MHz'
+calcrefant = True
+
+
 [flagdata]
 mode  = 'tfcrop'
 ntime = 'scan'
