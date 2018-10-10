@@ -11,12 +11,13 @@ CPUS_PER_NODE_LIMIT = 64
 MEM_PER_NODE_GB_LIMIT = 512
 
 THIS_PROG = sys.argv[0]
+SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
 PLOT_DIR = 'plots'
+CONFIG = 'default_config.ini'
 
 threadsafe_tasks = ['flagdata', 'setjy', 'applycal', 'hanningsmooth', 'cvel2', 'uvcontsub',
                     'mstransform', 'partition', 'split', 'tclean']
-
 
 def parse_args():
 
@@ -24,42 +25,65 @@ def parse_args():
 
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Processes MeerKAT data via CASA measurement set.')
 
-    parser.add_argument("-N","--nodes",metavar="num",required=False, type=int, default=4, help="Use this number of nodes [default: 4; max: {0}].".format(TOTAL_NODES_LIMIT))
-    parser.add_argument("-t","--ntasks-per-node",metavar="num",required=False, type=int, default=16, help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-C","--cpus-per-task",metavar="num",required=False, type=int, default=4, help="Use this number of CPUs (per task) [default: 4; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
-    parser.add_argument("-m","--mem-per-cpu",metavar="num",required=False, type=int, default=4096, help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
-    parser.add_argument("-p","--plane",metavar="num",required=False, type=int, default=4, help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
-    parser.add_argument("-n","--nosubmit",action="store_true",required=False, default=False, help="Don't submit jobs to SLURM queue [default: False].")
-    parser.add_argument("-v","--verbose",action="store_true",required=False, default=False, help="Verbose output? [default: False].")
-    parser.add_argument("-M","--MS",metavar="path",required=True, type=str, help="Path to measurement set.")
+    parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
+    parser.add_argument("--config",metavar="path", required=False, type=str, help="Path to config file.")
+    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=4, help="Use this number of nodes [default: 4; max: {0}].".format(TOTAL_NODES_LIMIT))
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=16, help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=4, help="Use this number of CPUs (per task) [default: 4; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
+    parser.add_argument("-m","--mem-per-cpu", metavar="num", required=False, type=int, default=4096, help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
+    parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4, help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
+    parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
+
+    parser.add_argument("-n","--nosubmit", action="store_true", required=False, default=False, help="Don't submit jobs to SLURM queue [default: False].")
+    parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
+
+    #add mutually exclusive group - don't want to build config, and run pipeline at same time
+    run_args = parser.add_mutually_exclusive_group(required=True)
+    run_args.add_argument("-B","--build", action="store_true", required=False, default=False, help="Build default config file using input MS.")
+    run_args.add_argument("-R","--run", action="store_true", required=False, default=False, help="Run pipeline with input config file.")
 
     args, unknown = parser.parse_known_args()
 
-    #TODO FIX THIS
-    # if len(unknown) > 0:
-    #     #remove arguments stored from calling this program from casa
-    #     if '-c' in unknown:
-    #         unknown.remove('-c')
-    #         unknown.remove(parser.prog)
-    #     if len(unknown) > 0:
-    #         parser.error('Unknown input argument(s) present - {0}'.format(unknown))
+    if len(unknown) > 0:
+        parser.error('Unknown input argument(s) present - {0}'.format(unknown))
 
-    if not os.path.isdir(args.MS):
-        parser.error("Input MS '{0}' not found.".format(args.MS))
+    if args.build:
+        if args.MS is None:
+            parser.error("You must input an MS [-M --MS] to build the config file.")
+        if not os.path.isdir(args.MS):
+            parser.error("Input MS '{0}' not found.".format(args.MS))
 
-    if args.ntasks-per-node > NTASKS_PER_NODE_LIMIT:
+    if args.run:
+        if args.config is None:
+            parser.error("You must input a config file [--config] to run the pipeline.")
+        if not os.path.exists(args.config):
+            parser.error("Input config file '{0}' not found.".format(args.run))
+
+    if args.ntasks_per_node > NTASKS_PER_NODE_LIMIT:
         parser.error("The number of tasks [-t --ntasks-per-node] per node must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.ntasks-per-node))
 
-    if args.nodes > TOTAL_NODES:
+    if args.nodes > TOTAL_NODES_LIMIT:
         parser.error("The number of nodes [-n --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args.nodes))
 
-    if args.cpus-per-task * args.ntasks-per-node > CPUS_PER_NODE_LIMIT:
-        parser.error("The number of cpus per node [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(CPUS_PER_NODE_LIMIT,args.tasks))
+    if args.cpus_per_task * args.ntasks_per_node > CPUS_PER_NODE_LIMIT:
+        parser.error("The number of cpus per node [-t --ntasks-per-node] * [-c --cpus-per-task] must not exceed {0}. You input {1}.".format(CPUS_PER_NODE_LIMIT,args.ntasks_per_node))
 
-    if args.mem-per-cpu * args.cpus-per-task * args.ntasks-per-node > 512 * 1024:
-        parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.tasks))
+    if args.mem_per_cpu * args.cpus_per_task * args.ntasks_per_node > 512 * 1024:
+        parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.ntasks_per_node))
 
     return args
+
+def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
+                container="/users/frank/casameer.simg",casa_task=True):
+
+    params = locals()
+    params['SCRIPT_DIR'] = SCRIPT_DIR
+    if casa_task:
+        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c"""
+    else:
+        params['casa_call'] = ''
+
+    return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {SCRIPT_DIR}/{script} {args}".format(**params)
 
 def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,name="job",plane=1,
                 mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
@@ -116,10 +140,7 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
-    if casa_task:
-        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c"""
-    else:
-        params['casa_call'] = ''
+    params['command'] = write_command(**params)
 
     contents = """#!/bin/bash
     #SBATCH --time={time}
@@ -130,7 +151,7 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
     #SBATCH -o {LOG_DIR}/{name}-%j.out
     #SBATCH -e {LOG_DIR}/{name}-%j.err
 
-    {mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} -r {name} {args}"""
+    {command}"""
     #--nologfile --log2term 2> {LOG_DIR}/{name}-{job}.stderr 1> {LOG_DIR}/{name}-{job}.stdout
 
     #insert arguments and remove whitespace
@@ -172,7 +193,8 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
     step += 1
     return jobIDs,step
 
-def calibrate_data(MS, basename, nodes=2, tasks=8, noSubmit=False, verbose=False):
+
+def write_jobs(MS, nodes=2, tasks=8, noSubmit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -180,8 +202,6 @@ def calibrate_data(MS, basename, nodes=2, tasks=8, noSubmit=False, verbose=False
     ----------
     MS : str
         Path to measurement set.
-    basename : str
-        Basename of output files.
     nodes : int
         The number of nodes to use for all thread-safe CASA tasks.
     tasks : int
@@ -191,75 +211,44 @@ def calibrate_data(MS, basename, nodes=2, tasks=8, noSubmit=False, verbose=False
     verbose : bool
         Verbose output?"""
 
-    #count steps for unique sbatch file names
-    step = 0
     jobIDs = []
 
-    #create names for output data
-    MMS = '{0}.mms'.format(basename)
-    BPtable = '{0}.b0'.format(basename)
-    Gtable = '{0}.g0'.format(basename)
+    print "RUNNING PIPELINE BRAH!"
 
-    #create directory for plots if doesn't exist yet
-    if not os.path.exists(PLOT_DIR):
-        os.mkdir(PLOT_DIR)
+    #TODO: Create sbatch files pointing to Krishna's scripts here
+    # #create directory for logs and plots if doesn't exist yet
+    # for dir in [LOG_DIR,PLOT_DIR]:
+    #     if not os.path.exists(DIR):
+    #         os.mkdir(DIR)
+    #
+    # #partition the data
+    # jobIDs = write_sbatch(THIS_PROG,args,step,time="00:10:00",nodes=nodes,tasks_per_node=tasks,name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    #
+    # #flag the data
+    # jobIDs = write_sbatch(THIS_PROG,args,step,time="00:30:00",nodes=nodes,tasks_per_node=tasks,name="inital_flag",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
-    #partition the data
-    args = '-M {0} -T {1}'.format(MS,MMS)
-    jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:10:00",nodes=nodes,tasks_per_node=tasks,name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
-    #point to bandpass calibrator for following steps
-    intent = 'CALIBRATE_BANDPASS'
-    args = '-i {0} -M {1}'.format(intent,MMS)
+def default_config(MS,filename,verbose=False):
 
-    #flag the data
-    jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:30:00",nodes=nodes,tasks_per_node=tasks,name="flag",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    """Generate default config file in current directory, pointing to MS."""
 
-    #set absolute flux scale
-    jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:20:00",nodes=nodes,tasks_per_node=tasks,name="setjy",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    os.system('cp {0}/{1} .'.format(SCRIPT_DIR,filename))
+    args =  '-R -M {0} --config {1}'.format(MS,filename)
 
-    #solve for bandpass
-    jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:10:00",nodes=1,tasks_per_node=1,name="bandpass",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
-
-    #plot bandpass model
-    # container = '/data/exp_soft/containers/kern-2.img'
-    # args = '-f fastplot_amp.png -x Chan -y Amp -C CPARAM -T {0}'.format(BPtable)
-    # jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:01:00",nodes=1,tasks_per_node=1,name="fastplot",mpi_wrapper='srun',container=container,jobIDs=jobIDs,casa_task=False,noSubmit=noSubmit,verbose=verbose)
-
-    #plot bandpass model
-    # args = '-f fastplot_phase.png -x Chan -y Phase -C CPARAM -T {0}'.format(BPtable)
-    # jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:01:00",nodes=1,tasks_per_node=1,name="fastplot",mpi_wrapper='srun',container=container,jobIDs=jobIDs,casa_task=False,noSubmit=noSubmit,verbose=verbose)
-
-    #flag the data
-    args = '-i {0} -m {1} -M {2}'.format(intent,'rflag',MMS)
-    jobIDs,step = write_sbatch(THIS_PROG,args,step,time="00:30:00",nodes=nodes,tasks_per_node=tasks,name="flag",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    #write and submit command
+    command = write_command('get_fields.py', args, mpi_wrapper="srun", container="/users/frank/casameer.simg")
+    if verbose:
+        print command
+    os.system(command)
 
 
 if __name__ == "__main__":
 
     args = parse_args()
-    subms = args.nodes*args.tasks
-    task = args.run.lower()
-    if args.MS is not None:
-        basename = os.path.splitext(os.path.basename(args.MS))[0]
-    else:
-        basename = os.path.splitext(os.path.basename(args.table))[0]
+    subms = args.nodes*args.ntasks_per_node
 
-    if task == 'script':
-        calibrate_data(args.MS, basename, args.nodes, args.tasks, args.nosubmit, args.verbose)
-    elif task == 'partition':
-        casa_functions.split(args.MS, args.table, subms, args.column)
-    elif task == 'flag':
-        casa_functions.flag(args.MS,args.intent,mode=args.flagmode,corr=args.corr)
-    elif task == 'plotms':
-        casa_functions.plot(args.MS,intent=args.intent,fname=args.fname)
-    elif task == 'fastplot':
-        import fastplot
-        table = args.MS if args.table is None else args.table
-        fastplot.msvis(table, col=args.column, field=args.field, xaxis=args.xaxis, yaxis=args.yaxis, extent=args.extent, logy=args.logy, fname='{0}/{1}_{2}'.format(PLOT_DIR,basename,args.fname))
-    elif task == 'setjy':
-        casa_functions.boot(args.MS, intent=args.intent)
-    elif task == 'bandpass':
-        casa_functions.bpass(args.MS,intent=args.intent,caltable=args.table)
-
+    if args.build:
+        default_config(args.MS,CONFIG,args.verbose)
+    elif args.run:
+        write_jobs(args.MS, nodes=args.nodes, tasks=args.ntasks_per_node, noSubmit=args.nosubmit, verbose=args.verbose)
 

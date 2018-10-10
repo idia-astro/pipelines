@@ -37,7 +37,7 @@ def get_fields(MS):
     fieldIDs = {}
 
     for i,intent in enumerate(intents):
-        fieldIDs[fields[i]] = msmd.fieldsforintent(intent).tolist()
+        fieldIDs[fields[i]] = msmd.fieldsforintent(intent)[0]
 
     return fieldIDs
 
@@ -45,8 +45,7 @@ def get_fields(MS):
 if __name__ == "__main__":
 
     args = processMeerKAT.parse_args()
-    # clearcal(args.MS)
-    # flagmanager(vis=args.MS, mode='save', versionname='orig', comment='original flags', merge='replace')
     fields = get_fields(args.MS)
-    config_parser.overwrite_config('default_config.ini',additional_dict=fields,additional_sec='fields')
+    config_parser.overwrite_config(args.config,additional_dict=fields,additional_sec='fields')
+    config_parser.overwrite_config(args.config,additional_dict={'vis' : "'{0}'".format(args.MS)},additional_sec='data')
 

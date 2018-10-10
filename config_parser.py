@@ -51,8 +51,9 @@ def overwrite_config(filename,additional_dict={},additional_sec=''):
         for key in additional_dict.keys():
             config.set(additional_sec, key, str(additional_dict[key]))
 
-            config_file = open(filename, 'w')
-            config.write(config_file)
+        config_file = open(filename, 'w')
+        config.write(config_file)
+        config_file.close()
 
     else:
         print '{0} section exists in {1}. Will not overwrite.'.format(additional_sec,filename)
