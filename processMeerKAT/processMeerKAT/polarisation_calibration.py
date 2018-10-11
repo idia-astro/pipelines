@@ -575,31 +575,18 @@ def crosscal(visname, sources, **kwargs):
 
     clearcal(visname)
 
-    #if preflag:
-    #    do_pre_flag(visname, spw, fields)
+    if preflag:
+        do_pre_flag(visname, spw, fields)
 
-    #do_parallel_cal(visname, spw, fields, calfiles, referenceant, minbaselines)
+    do_parallel_cal(visname, spw, fields, calfiles, referenceant, minbaselines)
 
-    #if preflag:
-    #    do_pre_flag2(visname, spw, fields)
+    if preflag:
+        do_pre_flag2(visname, spw, fields)
 
     do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
             minbaselines, do_clearcal=True)
 
     split_vis(visname, fields, specave, timeave)
-
-    marktime = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime() )
-    print "pipeline processing of field %s completed" % ms
-    process_end = time.time()
-    duration = (process_end - process_start)/3600.0
-    print "Run time: %7.2f hours" % duration
-
-    marktime = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
-    print "\n Pipeline processing completed at %s" % marktime
-
-    process_end = time.time()
-    duration = (process_end - process_start)/3600.0
-    print " Total run time: %6.2f hours" % duration
 
     print "\n Cleaning up."
     for filename in os.listdir(workdir):

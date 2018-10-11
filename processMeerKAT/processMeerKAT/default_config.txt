@@ -1,0 +1,11 @@
+[crosscal]
+minbaselines = 4        # Minimum number of baseline while calibrating
+specave = 2             # Number of chans to avg after calibration
+timeave = '8s'          # Time interval to avg after calibration
+spw = '0:860~1700MHz'   # spw to use for calibration
+calcrefant = False      # Not implemented yet
+refant = 'm005'         # Reference antenna name/number
+
+do_flag = True          # Run the flagging recipes
+do_parallel_cal = True  # Run parallel hand calibration recipe
+do_cross_cal = True     # Run full stokes calibration recipe

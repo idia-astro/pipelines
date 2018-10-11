@@ -9,6 +9,6 @@ setup (
         include_dirs=numpy.get_include(),
         entry_points="""
         [console_scripts]
-        processmeer=processMeerKAT:main
+        processmeer=processMeerKAT.processMeerKAT:main
         """,
 )

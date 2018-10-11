@@ -8,9 +8,8 @@ def parse_args():
     """
     Parse the command line arguments
     """
-    parser = argparse.ArgumentParser(
-        description='Dummy program to parse a config file using the ConfigParser class.')
-    parser.add_argument('config', help='Name of the input config file')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', required=True, help='Name of the input config file')
 
     args, __ = parser.parse_known_args()
 
