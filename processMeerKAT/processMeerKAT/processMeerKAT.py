@@ -14,7 +14,8 @@ THIS_PROG = sys.argv[0]
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
 PLOT_DIR = 'plots'
-CONFIG = 'default_config.ini'
+CONFIG = 'default_config.txt'
+CALIBR_SCRIPTS_DIR = 'cal_scripts'
 
 threadsafe_tasks = ['flagdata', 'setjy', 'applycal', 'hanningsmooth', 'cvel2', 'uvcontsub',
                     'mstransform', 'partition', 'split', 'tclean']
@@ -71,21 +72,23 @@ def parse_args():
     if args.mem_per_cpu * args.cpus_per_task * args.ntasks_per_node > 512 * 1024:
         parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.ntasks_per_node))
 
-    return args
+    return args,vars(args)
 
 def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
                 container="/users/frank/casameer.simg",casa_task=True):
 
     params = locals()
     params['SCRIPT_DIR'] = SCRIPT_DIR
+    params['CALIBR_SCRIPTS_DIR'] = CALIBR_SCRIPTS_DIR
+
     if casa_task:
         params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c"""
     else:
         params['casa_call'] = ''
 
-    return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {SCRIPT_DIR}/{script} {args}".format(**params)
+    return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {SCRIPT_DIR}/{CALIBR_SCRIPTS_DIR}/{script} {args}".format(**params)
 
-def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,name="job",plane=1,
+def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,name="job",plane=1,
                 mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
                 container="/users/frank/casameer.simg",jobIDs=[],casa_task=True,noSubmit=False,verbose=False):
 
@@ -97,8 +100,6 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
         Path to script that is called within sbatch file.
     args : str
         Arguments passed into script that is called within sbatch file.
-    step : int
-        The step within the overall set of sbatch jobs submitted to the SLURM queue.
     time : str
         Time limit on this job.
     nodes : str
@@ -129,9 +130,7 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
     Returns:
     --------
     jobIDs : list
-        Input job IDs with this job ID appended if noSubmit is False.
-    step : int
-        Input step + 1."""
+        Input job IDs with this job ID appended if noSubmit is False."""
 
     if not os.path.exists(LOG_DIR):
         os.mkdir(LOG_DIR)
@@ -140,12 +139,14 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
-    params['command'] = write_command(**params)
+    params['command'] = write_command(script,args,mpi_wrapper,container,casa_task)
 
     contents = """#!/bin/bash
     #SBATCH --time={time}
     #SBATCH -N {nodes}
     #SBATCH --ntasks-per-node={tasks}
+    #SBATCH -c={cpus}
+    #SBATCH --mem-per-cpu={mem}
     #SBATCH -J {name}
     #SBATCH -m plane={plane}
     #SBATCH -o {LOG_DIR}/{name}-%j.out
@@ -158,7 +159,7 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
     contents = contents.format(**params).replace("    ","")
 
     #write sbatch file
-    sbatch = '{0}_{1}.sbatch'.format(name,step)
+    sbatch = '{0}.sbatch'.format(name)
     config = open(sbatch,'w')
     config.write(contents)
     config.close()
@@ -190,11 +191,10 @@ def write_sbatch(script,args,step,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=40
         jobID = int(output.split(' ')[-1])
         jobIDs.append(jobID)
 
-    step += 1
-    return jobIDs,step
+    return jobIDs
 
 
-def write_jobs(MS, nodes=2, tasks=8, noSubmit=False, verbose=False):
+def write_jobs(MS, nodes=4, tasks=16, cpus=4, mem=4096, noSubmit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -213,19 +213,31 @@ def write_jobs(MS, nodes=2, tasks=8, noSubmit=False, verbose=False):
 
     jobIDs = []
 
-    print "RUNNING PIPELINE BRAH!"
-
-    #TODO: Create sbatch files pointing to Krishna's scripts here
-    # #create directory for logs and plots if doesn't exist yet
+    #create directory for logs and plots if doesn't exist yet
     # for dir in [LOG_DIR,PLOT_DIR]:
     #     if not os.path.exists(DIR):
     #         os.mkdir(DIR)
-    #
-    # #partition the data
-    # jobIDs = write_sbatch(THIS_PROG,args,step,time="00:10:00",nodes=nodes,tasks_per_node=tasks,name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
-    #
-    # #flag the data
-    # jobIDs = write_sbatch(THIS_PROG,args,step,time="00:30:00",nodes=nodes,tasks_per_node=tasks,name="inital_flag",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #partition the data
+    jobIDs = write_sbatch('partition.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #pre-flag the data
+    jobIDs = write_sbatch('flag_round_1.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_1",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #solve for parallel-hand calibration
+    jobIDs = write_sbatch('parallel_cal.py','',time="01:00:00",nodes=1,tasks=1, cpus=1, mem=8192, name="parallel_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #apply parallel-hand calibration
+    jobIDs = write_sbatch('parallel_cal_apply.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="parallel_cal_apply",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #flag the data
+    jobIDs = write_sbatch('flag_round_2.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_2",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #solve for and apply cross-hand calibration
+    jobIDs = write_sbatch('cross_cal.py','',time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="cross_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+
+    #split the target
+    jobIDs = write_sbatch('split.py','',time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="split",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
 
 def default_config(MS,filename,verbose=False):
@@ -242,14 +254,14 @@ def default_config(MS,filename,verbose=False):
     os.system(command)
 
 
-#if __name__ == "__main__":
 def main():
 
-    args = parse_args()
-    subms = args.nodes*args.ntasks_per_node
+    args,arg_dict = parse_args()
 
     if args.build:
         default_config(args.MS,CONFIG,args.verbose)
     elif args.run:
         write_jobs(args.MS, nodes=args.nodes, tasks=args.ntasks_per_node, noSubmit=args.nosubmit, verbose=args.verbose)
 
+if __name__ == "__main__":
+    main()
