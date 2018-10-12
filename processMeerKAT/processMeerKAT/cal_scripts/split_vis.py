@@ -5,11 +5,11 @@ def split_vis(visname, fields, specave, timeave):
     outputbase = visname.strip('.ms')
     split(vis=visname, outputvis = outputbase+'.'+fields.targetfield+'.ms',
             datacolumn='corrected', field = fields.targetfield, spw = spw,
-            keepflags=True, width = specave, timebin = timeave)
+            keepflags=True, keepmms = True, width = specave, timebin = timeave)
 
     split(vis=visname, outputvis = outputbase+'.'+fields.secondaryfield+'.ms',
             datacolumn='corrected', field = fields.secondaryfield, spw = spw,
-            keepflags=True, width = specave, timebin = timeave)
+            keepflags=True, keepmms = True, width = specave, timebin = timeave)
 
 if __name__ == '__main__':
     # Get the name of the config file
@@ -19,6 +19,8 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['--config'])
 
     visname = taskvals['data']['vis']
+    visname = visname.replace('.ms', '.mms')
+
     calfiles = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 

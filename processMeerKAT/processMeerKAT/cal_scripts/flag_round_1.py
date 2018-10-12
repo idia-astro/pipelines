@@ -62,6 +62,8 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['--config'])
 
     visname = taskvals['data']['vis']
+    visname = visname.replace('.ms', '.mms')
+
     calfiles = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
