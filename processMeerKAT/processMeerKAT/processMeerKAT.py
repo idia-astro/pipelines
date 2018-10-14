@@ -8,7 +8,7 @@ import casa_functions
 TOTAL_NODES_LIMIT = 7
 NTASKS_PER_NODE_LIMIT = 28
 CPUS_PER_NODE_LIMIT = 64
-MEM_PER_NODE_GB_LIMIT = 512
+MEM_PER_NODE_GB_LIMIT = 230
 
 THIS_PROG = sys.argv[0]
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
@@ -29,8 +29,8 @@ def parse_args():
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("--config",metavar="path", required=False, type=str, help="Path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=4, help="Use this number of nodes [default: 4; max: {0}].".format(TOTAL_NODES_LIMIT))
-    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=16, help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=4, help="Use this number of CPUs (per task) [default: 4; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8, help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=3, help="Use this number of CPUs (per task) [default: 3; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
     parser.add_argument("-m","--mem-per-cpu", metavar="num", required=False, type=int, default=4096, help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4, help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
@@ -67,10 +67,10 @@ def parse_args():
         parser.error("The number of nodes [-n --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args.nodes))
 
     if args.cpus_per_task * args.ntasks_per_node > CPUS_PER_NODE_LIMIT:
-        parser.error("The number of cpus per node [-t --ntasks-per-node] * [-c --cpus-per-task] must not exceed {0}. You input {1}.".format(CPUS_PER_NODE_LIMIT,args.ntasks_per_node))
+        parser.error("The number of cpus per node [-t --ntasks-per-node] * [-c --cpus-per-task] must not exceed {0}. You input {1}.".format(CPUS_PER_NODE_LIMIT,args.cpus_per_node))
 
-    if args.mem_per_cpu * args.cpus_per_task * args.ntasks_per_node > 512 * 1024:
-        parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.ntasks_per_node))
+    if args.mem_per_cpu * args.cpus_per_task * args.ntasks_per_node > MEM_PER_NODE_GB_LIMIT * 1024:
+        parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args.mem_per_cpu))
 
     return args,vars(args)
 
@@ -80,9 +80,11 @@ def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-p
     params = locals()
     params['SCRIPT_DIR'] = SCRIPT_DIR
     params['CALIBR_SCRIPTS_DIR'] = CALIBR_SCRIPTS_DIR
+    params['LOG_DIR'] = LOG_DIR
+    params['job'] = '${SLURM_JOB_ID}'
 
     if casa_task:
-        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c"""
+        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c""".format(**params)
     else:
         params['casa_call'] = ''
 
@@ -145,7 +147,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     #SBATCH --time={time}
     #SBATCH -N {nodes}
     #SBATCH --ntasks-per-node={tasks}
-    #SBATCH -c={cpus}
+    #SBATCH -c {cpus}
     #SBATCH --mem-per-cpu={mem}
     #SBATCH -J {name}
     #SBATCH -m plane={plane}
@@ -194,7 +196,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     return jobIDs
 
 
-def write_jobs(MS, nodes=4, tasks=16, cpus=4, mem=4096, noSubmit=False, verbose=False):
+def write_jobs(MS, config, nodes=4, tasks=16, cpus=4, mem=4096, noSubmit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -219,25 +221,25 @@ def write_jobs(MS, nodes=4, tasks=16, cpus=4, mem=4096, noSubmit=False, verbose=
     #         os.mkdir(DIR)
 
     #partition the data
-    jobIDs = write_sbatch('partition.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('partition.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
     #pre-flag the data
-    jobIDs = write_sbatch('flag_round_1.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_1",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('flag_round_1.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_1",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
     #solve for parallel-hand calibration
-    jobIDs = write_sbatch('parallel_cal.py','',time="01:00:00",nodes=1,tasks=1, cpus=1, mem=8192, name="parallel_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('parallel_cal.py','--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1, cpus=1, mem=8192, name="parallel_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
     #apply parallel-hand calibration
-    jobIDs = write_sbatch('parallel_cal_apply.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="parallel_cal_apply",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('parallel_cal_apply.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="parallel_cal_apply",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
     #flag the data
-    jobIDs = write_sbatch('flag_round_2.py','',time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_2",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('flag_round_2.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_2",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
     #solve for and apply cross-hand calibration
-    jobIDs = write_sbatch('cross_cal.py','',time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="cross_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('cross_cal.py','--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="cross_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
     #split the target
-    jobIDs = write_sbatch('split.py','',time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="split",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    jobIDs = write_sbatch('split.py','--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="split",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
 
 
 def default_config(MS,filename,verbose=False):
@@ -261,7 +263,7 @@ def main():
     if args.build:
         default_config(args.MS,CONFIG,args.verbose)
     elif args.run:
-        write_jobs(args.MS, nodes=args.nodes, tasks=args.ntasks_per_node, noSubmit=args.nosubmit, verbose=args.verbose)
+        write_jobs(args.MS, args.config, nodes=args.nodes, tasks=args.ntasks_per_node, noSubmit=args.nosubmit, verbose=args.verbose)
 
 if __name__ == "__main__":
     main()

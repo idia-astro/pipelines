@@ -1,7 +1,10 @@
-from processMeerKAT import config_parser, get_field_ids
-from processMeerKAT.cal_scripts import bookkeeping
+import sys
 
-def do_apply_cal_parhand(visname, spw, fields, calfiles):
+sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT')
+import config_parser
+from cal_scripts import bookkeeping
+
+def do_parallel_cal_apply(visname, spw, fields, calfiles):
     print " applying calibration -> primary calibrator"
     applycal(vis=visname, field=fields.fluxfield, spw = spw, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
@@ -27,7 +30,7 @@ if __name__ == '__main__':
     args = config_parser.parse_args()
 
     # Parse config file
-    taskvals, config = config_parser.parse_config(args['--config'])
+    taskvals, config = config_parser.parse_config(args['config'])
 
     visname = taskvals['data']['vis']
     visname = visname.replace('.ms', '.mms')

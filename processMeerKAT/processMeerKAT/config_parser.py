@@ -13,7 +13,7 @@ def parse_args():
 
     args, __ = parser.parse_known_args()
 
-    return args
+    return vars(args)
 
 
 def parse_config(filename):

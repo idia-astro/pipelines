@@ -1,5 +1,9 @@
-from processMeerKAT import config_parser, get_field_ids
-from processMeerKAT.cal_scripts import bookkeeping
+import sys
+
+sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT')
+
+import config_parser
+from cal_scripts import bookkeeping
 
 def do_pre_flag(visname, spw, fields):
     clipfluxcal   = [0., 50.]
@@ -59,7 +63,7 @@ if __name__ == '__main__':
     args = config_parser.parse_args()
 
     # Parse config file
-    taskvals, config = config_parser.parse_config(args['--config'])
+    taskvals, config = config_parser.parse_config(args['config'])
 
     visname = taskvals['data']['vis']
     visname = visname.replace('.ms', '.mms')

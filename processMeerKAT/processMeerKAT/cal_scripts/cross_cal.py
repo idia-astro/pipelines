@@ -1,5 +1,10 @@
-from processMeerKAT import config_parser, get_field_ids
-from processMeerKAT.cal_scripts import bookkeeping
+import sys
+
+sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT')
+
+import config_parser
+from cal_scripts import bookkeeping
+from recipes.almapolhelpers import *
 
 def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
         minbaselines, do_clearcal=False):
@@ -179,17 +184,17 @@ if __name__ == '__main__':
     args = config_parser.parse_args()
 
     # Parse config file
-    taskvals, config = config_parser.parse_config(args['--config'])
+    taskvals, config = config_parser.parse_config(args['config'])
 
     visname = taskvals['data']['vis']
     visname = visname.replace('.ms', '.mms')
 
-    calfiles = bookkeeping.bookkeeping(visname)
+    calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     spw = taskvals['crosscal'].pop('spw', '')
     refant = taskvals['crosscal'].pop('referenceant', 'm005')
     minbaselines = taskvals['crosscal'].pop('minbaselines', 4)
 
-    do_cross_cal(visname, spw, fields, calfiles, refant,
+    do_cross_cal(visname, spw, fields, calfiles, refant, caldir,
             minbaselines, do_clearcal=True)

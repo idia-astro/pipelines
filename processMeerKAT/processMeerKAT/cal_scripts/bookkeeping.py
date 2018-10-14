@@ -1,4 +1,9 @@
-from processMeerKAT import config_parser
+import sys
+
+sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT/')
+import config_parser
+from collections import namedtuple
+import os
 
 def get_calfiles(visname, caldir):
         base = visname.replace('.ms', '')
@@ -32,9 +37,12 @@ def bookkeeping(visname):
         os.makedirs(logdir)
 
     caldir = os.path.join(procdir, 'calib_out/')
+    if not os.path.isdir(caldir):
+        os.makedirs(caldir)
+
     calfiles = get_calfiles(visname, caldir)
 
-    return calfiles
+    return calfiles, caldir
 
 
 def get_field_ids(fields):
@@ -58,6 +66,7 @@ def get_field_ids(fields):
     FieldIDs = namedtuple('FieldIDs', ['targetfield', 'fluxfield',
                     'bpassfield', 'secondaryfield', 'kcorrfield', 'xdelfield',
                     'dpolfield', 'xpolfield', 'gainfields'])
+
 
     return FieldIDs(targetfield, fluxfield, bpassfield, secondaryfield,
             kcorrfield, xdelfield, dpolfield, xpolfield, gainfields)
