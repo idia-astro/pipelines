@@ -4,8 +4,6 @@ Runs partition on the input MS
 """
 import sys
 
-sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT')
-
 #from processMeerKAT import config_parser
 import config_parser
 

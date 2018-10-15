@@ -1,6 +1,5 @@
 import sys
 
-sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT/')
 import config_parser
 from collections import namedtuple
 import os

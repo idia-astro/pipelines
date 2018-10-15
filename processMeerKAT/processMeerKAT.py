@@ -3,7 +3,7 @@
 import argparse
 import os
 import sys
-import casa_functions
+import config_parser
 
 TOTAL_NODES_LIMIT = 7
 NTASKS_PER_NODE_LIMIT = 28
@@ -16,9 +16,9 @@ LOG_DIR = 'logs'
 PLOT_DIR = 'plots'
 CONFIG = 'default_config.txt'
 CALIBR_SCRIPTS_DIR = 'cal_scripts'
+SCRIPTS = ['partition.py','flag_round_1.py','parallel_cal.py','flag_round_2.py','cross_cal.py','split.py']
+THREADSAFE = [True, True, False, True, False, True]
 
-threadsafe_tasks = ['flagdata', 'setjy', 'applycal', 'hanningsmooth', 'cvel2', 'uvcontsub',
-                    'mstransform', 'partition', 'split', 'tclean']
 
 def parse_args():
 
@@ -27,12 +27,14 @@ def parse_args():
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Processes MeerKAT data via CASA measurement set.')
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
-    parser.add_argument("--config",metavar="path", required=False, type=str, help="Path to config file.")
+    parser.add_argument("--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=4, help="Use this number of nodes [default: 4; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8, help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
     parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=3, help="Use this number of CPUs (per task) [default: 3; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
     parser.add_argument("-m","--mem-per-cpu", metavar="num", required=False, type=int, default=4096, help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4, help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
+    parser.add_argument("-s","--scripts", metavar="list", required=False, type=list, default=SCRIPTS, help="Run pipeline with these scripts, in this order.")
+    parser.add_argument("-T","--threadsafe", metavar="list", required=False, type=list, default=THREADSAFE, help="Parallel list of [-s --scripts], specifying whether is script is threadsafe.")
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
 
     parser.add_argument("-n","--nosubmit", action="store_true", required=False, default=False, help="Don't submit jobs to SLURM queue [default: False].")
@@ -58,7 +60,7 @@ def parse_args():
         if args.config is None:
             parser.error("You must input a config file [--config] to run the pipeline.")
         if not os.path.exists(args.config):
-            parser.error("Input config file '{0}' not found.".format(args.run))
+            parser.error("Input config file '{0}' not found.".format(args.config))
 
     if args.ntasks_per_node > NTASKS_PER_NODE_LIMIT:
         parser.error("The number of tasks [-t --ntasks-per-node] per node must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.ntasks-per-node))
@@ -72,27 +74,33 @@ def parse_args():
     if args.mem_per_cpu * args.cpus_per_task * args.ntasks_per_node > MEM_PER_NODE_GB_LIMIT * 1024:
         parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args.mem_per_cpu))
 
+    if len(args.scripts) != len(args.threadsafe):
+        parser.error("The list of scripts [-s --scripts] and threadsafe list [-T --threadsafe] must be the same length. You input lists of length {0} and {1}, respectively".format(len(args.scripts),len(args.threadsafe)))
+
     return args,vars(args)
 
 def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
                 container="/users/frank/casameer.simg",casa_task=True):
 
     params = locals()
-    params['SCRIPT_DIR'] = SCRIPT_DIR
-    params['CALIBR_SCRIPTS_DIR'] = CALIBR_SCRIPTS_DIR
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
+
+    #if script path doesn't exist and it's not in user's path, assume it's in the calibration directory
+    if not os.path.exists(script) and script not in os.environ['PATH']:
+        params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIBR_SCRIPTS_DIR,script)
 
     if casa_task:
         params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c""".format(**params)
     else:
         params['casa_call'] = ''
 
-    return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {SCRIPT_DIR}/{CALIBR_SCRIPTS_DIR}/{script} {args}".format(**params)
+    return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
+
 
 def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,name="job",plane=1,
                 mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
-                container="/users/frank/casameer.simg",jobIDs=[],casa_task=True,noSubmit=False,verbose=False):
+                container="/users/frank/casameer.simg",jobIDs=[],casa_task=True,verbose=False):
 
     """Write a SLURM sbatch file calling a certain script with a particular configuration.
 
@@ -124,15 +132,8 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
         List of job IDs for SLURM jobs needing to finish before this one is run.
     casa_task : bool
         Is the script that is called within this job a CASA task?
-    noSubmit : bool
-        Don't submit the sbatch job to the SLURM queue, only write the file.
     verbose : bool
-        Verbose output?
-
-    Returns:
-    --------
-    jobIDs : list
-        Input job IDs with this job ID appended if noSubmit is False."""
+        Verbose output?"""
 
     if not os.path.exists(LOG_DIR):
         os.mkdir(LOG_DIR)
@@ -155,7 +156,6 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     #SBATCH -e {LOG_DIR}/{name}-%j.err
 
     {command}"""
-    #--nologfile --log2term 2> {LOG_DIR}/{name}-{job}.stderr 1> {LOG_DIR}/{name}-{job}.stdout
 
     #insert arguments and remove whitespace
     contents = contents.format(**params).replace("    ","")
@@ -166,37 +166,49 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     config.write(contents)
     config.close()
 
-    #submit sbatch file to SLURM queue
-    out = 'out.tmp'
-    command = 'sbatch'
-    if len(jobIDs) > 0:
-        command += " -d afterok:"
-        command += ','.join(str(jobID) for jobID in jobIDs)
+    if verbose:
+        print 'Wrote sbatch file "{0}"'.format(sbatch)
 
-    command += ' {0} | tee {1}'.format(sbatch,out)
+def write_master(filename,scripts=[],nosubmit=False,verbose=False):
 
-    if noSubmit:
-        print 'Not submitting {0} to SLURM queue'.format(sbatch)
-    else:
+    killScript = 'killJobs.sh'
+
+    master = open(filename,'w')
+    master.write('#!/bin/bash\n')
+
+    command = 'sbatch {0}'.format(scripts[0])
+    master.write('\n#{0}\n'.format(scripts[0]))
+    if verbose:
+        master.write('echo Submitting {0} SLURM queue with following command\necho {1}\n'.format(scripts[0],command))
+    master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
+    scripts.pop(0)
+
+    for script in scripts:
+        command = 'sbatch -d afterok:$IDs'
+        master.write('\n#{0}\n'.format(script))
         if verbose:
-            print 'Running following command:\n{0}'.format(command)
-        print 'Submitting {0} to the SLURM queue.'.format(sbatch)
-        os.system(command)
+            master.write('echo Submitting {0} SLURM queue with following command\necho {1}\n'.format(script,command))
+        master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
-        #check output from calling sbatch
-        output = open(out).read()
-        if output == '':
-            print 'There was an error submitting {0} to the slurm queue. Please check this file.'.format(sbatch)
-            sys.exit(0)
+    master.write('\n#Output message and create killJobs.sh file\n')
+    master.write('echo Submitted scripts with following IDs: $IDs\n')
+    master.write('echo "#!/bin/bash" > {0}\n'.format(killScript))
+    master.write('echo scancel $IDs >> {0}\n'.format(killScript))
+    master.write('chmod u+x {0}\n'.format(killScript))
+    master.write('echo Run {0} to kill all the jobs.\n'.format(killScript))
+    master.close()
 
-        #extract jobIDs
-        jobID = int(output.split(' ')[-1])
-        jobIDs.append(jobID)
+    if verbose:
+        print 'Master script "{0}" written.'.format(filename)
 
-    return jobIDs
+    os.chmod(filename, 509)
+    if nosubmit:
+        print 'Will not run "{0}".'.format(filename)
+    else:
+        print 'Running master script "{0}"'.format(filename)
+        os.system('./{0}'.format(filename))
 
-
-def write_jobs(MS, config, nodes=4, tasks=16, cpus=4, mem=4096, noSubmit=False, verbose=False):
+def write_jobs(MS, config, scripts=[], threadsafe=[], nodes=4, tasks=16, cpus=4, mem=4096, nosubmit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -208,52 +220,44 @@ def write_jobs(MS, config, nodes=4, tasks=16, cpus=4, mem=4096, noSubmit=False, 
         The number of nodes to use for all thread-safe CASA tasks.
     tasks : int
         The number of tasks per node to use for all thread-safe CASA tasks.
-    noSubmit : bool
+    nosubmit : bool
         Don't submit the sbatch job to the SLURM queue, only write the file.
     verbose : bool
         Verbose output?"""
 
-    jobIDs = []
+    for i,script in enumerate(scripts):
+        if threadsafe[i]:
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks,cpus=cpus,mem=mem,name=os.path.splitext(script)[0],verbose=verbose)
+        else:
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1, cpus=1, mem=8192, name=os.path.splitext(script)[0],verbose=verbose)
 
-    #create directory for logs and plots if doesn't exist yet
-    # for dir in [LOG_DIR,PLOT_DIR]:
-    #     if not os.path.exists(DIR):
-    #         os.mkdir(DIR)
+    #Build master submission script, replacing all .py with .sbatch
+    scripts = [scripts[i].replace('.py','.sbatch') for i in range(len(scripts))]
+    write_master('submit_pipeline.sh',scripts=scripts,nosubmit=nosubmit,verbose=verbose)
 
-    #partition the data
-    jobIDs = write_sbatch('partition.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="partition",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+def default_config(arg_dict,filename,verbose=False):
 
-    #pre-flag the data
-    jobIDs = write_sbatch('flag_round_1.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_1",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set."""
 
-    #solve for parallel-hand calibration
-    jobIDs = write_sbatch('parallel_cal.py','--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1, cpus=1, mem=8192, name="parallel_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    #Copy default config to current location
+    os.system('cp {0}/{1} {2}'.format(SCRIPT_DIR,CONFIG,filename))
 
-    #apply parallel-hand calibration
-    jobIDs = write_sbatch('parallel_cal_apply.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="parallel_cal_apply",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    #Add following SLURM arguments to config file
+    slurm_config_keys = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','nosubmit','scripts','threadsafe']
+    slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
+    config_parser.overwrite_config(filename,additional_dict=slurm_dict,additional_sec='slurm')
 
-    #flag the data
-    jobIDs = write_sbatch('flag_round_2.py','--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks, cpus=cpus, mem=mem, name="flag_round_2",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
+    #Add MS to config file
+    config_parser.overwrite_config(filename,additional_dict={'vis' : "'{0}'".format(arg_dict['MS'])},additional_sec='data')
 
-    #solve for and apply cross-hand calibration
-    jobIDs = write_sbatch('cross_cal.py','--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="cross_cal",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
-
-    #split the target
-    jobIDs = write_sbatch('split.py','--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1, mem=8192, name="split",jobIDs=jobIDs,noSubmit=noSubmit,verbose=verbose)
-
-
-def default_config(MS,filename,verbose=False):
-
-    """Generate default config file in current directory, pointing to MS."""
-
-    os.system('cp {0}/{1} .'.format(SCRIPT_DIR,filename))
-    args =  '-R -M {0} --config {1}'.format(MS,filename)
-
-    #write and submit command
-    command = write_command('get_fields.py', args, mpi_wrapper="srun", container="/users/frank/casameer.simg")
+    #Write and submit command to extract fields
+    params =  '-B -M {0} --config {1}'.format(arg_dict['MS'],filename)
+    command = write_command('get_fields.py', params, mpi_wrapper="srun", container="/users/frank/casameer.simg")
     if verbose:
-        print command
+        print 'Extracting fields using the following command:\n{0}'.format(command)
     os.system(command)
+
+    print 'Config "{0}" generated.'.format(filename)
 
 
 def main():
@@ -261,9 +265,9 @@ def main():
     args,arg_dict = parse_args()
 
     if args.build:
-        default_config(args.MS,CONFIG,args.verbose)
+        default_config(arg_dict,args.config,args.verbose)
     elif args.run:
-        write_jobs(args.MS, args.config, nodes=args.nodes, tasks=args.ntasks_per_node, noSubmit=args.nosubmit, verbose=args.verbose)
+        write_jobs(args.MS, args.config, scripts=args.scripts, threadsafe=args.threadsafe, nodes=args.nodes, tasks=args.ntasks_per_node, nosubmit=args.nosubmit, verbose=args.verbose)
 
 if __name__ == "__main__":
     main()
