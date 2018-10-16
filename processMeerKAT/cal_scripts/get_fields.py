@@ -51,7 +51,7 @@ def main():
 
     args = processMeerKAT.parse_args()[0]
     fields = get_fields(args.MS)
-    config_parser.overwrite_config(args.config,additional_dict=fields,additional_sec='fields')
+    config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
 
 
 if __name__ == "__main__":

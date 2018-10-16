@@ -2,6 +2,7 @@ import sys
 
 import config_parser
 from cal_scripts import bookkeeping
+from config_parser import validate_args as va
 
 def split_vis(visname, spw, fields, specave, timeave):
     outputbase = visname.strip('.ms')
@@ -20,15 +21,15 @@ if __name__ == '__main__':
     # Parse config file
     taskvals, config = config_parser.parse_config(args['config'])
 
-    visname = taskvals['data']['vis']
+    visname = va(taskvals, 'data', 'vis', str)
     visname = visname.replace('.ms', '.mms')
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = taskvals['crosscal'].pop('spw', '')
+    spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
-    specave = taskvals['crosscal'].pop('specave', 2)
-    timeave = taskvals['crosscal'].pop('timeave', '8s')
+    specave = va(taskvals, 'crosscal', 'specave', int, default=1)
+    timeave = va(taskvals, 'crosscal', 'timeave', str, default='8s')
 
     split_vis(visname, spw, fields, specave, timeave)

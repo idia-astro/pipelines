@@ -2,6 +2,7 @@
 import sys
 
 import config_parser
+from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 
 def do_pre_flag_2(visname, spw, fields):
@@ -80,12 +81,12 @@ if __name__ == '__main__':
     # Parse config file
     taskvals, config = config_parser.parse_config(args['config'])
 
-    visname = taskvals['data']['vis']
+    visname = va(taskvals, 'data', 'vis', str)
     visname = visname.replace('.ms', '.mms')
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = taskvals['crosscal'].pop('spw', '')
+    spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
     do_pre_flag_2(visname, spw, fields)

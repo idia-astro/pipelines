@@ -1,14 +1,18 @@
 import sys
 
-sys.path.append('/data/users/krishna/pipeline/processMeerKAT/processMeerKAT')
-
 import config_parser
+from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 
-def do_pre_flag(visname, spw, fields):
+def do_pre_flag(visname, spw, fields, badfreqranges):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
     cliptarget    = [0., 20.]
+
+    if len(badfreqranges):
+        for badfreq in badfreqranges:
+            badspw = '0:' + badfreq
+            flagdata(vis=visname, mode='manual', spw=badspw)
 
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
@@ -65,12 +69,14 @@ if __name__ == '__main__':
     # Parse config file
     taskvals, config = config_parser.parse_config(args['config'])
 
-    visname = taskvals['data']['vis']
+    visname = va(taskvals, 'data', 'vis', str)
     visname = visname.replace('.ms', '.mms')
+
+    badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = taskvals['crosscal'].pop('spw', '')
+    spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
-    do_pre_flag(visname, spw, fields)
+    do_pre_flag(visname, spw, fields, badfreqranges)

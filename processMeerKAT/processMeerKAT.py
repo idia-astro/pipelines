@@ -88,7 +88,7 @@ def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-p
 
     #if script path doesn't exist and it's not in user's path, assume it's in the calibration directory
     if not os.path.exists(script) and script not in os.environ['PATH']:
-        params['script'] = '{0}/{1}'.format(SCRIPT_DIR,script)
+        params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIBR_SCRIPTS_DIR, script)
 
     if casa_task:
         params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c""".format(**params)
@@ -245,10 +245,10 @@ def default_config(arg_dict,filename,verbose=False):
     #Add following SLURM arguments to config file
     slurm_config_keys = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','nosubmit','scripts','threadsafe']
     slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
-    config_parser.overwrite_config(filename,additional_dict=slurm_dict,additional_sec='slurm')
+    config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file
-    config_parser.overwrite_config(filename,additional_dict={'vis' : "'{0}'".format(arg_dict['MS'])},additional_sec='data')
+    config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(arg_dict['MS'])}, conf_sec='data')
 
     #Write and submit command to extract fields
     params =  '-B -M {0} --config {1}'.format(arg_dict['MS'],filename)

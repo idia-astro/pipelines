@@ -2,6 +2,7 @@ import sys
 
 import config_parser
 from cal_scripts import bookkeeping
+from config_parser import validate_args as va
 
 def do_parallel_cal_apply(visname, spw, fields, calfiles):
     print " applying calibration -> primary calibrator"
@@ -31,15 +32,15 @@ if __name__ == '__main__':
     # Parse config file
     taskvals, config = config_parser.parse_config(args['config'])
 
-    visname = taskvals['data']['vis']
+    visname = va(taskvals, 'data', 'vis', str)
     visname = visname.replace('.ms', '.mms')
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = taskvals['crosscal'].pop('spw', '')
-    refant = taskvals['crosscal'].pop('referenceant', 'm005')
-    minbaselines = taskvals['crosscal'].pop('minbaselines', 4)
+    spw = va(taskvals, 'crosscal', 'spw', str, default='')
+    refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
+    minbaselines = va(taskvals, 'crosscal', 'minbaselines', int, default=4)
 
     do_parallel_cal_apply(visname, taskvals['crosscal']['spw'], fields, calfiles,
             minbaselines, do_clearcal=True)
