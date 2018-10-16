@@ -23,7 +23,7 @@ if __name__ == '__main__':
     visname = taskvals['data']['vis']
     visname = visname.replace('.ms', '.mms')
 
-    calfiles = bookkeeping.bookkeeping(visname)
+    calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     spw = taskvals['crosscal'].pop('spw', '')

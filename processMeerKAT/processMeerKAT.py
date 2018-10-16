@@ -88,7 +88,7 @@ def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-p
 
     #if script path doesn't exist and it's not in user's path, assume it's in the calibration directory
     if not os.path.exists(script) and script not in os.environ['PATH']:
-        params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIBR_SCRIPTS_DIR,script)
+        params['script'] = '{0}/{1}'.format(SCRIPT_DIR,script)
 
     if casa_task:
         params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c""".format(**params)
