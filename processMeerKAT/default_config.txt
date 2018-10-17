@@ -7,6 +7,14 @@ calcrefant = True       # Not implemented yet
 refant = 'm005'         # Reference antenna name/number
 badfreqranges = ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz']
 
-do_flag = True          # Run the flagging recipes
-do_parallel_cal = True  # Run parallel hand calibration recipe
-do_cross_cal = True     # Run full stokes calibration recipe
+[slurm]
+ntasks_per_node = 8
+threadsafe = [True, True, False, True, False, True]
+mem_per_cpu = 4096
+plane = 4
+nosubmit = False
+cpus_per_task = 3
+scripts = ['partition.py', 'flag_round_1.py', 'parallel_cal.py', 'flag_round_2.py', 'cross_cal.py', 'split.py']
+nodes = 4
+verbose = False
+

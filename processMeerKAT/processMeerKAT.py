@@ -79,7 +79,7 @@ def parse_args():
 
     return args,vars(args)
 
-def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
+def write_command(script,args,name="job",mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
                 container="/users/frank/casameer.simg",casa_task=True):
 
     params = locals()
@@ -91,7 +91,7 @@ def write_command(script,args,mpi_wrapper="/data/users/frank/casa-cluster/casa-p
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIBR_SCRIPTS_DIR, script)
 
     if casa_task:
-        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/casa-{job}.log -c""".format(**params)
+        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/{name}-{job}.casa -c""".format(**params)
     else:
         params['casa_call'] = ''
 
@@ -142,7 +142,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
-    params['command'] = write_command(script,args,mpi_wrapper,container,casa_task)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_task=casa_task)
 
     contents = """#!/bin/bash
     #SBATCH --time={time}
@@ -208,7 +208,7 @@ def write_master(filename,scripts=[],nosubmit=False,verbose=False):
         print 'Running master script "{0}"'.format(filename)
         os.system('./{0}'.format(filename))
 
-def write_jobs(MS, config, scripts=[], threadsafe=[], nodes=4, tasks=16, cpus=4, mem=4096, nosubmit=False, verbose=False):
+def write_jobs(config, scripts=[], threadsafe=[], nodes=4, ntasks_per_node=16, cpus_per_task=4, mem_per_cpu=4096, nosubmit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -235,6 +235,12 @@ def write_jobs(MS, config, scripts=[], threadsafe=[], nodes=4, tasks=16, cpus=4,
     scripts = [scripts[i].replace('.py','.sbatch') for i in range(len(scripts))]
     write_master('submit_pipeline.sh',scripts=scripts,nosubmit=nosubmit,verbose=verbose)
 
+def get_slurm_dict(arg_dict,slurm_config_keys = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','nosubmit','scripts','threadsafe','verbose']):
+
+    slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
+    return slurm_dict
+
+
 def default_config(arg_dict,filename,verbose=False):
 
     """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set."""
@@ -243,8 +249,7 @@ def default_config(arg_dict,filename,verbose=False):
     os.system('cp {0}/{1} {2}'.format(SCRIPT_DIR,CONFIG,filename))
 
     #Add following SLURM arguments to config file
-    slurm_config_keys = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','nosubmit','scripts','threadsafe']
-    slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
+    slurm_dict = get_slurm_dict(arg_dict)
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file
@@ -262,12 +267,18 @@ def default_config(arg_dict,filename,verbose=False):
 
 def main():
 
+    #Parse command-line arguments, and those from config file
     args,arg_dict = parse_args()
 
     if args.build:
         default_config(arg_dict,args.config,args.verbose)
     elif args.run:
-        write_jobs(args.MS, args.config, scripts=args.scripts, threadsafe=args.threadsafe, nodes=args.nodes, tasks=args.ntasks_per_node, nosubmit=args.nosubmit, verbose=args.verbose)
+        config_dict = config_parser.parse_config(args.config)[0]
+        if 'slurm' in config_dict.key():
+            kwargs = config_dict['slurm']
+        else:
+            kwargs = get_slurm_dict(arg_dict)
+        write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":
     main()
