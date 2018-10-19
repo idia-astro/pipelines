@@ -6,16 +6,14 @@ from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 
 def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
-        minbaselines, do_clearcal=False):
+        minbaselines, standard, do_clearcal=False):
 
     if do_clearcal:
         clearcal(visname)
 
-    print '\n\n ++++++ Linear Feed Polarization calibration ++++++'
-
     print " starting setjy for flux calibrator"
     setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
-            standard='Perley-Butler 2010')
+            standard=standard)
 
     print " starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
@@ -194,6 +192,7 @@ if __name__ == '__main__':
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
     minbaselines = va(taskvals, 'crosscal', 'minbaselines', int, default=4)
+    standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
 
     do_cross_cal(visname, spw, fields, calfiles, refant, caldir,
-            minbaselines, do_clearcal=True)
+            minbaselines, standard, do_clearcal=True)
