@@ -4,21 +4,34 @@ import argparse
 import os
 import sys
 import config_parser
+import numpy as np
+from shutil import copyfile
 
+#Set global limits for cluster configuration
 TOTAL_NODES_LIMIT = 7
 NTASKS_PER_NODE_LIMIT = 28
 CPUS_PER_NODE_LIMIT = 64
 MEM_PER_NODE_GB_LIMIT = 230
 
+#Set global values for paths and file names
 THIS_PROG = sys.argv[0]
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
 PLOT_DIR = 'plots'
-CONFIG = 'default_config.txt'
 CALIBR_SCRIPTS_DIR = 'cal_scripts'
-SCRIPTS = ['partition.py','flag_round_1.py','parallel_cal.py','flag_round_2.py','cross_cal.py','split.py']
-THREADSAFE = [True, True, False, True, False, True]
+CONFIG = 'default_config.txt'
+TMP_CONFIG = '.config.tmp'
 
+#Set global values for arguments copied to config file, and some of their default values
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','submit','scripts','verbose']
+CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.0.simg'
+MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
+SCRIPTS = [ ('partition.py',True,''),
+            ('flag_round_1.py',True,''),
+            ('parallel_cal.py',False,''),
+            ('flag_round_2.py',True,''),
+            ('cross_cal.py',False,''),
+            ('split.py',True,'')]
 
 def parse_args():
 
@@ -28,16 +41,24 @@ def parse_args():
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
-    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=4, help="Use this number of nodes [default: 4; max: {0}].".format(TOTAL_NODES_LIMIT))
-    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8, help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=3, help="Use this number of CPUs (per task) [default: 3; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
-    parser.add_argument("-m","--mem-per-cpu", metavar="num", required=False, type=int, default=4096, help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
-    parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4, help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
-    parser.add_argument("-s","--scripts", metavar="list", required=False, type=list, default=SCRIPTS, help="Run pipeline with these scripts, in this order.")
-    parser.add_argument("-T","--threadsafe", metavar="list", required=False, type=list, default=THREADSAFE, help="Parallel list of [-s --scripts], specifying whether is script is threadsafe.")
+    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=4,
+                        help="Use this number of nodes [default: 4; max: {0}].".format(TOTAL_NODES_LIMIT))
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
+                        help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=3,
+                        help="Use this number of CPUs (per task) [default: 3; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
+    parser.add_argument("-m","--mem-per-cpu", metavar="num", required=False, type=int, default=4096,
+                        help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
+    parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
+                        help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
+    parser.add_argument("-s","--scripts", metavar="list", required=False, type=list, default=SCRIPTS,
+                        help="Run pipeline with these scripts, in this order, using this container (3nd tuple value - empty string to default to [--container]). Is it threadsafe (2nd tuple value)?")
+    parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
+                        help="Use this mpi wrapper when calling scripts.")
+    parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts.")
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
 
-    parser.add_argument("-n","--nosubmit", action="store_true", required=False, default=False, help="Don't submit jobs to SLURM queue [default: False].")
+    parser.add_argument("-n","--submit", action="store_true", required=False, default=False, help="Don't submit jobs to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
 
     #add mutually exclusive group - don't want to build config, and run pipeline at same time
@@ -74,12 +95,9 @@ def parse_args():
     if args.mem_per_cpu * args.cpus_per_task * args.ntasks_per_node > MEM_PER_NODE_GB_LIMIT * 1024:
         parser.error("The memory per node [-m --mem-per-cpu] * [-t --ntasks-per-node] * [-C --cpus-per-task] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args.mem_per_cpu))
 
-    if len(args.scripts) != len(args.threadsafe):
-        parser.error("The list of scripts [-s --scripts] and threadsafe list [-T --threadsafe] must be the same length. You input lists of length {0} and {1}, respectively".format(len(args.scripts),len(args.threadsafe)))
-
     return args,vars(args)
 
-def write_command(script,args,name="job",mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
+def write_command(script,args,name="job",mpi_wrapper="/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
                 container="/users/frank/casameer.simg",casa_task=True):
 
     params = locals()
@@ -99,8 +117,7 @@ def write_command(script,args,name="job",mpi_wrapper="/data/users/frank/casa-clu
 
 
 def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,name="job",plane=1,
-                mpi_wrapper="/data/users/frank/casa-cluster/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
-                container="/users/frank/casameer.simg",jobIDs=[],casa_task=True,verbose=False):
+                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_task=True,verbose=False):
 
     """Write a SLURM sbatch file calling a certain script with a particular configuration.
 
@@ -128,8 +145,6 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
         MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
     container : str
         Path to singularity container used for this job.
-    jobIDs : list
-        List of job IDs for SLURM jobs needing to finish before this one is run.
     casa_task : bool
         Is the script that is called within this job a CASA task?
     verbose : bool
@@ -169,7 +184,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     if verbose:
         print 'Wrote sbatch file "{0}"'.format(sbatch)
 
-def write_master(filename,scripts=[],nosubmit=False,verbose=False):
+def write_master(filename,scripts=[],submit=False,verbose=False):
 
     killScript = 'killJobs.sh'
 
@@ -198,17 +213,15 @@ def write_master(filename,scripts=[],nosubmit=False,verbose=False):
     master.write('echo Run {0} to kill all the jobs.\n'.format(killScript))
     master.close()
 
-    if verbose:
-        print 'Master script "{0}" written.'.format(filename)
-
     os.chmod(filename, 509)
-    if nosubmit:
-        print 'Will not run "{0}".'.format(filename)
-    else:
+    if submit:
         print 'Running master script "{0}"'.format(filename)
         os.system('./{0}'.format(filename))
+    else:
+        print 'Master script "{0}" written, but will not run.'.format(filename)
 
-def write_jobs(config, scripts=[], threadsafe=[], nodes=4, ntasks_per_node=16, cpus_per_task=4, mem_per_cpu=4096, nosubmit=False, verbose=False):
+def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=4, ntasks_per_node=16,
+                cpus_per_task=4, mem_per_cpu=4096, plane=1, submit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -220,25 +233,22 @@ def write_jobs(config, scripts=[], threadsafe=[], nodes=4, ntasks_per_node=16, c
         The number of nodes to use for all thread-safe CASA tasks.
     tasks : int
         The number of tasks per node to use for all thread-safe CASA tasks.
-    nosubmit : bool
+    submit : bool
         Don't submit the sbatch job to the SLURM queue, only write the file.
     verbose : bool
         Verbose output?"""
 
     for i,script in enumerate(scripts):
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=tasks,cpus=cpus,mem=mem,name=os.path.splitext(script)[0],verbose=verbose)
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,cpus=cpus_per_task,
+                        mem=mem_per_cpu,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=os.path.splitext(script)[0],verbose=verbose)
         else:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1, cpus=1, mem=8192, name=os.path.splitext(script)[0],verbose=verbose)
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1,mem=8192,plane=1,
+                        mpi_wrapper=mpi_wrapper,container=containers[i],name=os.path.splitext(script)[0],verbose=verbose)
 
     #Build master submission script, replacing all .py with .sbatch
     scripts = [scripts[i].replace('.py','.sbatch') for i in range(len(scripts))]
-    write_master('submit_pipeline.sh',scripts=scripts,nosubmit=nosubmit,verbose=verbose)
-
-def get_slurm_dict(arg_dict,slurm_config_keys = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','nosubmit','scripts','threadsafe','verbose']):
-
-    slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
-    return slurm_dict
+    write_master('submit_pipeline.sh',scripts=scripts,submit=submit,verbose=verbose)
 
 
 def default_config(arg_dict,filename,verbose=False):
@@ -249,7 +259,7 @@ def default_config(arg_dict,filename,verbose=False):
     os.system('cp {0}/{1} {2}'.format(SCRIPT_DIR,CONFIG,filename))
 
     #Add following SLURM arguments to config file
-    slurm_dict = get_slurm_dict(arg_dict)
+    slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file
@@ -265,20 +275,41 @@ def default_config(arg_dict,filename,verbose=False):
     print 'Config "{0}" generated.'.format(filename)
 
 
+def get_slurm_dict(arg_dict,slurm_config_keys):
+
+    slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
+    return slurm_dict
+
+def format_args(args):
+
+    config_dict = config_parser.parse_config(args.config)[0]
+    copyfile(args.config, TMP_CONFIG)
+    if 'slurm' in config_dict.keys():
+        kwargs = config_dict['slurm']
+    else:
+        kwargs = get_slurm_dict(arg_dict)
+
+    #Reformat scripts, to extract scripts, threadsafe, and containers
+    scripts = np.array(kwargs['scripts'],dtype='object')
+    kwargs['scripts'] = scripts[:,0]
+    kwargs['threadsafe'] = scripts[:,1] == 'True'
+    kwargs['containers'] = scripts[:,2]
+    kwargs['containers'][kwargs['containers'] == ''] = kwargs['container']
+    kwargs.pop('container')
+
+    return kwargs
+
 def main():
 
-    #Parse command-line arguments, and those from config file
+    #Parse command-line arguments
     args,arg_dict = parse_args()
 
     if args.build:
         default_config(arg_dict,args.config,args.verbose)
     elif args.run:
-        config_dict = config_parser.parse_config(args.config)[0]
-        if 'slurm' in config_dict.key():
-            kwargs = config_dict['slurm']
-        else:
-            kwargs = get_slurm_dict(arg_dict)
-        write_jobs(args.config, **kwargs)
+        #Copy args from config file to TMP_CONFIG and use to write jobs
+        kwargs = format_args(args)
+        write_jobs(TMP_CONFIG, **kwargs)
 
 if __name__ == "__main__":
     main()
