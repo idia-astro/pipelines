@@ -4,7 +4,6 @@ import argparse
 import os
 import sys
 import config_parser
-import numpy as np
 from shutil import copyfile
 
 #Set global limits for cluster configuration
@@ -21,6 +20,7 @@ PLOT_DIR = 'plots'
 CALIBR_SCRIPTS_DIR = 'cal_scripts'
 CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
+MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for arguments copied to config file, and some of their default values
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','submit','scripts','verbose']
@@ -37,7 +37,7 @@ def parse_args():
 
     """Parse arguments into this script."""
 
-    parser = argparse.ArgumentParser(prog=THIS_PROG,description='Processes MeerKAT data via CASA measurement set.')
+    parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA measurement set.')
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
@@ -248,7 +248,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
 
     #Build master submission script, replacing all .py with .sbatch
     scripts = [scripts[i].replace('.py','.sbatch') for i in range(len(scripts))]
-    write_master('submit_pipeline.sh',scripts=scripts,submit=submit,verbose=verbose)
+    write_master(MASTER_SCRIPT,scripts=scripts,submit=submit,verbose=verbose)
 
 
 def default_config(arg_dict,filename,verbose=False):
@@ -256,7 +256,7 @@ def default_config(arg_dict,filename,verbose=False):
     """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set."""
 
     #Copy default config to current location
-    os.system('cp {0}/{1} {2}'.format(SCRIPT_DIR,CONFIG,filename))
+    copyfile('{0}/{1}'.format(SCRIPT_DIR,CONFIG),filename)
 
     #Add following SLURM arguments to config file
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
@@ -290,11 +290,15 @@ def format_args(args):
         kwargs = get_slurm_dict(arg_dict)
 
     #Reformat scripts, to extract scripts, threadsafe, and containers
-    scripts = np.array(kwargs['scripts'],dtype='object')
-    kwargs['scripts'] = scripts[:,0]
-    kwargs['threadsafe'] = scripts[:,1] == 'True'
-    kwargs['containers'] = scripts[:,2]
-    kwargs['containers'][kwargs['containers'] == ''] = kwargs['container']
+    scripts = kwargs['scripts']
+    kwargs['scripts'] = [i[0] for i in scripts]
+    kwargs['threadsafe'] = [i[1] for i in scripts]
+    kwargs['containers'] = [i[2] for i in scripts]
+
+    #Replace empty containers with default container and remove unwanted kwarg
+    for i in range(len(kwargs['containers'])):
+        if kwargs['containers'][i] == '':
+            kwargs['containers'][i] = kwargs['container']
     kwargs.pop('container')
 
     return kwargs
