@@ -8,7 +8,9 @@ This pipeline is designed to run on the IDIA data intensive research facility, m
 
 ## Getting it working
 
-1. To get things working, run setup.sh, which will add to your PATH and PYTHONPATH.
+1. To get things working, source setup.sh, which will add to your PATH and PYTHONPATH (this is a temporary solution)
+
+```source /data/exp_soft/pipelines/processMeerKAT/setup.sh```
 
 2. To build a config file, which the pipeline reads as input for how to process the data, run 
 
