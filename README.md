@@ -10,13 +10,13 @@ This pipeline is designed to run on the IDIA data intensive research facility, m
 
 1. To get things working, source setup.sh, which will add to your PATH and PYTHONPATH (this is a temporary solution)
 
-```source /data/exp_soft/pipelines/processMeerKAT/setup.sh```
+```source /data/exp_soft/pipelines/processMeerKAT/pipelines/setup.sh```
 
-2. To build a config file, which the pipeline reads as input for how to process the data, run 
+2. To build a config file, which the pipeline reads as input for how to process the data, run
 
 ```processMeerKAT.py -B --config myconfig.txt -M mydata.ms```
 
-3. To run the pipeline, run 
+3. To run the pipeline, run
 
 ```processMeerKAT.py -R --config myconfig.txt```
 
