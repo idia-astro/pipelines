@@ -6,7 +6,7 @@ spw = '0:860~1700MHz'   # spw to use for calibration
 calcrefant = True       # Calculate reference antenna in program (overwrites 'refant')
 refant = 'm005'         # Reference antenna name/number
 badfreqranges = ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz']
-standard = 'Perley-Buter 2010'  # Flux density standard for setjy
+standard = 'Perley-Butler 2010'  # Flux density standard for setjy
 
 [slurm]			#See processMeerKAT.py -h for help
 nodes = 4

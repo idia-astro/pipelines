@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
         refant = get_ref_ant(visname, field)
         # Overwrite config file with new refant
-        config_parser.overwrite_config(args['config'], {'refant':refant}, 'crosscal')
+        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'refant':refant})
     else:
         refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
 
