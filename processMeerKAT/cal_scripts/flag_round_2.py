@@ -82,7 +82,7 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-    visname = visname.replace('.ms', '.mms')
+    visname = os.path.split(visname.replace('.ms', '.mms'))[1]
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])

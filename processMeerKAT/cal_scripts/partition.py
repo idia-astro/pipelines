@@ -17,5 +17,5 @@ taskvals, config = config_parser.parse_config(args['config'])
 
 # Partition
 visname = va(taskvals, 'data', 'vis', str)
-mvis = visname.replace('.ms', '.mms')
+mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
 partition(vis=visname, outputvis=mvis, createmms=True, datacolumn='DATA')
