@@ -188,8 +188,6 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
 
 def write_master(filename,scripts=[],submit=False,verbose=False):
 
-    killScript = 'killJobs.sh'
-
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
 
@@ -200,19 +198,31 @@ def write_master(filename,scripts=[],submit=False,verbose=False):
     master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
     scripts.pop(0)
 
+
     for script in scripts:
         command = 'sbatch -d afterok:$IDs'
         master.write('\n#{0}\n'.format(script))
         if verbose:
-            master.write('echo Submitting {0} SLURM queue with following command\necho {1}\n'.format(script,command))
+            master.write('echo Submitting {0} SLURM queue with following command\necho {1} {0}\n'.format(script,command))
         master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
-    master.write('\n#Output message and create killJobs.sh file\n')
+    master.write('\n#Output message\n')
     master.write('echo Submitted scripts with following IDs: $IDs\n')
-    master.write('echo "#!/bin/bash" > {0}\n'.format(killScript))
-    master.write('echo scancel $IDs >> {0}\n'.format(killScript))
-    master.write('chmod u+x {0}\n'.format(killScript))
-    master.write('echo Run {0} to kill all the jobs.\n'.format(killScript))
+
+    #Add time as extn to this pipeline run, to give unique ID
+    if not os.path.exists('jobScripts'):
+        os.mkdir('jobScripts')
+    master.write('\n#Add time as extn to this pipeline run, to give unique ID')
+    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
+    extn = '_$DATE.sh'
+    killScript = 'jobScripts/killJobs' + extn
+    summaryScript = 'jobScripts/summary' + extn
+    errorScript = 'jobScripts/findErrors' + extn
+
+    #Write each job script
+    write_bash_job_script(master, killScript, 'echo scancel $IDs', 'kill all the jobs')
+    write_bash_job_script(master, summaryScript, 'echo sacct -j $IDs', 'view the progress')
+    write_bash_job_script(master, errorScript, """echo "for ID in {$IDs}; do cat logs/*\$ID.{out,err,casa} | grep 'SEVERE\|rror'); done" """, 'find errors')
     master.close()
 
     os.chmod(filename, 509)
@@ -221,6 +231,14 @@ def write_master(filename,scripts=[],submit=False,verbose=False):
         os.system('./{0}'.format(filename))
     else:
         print 'Master script "{0}" written, but will not run.'.format(filename)
+
+def write_bash_job_script(master,fname,do,purpose):
+
+    master.write('\n#Create {0} file\n'.format(fname))
+    master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
+    master.write('{0} >> {1}\n'.format(do,fname))
+    master.write('chmod u+x {0}\n'.format(fname))
+    master.write('echo Run {0} to {1}.\n'.format(fname,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=4, ntasks_per_node=16,
                 cpus_per_task=4, mem_per_cpu=4096, plane=1, submit=False, verbose=False):
