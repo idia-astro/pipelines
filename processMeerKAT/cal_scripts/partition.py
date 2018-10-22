@@ -3,6 +3,7 @@
 Runs partition on the input MS
 """
 import sys
+import os
 
 #from processMeerKAT import config_parser
 import config_parser
