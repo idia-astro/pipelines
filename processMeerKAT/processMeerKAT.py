@@ -98,20 +98,22 @@ def parse_args():
     return args,vars(args)
 
 def write_command(script,args,name="job",mpi_wrapper="/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa",
-                container="/users/frank/casameer.simg",casa_task=True):
+                container=CONTAINER,casa_task=True,logfile=True):
 
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
+    params['casa_call'] = ''
+    params['casa_log'] = ''
 
     #if script path doesn't exist and it's not in user's path, assume it's in the calibration directory
     if not os.path.exists(script) and script not in os.environ['PATH']:
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIBR_SCRIPTS_DIR, script)
 
+    if logfile:
+        params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
     if casa_task:
-        params['casa_call'] = """"casa" --nologger --nogui --logfile {LOG_DIR}/{name}-{job}.casa -c""".format(**params)
-    else:
-        params['casa_call'] = ''
+        params['casa_call'] = """"casa" --nologger --nogui {casa_log} -c""".format(**params)
 
     return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
 
@@ -267,7 +269,7 @@ def default_config(arg_dict,filename,verbose=False):
 
     #Write and submit command to extract fields
     params =  '-B -M {0} --config {1}'.format(arg_dict['MS'],filename)
-    command = write_command('get_fields.py', params, mpi_wrapper="srun", container="/users/frank/casameer.simg")
+    command = write_command('get_fields.py', params, mpi_wrapper="srun", container=arg_dict['container'],logfile=False)
     if verbose:
         print 'Extracting fields using the following command:\n{0}'.format(command)
     os.system(command)
