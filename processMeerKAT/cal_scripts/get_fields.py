@@ -14,8 +14,6 @@ def get_fields(MS):
     ----------
     MS : str
         Input measurement set (relative or absolute path).
-    my_intents : dict
-        Dictionary of assumed intents for this observation. If any doesn't exist, the function will return None.
 
     Returns:
     --------
@@ -45,9 +43,39 @@ def get_fields(MS):
             print 'Intent "{0}" not found. Setting {1}={2}'.format(intent,fields[i],default_intent)
             fieldIDs[fields[i]] = "'{0}'".format(default_intent)
 
+    msmd.close()
+
     return fieldIDs
 
+def check_refant(MS,refant,warn=True):
+
+    """Check if reference antenna exists, otherwise throw an error or print a warning.
+
+    Arguments:
+    ----------
+    MS : str
+        Input measurement set (relative or absolute path).
+    refant: str
+        Input reference antenna.
+    warn : bool, optional
+        Warn the user? If False, raise ValueError."""
+
+    msmd.open(MS)
+    ants = msmd.antennanames()
+
+    if refant not in ants:
+        err = "Antenna {0} isn't present in input dataset ('{1}'). Antennas present are: {2}".format(refant,MS,ants)
+        if warn:
+            print '### WARNING: {0}'.format(err)
+        else:
+            raise ValueError(err)
+
+    msmd.close()
+
 def main():
+
+    refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
+    check_refant(args.MS, refant, warn=True)
 
     args = processMeerKAT.parse_args()[0]
     fields = get_fields(args.MS)
