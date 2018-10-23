@@ -64,7 +64,7 @@ def check_refant(MS,refant,warn=True):
     ants = msmd.antennanames()
 
     if refant not in ants:
-        err = "Antenna {0} isn't present in input dataset ('{1}'). Antennas present are: {2}".format(refant,MS,ants)
+        err = "Reference antenna '{0}' isn't present in input dataset '{1}'. Antennas present are: {2}".format(refant,MS,ants)
         if warn:
             print '### WARNING: {0}'.format(err)
         else:

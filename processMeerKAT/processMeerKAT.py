@@ -222,7 +222,8 @@ def write_master(filename,scripts=[],submit=False,verbose=False):
     #Write each job script
     write_bash_job_script(master, killScript, 'echo scancel $IDs', 'kill all the jobs')
     write_bash_job_script(master, summaryScript, 'echo sacct -j $IDs', 'view the progress')
-    write_bash_job_script(master, errorScript, """echo "for ID in {$IDs}; do cat logs/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """, 'find errors')
+    do = """echo "for ID in {$IDs}; do cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % LOG_DIR
+    write_bash_job_script(master, errorScript, do, 'find errors')
     master.close()
 
     os.chmod(filename, 509)
