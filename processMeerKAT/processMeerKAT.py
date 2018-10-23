@@ -130,7 +130,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     args : str
         Arguments passed into script that is called within sbatch file.
     time : str
-        Time limit on this job.
+        Time limit on this job (not currently used).
     nodes : str
         Number of nodes to use for this job - e.g. '2-2' meaning minimum and maximum of 2 nodes.
     tasks : int
@@ -161,8 +161,8 @@ def write_sbatch(script,args,time="00:10:00",nodes=4,tasks=16,cpus=4,mem=4096,na
     params['job'] = '${SLURM_JOB_ID}'
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_task=casa_task)
 
-    contents = """#!/bin/bash
     #SBATCH --time={time}
+    contents = """#!/bin/bash
     #SBATCH -N {nodes}
     #SBATCH --ntasks-per-node={tasks}
     #SBATCH -c {cpus}
