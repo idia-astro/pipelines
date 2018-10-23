@@ -74,10 +74,10 @@ def check_refant(MS,refant,warn=True):
 
 def main():
 
+    args = processMeerKAT.parse_args()[0]
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
     check_refant(args.MS, refant, warn=True)
 
-    args = processMeerKAT.parse_args()[0]
     fields = get_fields(args.MS)
     config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
 
