@@ -7,13 +7,16 @@ from config_parser import validate_args as va
 
 def split_vis(visname, spw, fields, specave, timeave):
     outputbase = visname.strip('.ms')
-    split(vis=visname, outputvis = outputbase+'.'+fields.targetfield+'.ms',
-            datacolumn='corrected', field = fields.targetfield, spw = spw,
-            keepflags=True, keepmms = True, width = specave, timebin = timeave)
+    for field in fields.targetfield:
+        split(vis=visname, outputvis = outputbase+'.'+field+'.mms',
+                datacolumn='corrected', field = fields.targetfield, spw = spw,
+                keepflags=True, keepmms = True, width = specave,
+                timebin = timeave, keepmms=True)
 
-    split(vis=visname, outputvis = outputbase+'.'+fields.secondaryfield+'.ms',
+    split(vis=visname, outputvis = outputbase+'.'+fields.secondaryfield+'.mms',
             datacolumn='corrected', field = fields.secondaryfield, spw = spw,
-            keepflags=True, keepmms = True, width = specave, timebin = timeave)
+            keepflags=True, keepmms = True, width = specave, timebin = timeave,
+            keepmms = True)
 
 if __name__ == '__main__':
     # Get the name of the config file
