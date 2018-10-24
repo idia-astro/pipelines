@@ -39,9 +39,11 @@ def do_parallel_cal(visname, spw, fields, calfiles, referenceant,
             gainfield=[fields.kcorrfield, fields.bpassfield],
             parang = False, append = False)
 
-    fluxscale(vis=visname, caltable=calfiles.gainfile,
-            reference=[fields.fluxfield], transfer='',
-            fluxtable=calfiles.fluxfile, append=False)
+    # Only run fluxscale if bootstrapping
+    if len(fields.gainfields) > 1:
+        fluxscale(vis=visname, caltable=calfiles.gainfile,
+                reference=[fields.fluxfield], transfer='',
+                fluxtable=calfiles.fluxfile, append=False)
 
 
 def get_ref_ant(visname, fluxfield):

@@ -59,13 +59,15 @@ def get_field_ids(fields):
     dpolfield      = fields['phasecalfield']
     xpolfield      = fields['phasecalfield']
 
-    gainfields = \
-            str(fluxfield) + ',' + str(secondaryfield)
+    if fluxfield != secondaryfield:
+        gainfields = \
+                str(fluxfield) + ',' + str(secondaryfield)
+    else:
+        gainfields = str(fluxfield)
 
     FieldIDs = namedtuple('FieldIDs', ['targetfield', 'fluxfield',
                     'bpassfield', 'secondaryfield', 'kcorrfield', 'xdelfield',
                     'dpolfield', 'xpolfield', 'gainfields'])
-
 
     return FieldIDs(targetfield, fluxfield, bpassfield, secondaryfield,
             kcorrfield, xdelfield, dpolfield, xpolfield, gainfields)

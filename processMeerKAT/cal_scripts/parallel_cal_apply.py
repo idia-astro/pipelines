@@ -6,23 +6,29 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
 def do_parallel_cal_apply(visname, spw, fields, calfiles):
+
+    if len(fields.gainfields) > 1:
+        fluxfile = calfiles.fluxfile
+    else:
+        fluxfile = calfiles.gainfile
+
     print " applying calibration -> primary calibrator"
     applycal(vis=visname, field=fields.fluxfield, spw = spw, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
-                calfiles.fluxfile], gainfield=[fields.kcorrfield,
+                fluxfile], gainfield=[fields.kcorrfield,
                     fields.bpassfield, fields.fluxfield], parang=True)
 
     print " applying calibration -> secondary calibrator"
     applycal(vis=visname, field=fields.secondaryfield, spw = spw,
             selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile,
-                calfiles.bpassfile, calfiles.fluxfile],
+                calfiles.bpassfile, fluxfile],
             gainfield=[fields.kcorrfield, fields.bpassfield,
                 fields.secondaryfield], parang=True)
 
     print " applying calibration -> target calibrator"
     applycal(vis=visname, field=fields.targetfield, spw = spw, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
-                calfiles.fluxfile], gainfield=[fields.kcorrfield,
+                fluxfile], gainfield=[fields.kcorrfield,
                     fields.bpassfield, fields.secondaryfield], parang=True)
 
 

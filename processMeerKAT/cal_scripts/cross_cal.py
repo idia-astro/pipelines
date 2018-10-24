@@ -128,19 +128,27 @@ def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
 
     Dgen(dtab=dtempfile, dout=calfiles.dpolfile)
 
-    print " starting fluxscale -> %s", calfiles.fluxfile
-    fluxscale(vis=visname, caltable = calfiles.gainfile,
-            reference = fields.fluxfield, transfer = '',
-            fluxtable = calfiles.fluxfile,
-            listfile = os.path.join(caldir,'fluxscale.txt'), append = False)
+    # Only run fluxscale if bootstrapping
+    if len(fields.gainfields) > 1:
+        print " starting fluxscale -> %s", calfiles.fluxfile
+        fluxscale(vis=visname, caltable = calfiles.gainfile,
+                reference = fields.fluxfield, transfer = '',
+                fluxtable = calfiles.fluxfile,
+                listfile = os.path.join(caldir,'fluxscale.txt'),
+                append = False)
 
     calfiles = calfiles._replace(xpolfile=xy0pfile)
     fields = fields._replace(xpolfield=fields.dpolfield)
 
+    if len(fields.gainfields) > 1:
+        fluxfile = calfiles.fluxfile
+    else:
+        fluxfile = calfiles.gainfile
+
     print " applying calibrations: primary calibrator"
     applycal(vis=visname, field = fields.fluxfield, spw = spw,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
-                calfiles.bpassfile, calfiles.fluxfile, calfiles.dpolfile,
+                calfiles.bpassfile, fluxfile, calfiles.dpolfile,
                 calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield,fields.bpassfield, fields.fluxfield,
             fields.dpolfield,fields.xdelfield, fields.xpolfield],
@@ -149,7 +157,7 @@ def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
     print " applying calibrations: polarization calibrator"
     applycal(vis=visname, field = fields.dpolfield, spw = spw,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
-                calfiles.bpassfile, calfiles.fluxfile, calfiles.dpolfile,
+                calfiles.bpassfile, fluxfile, calfiles.dpolfile,
                 calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield,fields.bpassfield,fields.secondaryfield,
             fields.dpolfield,fields.xdelfield,fields.xpolfield],
@@ -158,7 +166,7 @@ def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
     print " applying calibrations: secondary calibrators"
     applycal(vis=visname, field = fields.secondaryfield, spw = spw,
             selectdata = False, calwt = True,
-        gaintable = [calfiles.kcorrfile, calfiles.bpassfile, calfiles.fluxfile,
+        gaintable = [calfiles.kcorrfile, calfiles.bpassfile, fluxfile,
             calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield, fields.bpassfield,
             fields.secondaryfield, fields.dpolfield, fields.xdelfield,
@@ -168,7 +176,7 @@ def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
     print " applying calibrations: target fields"
     applycal(vis=visname, field = fields.targetfield, spw = spw,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
-                calfiles.bpassfile, calfiles.fluxfile, calfiles.dpolfile,
+                calfiles.bpassfile, fluxfile, calfiles.dpolfile,
                 calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield, fields.bpassfield,
             fields.secondaryfield, fields.dpolfield, fields.xdelfield,
