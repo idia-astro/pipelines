@@ -9,13 +9,6 @@ from recipes.almapolhelpers import *
 def do_cross_cal(visname, spw, fields, calfiles, referenceant, caldir,
         minbaselines, standard, do_clearcal=False):
 
-    if do_clearcal:
-        clearcal(visname)
-
-    print " starting setjy for flux calibrator"
-    setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
-            standard=standard)
-
     print " starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
             field = fields.kcorrfield, spw = spw, refant = referenceant,

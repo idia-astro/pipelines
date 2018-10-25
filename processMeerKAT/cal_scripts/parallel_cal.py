@@ -9,12 +9,6 @@ from scipy.stats import iqr
 
 def do_parallel_cal(visname, spw, fields, calfiles, referenceant,
         minbaselines, standard, do_clearcal=False):
-    if do_clearcal:
-        clearcal(vis=visname)
-
-    print " starting setjy for flux calibrator"
-    setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
-            standard=standard)
 
     print " starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile
     gaincal(vis=visname, caltable = calfiles.kcorrfile, field

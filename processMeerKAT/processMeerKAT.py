@@ -28,8 +28,10 @@ CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.0.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('partition.py',True,''),
             ('flag_round_1.py',True,''),
+            ('run_setjy.py',True,''),
             ('parallel_cal.py',False,''),
             ('flag_round_2.py',True,''),
+            ('run_setjy.py',True,''),
             ('cross_cal.py',False,''),
             ('split.py',True,'')]
 
