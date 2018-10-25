@@ -262,15 +262,17 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         Verbose output?"""
 
     for i,script in enumerate(scripts):
+        name = os.path.splitext(os.path.split(script)[1])[0]
+
         if threadsafe[i]:
             write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,cpus=cpus_per_task,
-                        mem=mem_per_cpu,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=os.path.splitext(script)[0],verbose=verbose)
+                        mem=mem_per_cpu,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name,verbose=verbose)
         else:
             write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1,mem=8192,plane=1,
-                        mpi_wrapper=mpi_wrapper,container=containers[i],name=os.path.splitext(script)[0],verbose=verbose)
+                        mpi_wrapper=mpi_wrapper,container=containers[i],name=name,verbose=verbose)
 
     #Build master submission script, replacing all .py with .sbatch
-    scripts = [scripts[i].replace('.py','.sbatch') for i in range(len(scripts))]
+    scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
     write_master(MASTER_SCRIPT,scripts=scripts,submit=submit,verbose=verbose)
 
 
