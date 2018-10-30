@@ -5,6 +5,11 @@ import os
 import processMeerKAT
 import config_parser
 
+
+# Get access to the msmd module for get_fields.py
+import casac
+msmd = casac.casac.msmetadata()
+
 def get_fields(MS):
 
     """Extract field numbers from intent, including calibrators for bandpass, flux, phase & amplitude, and the target.
