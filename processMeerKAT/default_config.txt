@@ -21,6 +21,7 @@ verbose = False
 scripts = [ ('partition.py',True,''),
             ('flag_round_1.py',True,''),
             ('parallel_cal.py',False,''),
+            ('parallel_cal_apply.py',True,''),
             ('flag_round_2.py',True,''),
             ('cross_cal.py',False,''),
             ('split.py',True,'')]
