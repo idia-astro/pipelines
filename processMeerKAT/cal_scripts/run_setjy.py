@@ -8,9 +8,28 @@ from config_parser import validate_args as va
 def do_setjy(visname, spw, fields, standard):
     clearcal(vis=visname)
 
+    fluxlist = ['J0408-6545', '0408-6545', '']
+
     print " starting setjy for flux calibrator"
-    setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
-            standard=standard)
+    if any([ff in fields.fluxfield for ff in fluxlist]):
+        for ff in fluxlist:
+            if ff in fields.fluxfield:
+                fieldname = ff
+
+        smodel = [17.066, 0.0, 0.0, 0.0]
+        spix = [-1.179]
+        reffreq="1284MHz"
+
+        print "Using manual flux density scale - "
+        print "Flux model: ", smodel
+        print "Spix: ", spix
+        print "Ref freq ", refreq
+
+        setjy(vis=visname, field=fieldname, scalebychan=True, standard='manual',
+                fluxdensity=smodel, spix=spix, refreq=refreq)
+    else:
+        setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
+                standard=standard)
 
 if __name__ == '__main__':
     # Get the name of the config file
