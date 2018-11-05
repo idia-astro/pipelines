@@ -30,6 +30,7 @@ SCRIPTS = [ ('partition.py',True,''),
             ('flag_round_1.py',True,''),
             ('run_setjy.py',True,''),
             ('parallel_cal.py',False,''),
+            ('parallel_cal_apply.py',True,''),
             ('flag_round_2.py',True,''),
             ('run_setjy.py',True,''),
             ('cross_cal.py',False,''),
@@ -53,14 +54,14 @@ def parse_args():
                         help="Use this many MB of memory (per core) [default: 4096; max: {0} GB / (ntasks-per-node * cpus-per-task)].".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
                         help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
-    parser.add_argument("-s","--scripts", metavar="list", required=False, type=list, default=SCRIPTS,
+    parser.add_argument("-S","--scripts", metavar="list", required=False, type=list, default=SCRIPTS,
                         help="Run pipeline with these scripts, in this order, using this container (3nd tuple value - empty string to default to [--container]). Is it threadsafe (2nd tuple value)?")
     parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
                         help="Use this mpi wrapper when calling scripts.")
     parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts.")
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
 
-    parser.add_argument("-n","--submit", action="store_true", required=False, default=False, help="Don't submit jobs to SLURM queue [default: False].")
+    parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
 
     #add mutually exclusive group - don't want to build config, and run pipeline at same time
@@ -83,7 +84,7 @@ def parse_args():
         if args.config is None:
             parser.error("You must input a config file [--config] to run the pipeline.")
         if not os.path.exists(args.config):
-            parser.error("Input config file '{0}' not found.".format(args.config))
+            parser.error("Input config file '{0}' not found. Please set --config.".format(args.config))
 
     if args.ntasks_per_node > NTASKS_PER_NODE_LIMIT:
         parser.error("The number of tasks [-t --ntasks-per-node] per node must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args.ntasks-per-node))
@@ -224,7 +225,7 @@ def write_master(filename,scripts=[],submit=False,verbose=False):
     #Write each job script
     write_bash_job_script(master, killScript, 'echo scancel $IDs', 'kill all the jobs')
     write_bash_job_script(master, summaryScript, 'echo sacct -j $IDs', 'view the progress')
-    do = """echo "for ID in {$IDs}; do cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % LOG_DIR
+    do = """echo "for ID in {$IDs,}; do echo $ID; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % LOG_DIR
     write_bash_job_script(master, errorScript, do, 'find errors')
     master.close()
 
