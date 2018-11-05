@@ -11,12 +11,11 @@ def split_vis(visname, spw, fields, specave, timeave):
         split(vis=visname, outputvis = outputbase+'.'+field+'.mms',
                 datacolumn='corrected', field = fields.targetfield, spw = spw,
                 keepflags=True, keepmms = True, width = specave,
-                timebin = timeave, keepmms=True)
+                timebin = timeave)
 
     split(vis=visname, outputvis = outputbase+'.'+fields.secondaryfield+'.mms',
             datacolumn='corrected', field = fields.secondaryfield, spw = spw,
-            keepflags=True, keepmms = True, width = specave, timebin = timeave,
-            keepmms = True)
+            keepflags=True, keepmms = True, width = specave, timebin = timeave)
 
 if __name__ == '__main__':
     # Get the name of the config file
