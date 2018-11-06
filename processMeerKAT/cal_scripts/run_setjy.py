@@ -15,6 +15,7 @@ def do_setjy(visname, spw, fields, standard):
         for ff in fluxlist:
             if ff in fields.fluxfield:
                 fieldname = ff
+                break
 
         smodel = [17.066, 0.0, 0.0, 0.0]
         spix = [-1.179]
@@ -23,10 +24,10 @@ def do_setjy(visname, spw, fields, standard):
         print "Using manual flux density scale - "
         print "Flux model: ", smodel
         print "Spix: ", spix
-        print "Ref freq ", refreq
+        print "Ref freq ", reffreq
 
         setjy(vis=visname, field=fieldname, scalebychan=True, standard='manual',
-                fluxdensity=smodel, spix=spix, refreq=refreq)
+                fluxdensity=smodel, spix=spix, reffreq=reffreq)
     else:
         setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
                 standard=standard)
