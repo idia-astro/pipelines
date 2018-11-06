@@ -49,5 +49,5 @@ if __name__ == '__main__':
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
     minbaselines = va(taskvals, 'crosscal', 'minbaselines', int, default=4)
 
-    do_parallel_cal_apply(visname, taskvals['crosscal']['spw'], fields, calfiles,
+    do_parallel_cal_apply(visname, spw, fields, calfiles,
             minbaselines, do_clearcal=True)
