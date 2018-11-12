@@ -1,5 +1,7 @@
 #!/usr/bin/python2.7
 
+__version__ = '1.0'
+
 import argparse
 import os
 import sys
@@ -23,7 +25,7 @@ TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for arguments copied to config file, and some of their default values
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','submit','scripts','verbose']
+SLURM_CONFIG_KEYS = ['version','nodes','ntasks_per_node','cpus_per_task','mem_per_cpu','plane','submit','scripts','verbose']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.0.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('partition.py',True,''),
@@ -68,6 +70,7 @@ def parse_args():
     run_args = parser.add_mutually_exclusive_group(required=True)
     run_args.add_argument("-B","--build", action="store_true", required=False, default=False, help="Build default config file using input MS.")
     run_args.add_argument("-R","--run", action="store_true", required=False, default=False, help="Run pipeline with input config file.")
+    run_args.add_argument("-V","--version", action="store_true", required=False, default=False, help="Print the version.")
 
     args, unknown = parser.parse_known_args()
 
@@ -225,7 +228,7 @@ def write_master(filename,scripts=[],submit=False,verbose=False):
     #Write each job script
     write_bash_job_script(master, killScript, 'echo scancel $IDs', 'kill all the jobs')
     write_bash_job_script(master, summaryScript, 'echo sacct -j $IDs', 'view the progress')
-    do = """echo "for ID in {$IDs,}; do echo $ID; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % LOG_DIR
+    do = """echo "for ID in {$IDs,}; do echo %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, do, 'find errors')
     master.close()
 
@@ -245,7 +248,7 @@ def write_bash_job_script(master,fname,do,purpose):
     master.write('echo Run {0} to {1}.\n'.format(fname,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=4, ntasks_per_node=16,
-                cpus_per_task=4, mem_per_cpu=4096, plane=1, submit=False, verbose=False):
+                cpus_per_task=4, mem_per_cpu=4096, plane=1, submit=False, verbose=False, version=None):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -260,7 +263,9 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
     submit : bool
         Don't submit the sbatch job to the SLURM queue, only write the file.
     verbose : bool
-        Verbose output?"""
+        Verbose output?
+    version : float
+        Version of this script."""
 
     for i,script in enumerate(scripts):
         name = os.path.splitext(os.path.split(script)[1])[0]
@@ -334,7 +339,9 @@ def main():
     #Parse command-line arguments
     args,arg_dict = parse_args()
 
-    if args.build:
+    if args.version:
+        print 'This is version {0}'.format(__version__)
+    elif args.build:
         default_config(arg_dict,args.config,args.verbose)
     elif args.run:
         #Copy args from config file to TMP_CONFIG and use to write jobs
