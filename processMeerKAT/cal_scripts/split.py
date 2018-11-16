@@ -6,14 +6,20 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
 def split_vis(visname, spw, fields, specave, timeave):
-    outputbase = visname.strip('.ms')
-    for field in fields.targetfield:
+    outputbase = visname.replace('.ms', '')
+
+    msmd.open(visname)
+    fnames = msmd.namesforfields([int(ff) for ff in fields.targetfield.split(',')])
+    secondaryname = msmd.namesforfields(int(fields.secondaryfield))[0]
+    msmd.close()
+
+    for field in fnames:
         split(vis=visname, outputvis = outputbase+'.'+field+'.mms',
                 datacolumn='corrected', field = fields.targetfield, spw = spw,
                 keepflags=True, keepmms = True, width = specave,
                 timebin = timeave)
 
-    split(vis=visname, outputvis = outputbase+'.'+fields.secondaryfield+'.mms',
+    split(vis=visname, outputvis = outputbase+'.'+secondaryname+'.mms',
             datacolumn='corrected', field = fields.secondaryfield, spw = spw,
             keepflags=True, keepmms = True, width = specave, timebin = timeave)
 
