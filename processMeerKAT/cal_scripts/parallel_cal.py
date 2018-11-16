@@ -7,18 +7,18 @@ from config_parser import validate_args as va
 
 from scipy.stats import iqr
 
-def do_parallel_cal(visname, spw, fields, calfiles, referenceant,
+def do_parallel_cal(visname, fields, calfiles, referenceant,
         minbaselines, standard, do_clearcal=False):
 
     print " starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile
     gaincal(vis=visname, caltable = calfiles.kcorrfile, field
-            = fields.kcorrfield, spw = spw, refant = referenceant,
+            = fields.kcorrfield, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'K',
             solint = 'inf', combine = '', parang = False, append = False)
 
     print " starting bandpass -> %s" % calfiles.bpassfile
     bandpass(vis=visname, caltable = calfiles.bpassfile,
-            field = fields.bpassfield, spw = spw, refant = referenceant,
+            field = fields.bpassfield, refant = referenceant,
             minblperant = minbaselines, solnorm = True,  solint = 'inf',
             combine = 'scan', bandtype = 'B', fillgaps = 8,
             gaintable = calfiles.kcorrfile, gainfield = fields.kcorrfield,
@@ -26,7 +26,7 @@ def do_parallel_cal(visname, spw, fields, calfiles, referenceant,
 
     print " starting gain calibration\n -> %s" % calfiles.gainfile
     gaincal(vis=visname, caltable = calfiles.gainfile,
-            field = fields.gainfields, spw = spw, refant = referenceant,
+            field = fields.gainfields, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'G',
             solint = 'inf', combine = '', calmode='ap',
             gaintable=[calfiles.kcorrfile, calfiles.bpassfile],
@@ -129,9 +129,8 @@ if __name__ == '__main__':
     else:
         refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
 
-    spw = va(taskvals, 'crosscal', 'spw', str, default='')
     minbaselines = va(taskvals, 'crosscal', 'minbaselines', int, default=4)
     standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
 
-    do_parallel_cal(visname, spw, fields, calfiles, refant,
+    do_parallel_cal(visname, fields, calfiles, refant,
             minbaselines, standard, do_clearcal=True)

@@ -9,7 +9,7 @@ from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 
 
-def do_cross_cal_apply(visname, spw, fields, calfiles, caldir):
+def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
     base = visname.replace('.ms', '')
     gain1file   = os.path.join(caldir, base+'.g1cal')
@@ -25,7 +25,7 @@ def do_cross_cal_apply(visname, spw, fields, calfiles, caldir):
         fluxfile = calfiles.gainfile
 
     print " applying calibrations: primary calibrator"
-    applycal(vis=visname, field = fields.fluxfield, spw = spw,
+    applycal(vis=visname, field = fields.fluxfield,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile, calfiles.dpolfile,
                 calfiles.xdelfile, calfiles.xpolfile],
@@ -34,7 +34,7 @@ def do_cross_cal_apply(visname, spw, fields, calfiles, caldir):
         parang = True)
 
     print " applying calibrations: polarization calibrator"
-    applycal(vis=visname, field = fields.dpolfield, spw = spw,
+    applycal(vis=visname, field = fields.dpolfield,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile, calfiles.dpolfile,
                 calfiles.xdelfile, calfiles.xpolfile],
@@ -43,7 +43,7 @@ def do_cross_cal_apply(visname, spw, fields, calfiles, caldir):
         parang= True)
 
     print " applying calibrations: secondary calibrators"
-    applycal(vis=visname, field = fields.secondaryfield, spw = spw,
+    applycal(vis=visname, field = fields.secondaryfield,
             selectdata = False, calwt = True,
         gaintable = [calfiles.kcorrfile, calfiles.bpassfile, fluxfile,
             calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile],
@@ -53,7 +53,7 @@ def do_cross_cal_apply(visname, spw, fields, calfiles, caldir):
         parang= True)
 
     print " applying calibrations: target fields"
-    applycal(vis=visname, field = fields.targetfield, spw = spw,
+    applycal(vis=visname, field = fields.targetfield,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile, calfiles.dpolfile,
                 calfiles.xdelfile, calfiles.xpolfile],
@@ -77,6 +77,4 @@ if __name__ == '__main__':
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = va(taskvals, 'crosscal', 'spw', str, default='')
-
-    do_cross_cal_apply(visname, spw, fields, calfiles, caldir)
+    do_cross_cal_apply(visname, fields, calfiles, caldir)

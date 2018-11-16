@@ -6,17 +6,17 @@ import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 
-def do_pre_flag_2(visname, spw, fields):
+def do_pre_flag_2(visname, fields):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
     cliptarget    = [0., 20.]
 
-    flagdata(vis=visname, mode="clip", spw = spw, field=fields.fluxfield,
+    flagdata(vis=visname, mode="clip", field=fields.fluxfield,
             clipminmax=clipfluxcal, datacolumn="corrected", clipoutside=True,
             clipzeros=True, extendpols=False, action="apply", flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", spw = spw,
+    flagdata(vis=visname, mode="clip",
             field=fields.secondaryfield, clipminmax=clipphasecal,
             datacolumn="corrected", clipoutside=True, clipzeros=True,
             extendpols=False, action="apply", flagbackup=True, savepars=False,
@@ -41,14 +41,14 @@ def do_pre_flag_2(visname, spw, fields):
             flagbackup=True, overwrite=True, writeflags=True)
 
     ## Now extend the flags (70% more means full flag, change if required)
-    flagdata(vis=visname, mode="extend", spw = spw, field=fields.gainfields,
+    flagdata(vis=visname, mode="extend", field=fields.gainfields,
             datacolumn="corrected", clipzeros=True, ntime="scan",
             extendflags=False, extendpols=False, growtime=90.0, growfreq=90.0,
             growaround=False, flagneartime=False, flagnearfreq=False,
             action="apply", flagbackup=True, overwrite=True, writeflags=True)
 
     # Now flag for target - moderate flagging, more flagging in self-cal cycles
-    flagdata(vis=visname, mode="clip", spw = spw, field=fields.targetfield,
+    flagdata(vis=visname, mode="clip", field=fields.targetfield,
             clipminmax=cliptarget, datacolumn="corrected", clipoutside=True,
             clipzeros=True, extendpols=False, action="apply", flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
@@ -88,6 +88,4 @@ if __name__ == '__main__':
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = va(taskvals, 'crosscal', 'spw', str, default='')
-
-    do_pre_flag_2(visname, spw, fields)
+    do_pre_flag_2(visname, fields)
