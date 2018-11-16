@@ -23,19 +23,7 @@ def get_calfiles(visname, caldir):
 
 def bookkeeping(visname):
     # Book keeping
-    workdir = os.path.join(os.getcwd(), 'pipeline')
-    if not os.path.isdir(workdir):
-        os.makedirs(workdir)
-
-    procdir = os.path.join(workdir, 'processing/')
-    if not os.path.isdir(procdir):
-        os.makedirs(procdir)
-
-    logdir = os.path.join(procdir, 'logs/')
-    if not os.path.isdir(logdir):
-        os.makedirs(logdir)
-
-    caldir = os.path.join(procdir, 'calib_out/')
+    caldir = os.path.join(os.getcwd(), 'caltables')
     if not os.path.isdir(caldir):
         os.makedirs(caldir)
 
