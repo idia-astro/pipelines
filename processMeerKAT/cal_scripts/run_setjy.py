@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 import config_parser
 from cal_scripts import bookkeeping
@@ -10,13 +10,21 @@ def do_setjy(visname, spw, fields, standard):
 
     fluxlist = ['J0408-6545', '0408-6545', '']
 
-    print " starting setjy for flux calibrator"
-    if any([ff in fields.fluxfield for ff in fluxlist]):
-        for ff in fluxlist:
-            if ff in fields.fluxfield:
-                fieldname = ff
-                break
+    msmd.open(visname)
+    fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(',')])
+    msmd.close()
 
+    do_manual=False
+    for ff in fluxlist:
+        if ff in fnames:
+            setjyname = ff
+            do_manual=True
+            break
+        else:
+            setjyname = fields.fluxfield.split(',')[0]
+
+
+    if do_manual:
         smodel = [17.066, 0.0, 0.0, 0.0]
         spix = [-1.179]
         reffreq="1284MHz"
@@ -26,11 +34,11 @@ def do_setjy(visname, spw, fields, standard):
         print "Spix: ", spix
         print "Ref freq ", reffreq
 
-        setjy(vis=visname, field=fieldname, scalebychan=True, standard='manual',
+        setjy(vis=visname, field=ff, scalebychan=True, standard='manual',
                 fluxdensity=smodel, spix=spix, reffreq=reffreq)
     else:
-        setjy(vis=visname, field = fields.fluxfield, spw = spw, scalebychan=True,
-                standard=standard)
+        setjy(vis=visname, field = fields.fluxfield, spw = spw,
+                scalebychan=True, standard=standard)
 
 if __name__ == '__main__':
     # Get the name of the config file
