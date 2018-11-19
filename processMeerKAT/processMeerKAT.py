@@ -36,6 +36,7 @@ SCRIPTS = [ ('partition.py',True,''),
             ('flag_round_2.py',True,''),
             ('run_setjy.py',True,''),
             ('cross_cal.py',False,''),
+            ('cross_cal_apply.py',True,''),
             ('split.py',True,'')]
 
 def parse_args():

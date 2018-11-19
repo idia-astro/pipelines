@@ -5,7 +5,7 @@ import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 
-def do_pre_flag(visname, spw, fields, badfreqranges):
+def do_pre_flag(visname, fields, badfreqranges):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
     cliptarget    = [0., 20.]
@@ -18,41 +18,41 @@ def do_pre_flag(visname, spw, fields, badfreqranges):
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", spw=spw, field=fields.fluxfield,
+    flagdata(vis=visname, mode="clip", field=fields.fluxfield,
             clipminmax=clipfluxcal, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", spw=spw, field=fields.secondaryfield,
+    flagdata(vis=visname, mode="clip", field=fields.secondaryfield,
             clipminmax=clipphasecal, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
-    flagdata(vis=visname, mode='tfcrop', field=fields.gainfields, spw=spw,
+    flagdata(vis=visname, mode='tfcrop', field=fields.gainfields,
             ntime='scan', timecutoff=5.0, freqcutoff=5.0, timefit='line',
             freqfit='line', extendflags=False, timedevscale=5., freqdevscale=5.,
             extendpols=True, growaround=False, action='apply', flagbackup=True,
             overwrite=True, writeflags=True, datacolumn='DATA')
 
     # Conservatively extend flags
-    flagdata(vis=visname, mode='extend', spw=spw, field=fields.gainfields,
+    flagdata(vis=visname, mode='extend', field=fields.gainfields,
             datacolumn='data', clipzeros=True, ntime='scan', extendflags=False,
             extendpols=True, growtime=80., growfreq=80., growaround=False,
             flagneartime=False, flagnearfreq=False, action='apply',
             flagbackup=True, overwrite=True, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", spw=spw, field=fields.targetfield,
+    flagdata(vis=visname, mode="clip", field=fields.targetfield,
             clipminmax=cliptarget, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
-    flagdata(vis=visname, mode='tfcrop', field=fields.targetfield, spw=spw,
+    flagdata(vis=visname, mode='tfcrop', field=fields.targetfield,
             ntime='scan', timecutoff=6.0, freqcutoff=6.0, timefit='poly',
             freqfit='poly', extendflags=False, timedevscale=5., freqdevscale=5.,
             extendpols=True, growaround=False, action='apply', flagbackup=True,
             overwrite=True, writeflags=True, datacolumn='DATA')
 
-    flagdata(vis=visname, mode='extend', spw=spw, field=fields.targetfield,
+    flagdata(vis=visname, mode='extend', field=fields.targetfield,
             datacolumn='data', clipzeros=True, ntime='scan', extendflags=False,
             extendpols=True, growtime=80., growfreq=80., growaround=False,
             flagneartime=False, flagnearfreq=False, action='apply',
@@ -78,6 +78,4 @@ if __name__ == '__main__':
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    spw = va(taskvals, 'crosscal', 'spw', str, default='')
-
-    do_pre_flag(visname, spw, fields, badfreqranges)
+    do_pre_flag(visname, fields, badfreqranges)
