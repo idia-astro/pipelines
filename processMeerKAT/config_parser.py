@@ -35,8 +35,12 @@ def parse_config(filename):
 
         for option in config.options(section):
             # Evaluate to the right type()
-            taskvals[section][option] =\
-                            ast.literal_eval(config.get(section, option))
+            try:
+                taskvals[section][option] = ast.literal_eval(config.get(section, option))
+            except ValueError:
+                err = "Cannot format field '{0}' in config file '{1}'".format(option,filename)
+                err += ", which is currently set to '{0}'.".format(config.get(section, option))
+                raise ValueError(err)
 
     return taskvals, config
 
@@ -120,5 +124,5 @@ def validate_args(kwdict, section, key, dtype, default=None):
 if __name__ == '__main__':
     cliargs = parse_args()
     taskvals,config = parse_config(cliargs.config)
-    print taskvals
+    print(taskvals)
 
