@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 
 __version__ = '1.0'
 
@@ -143,7 +143,7 @@ def write_command(script,args,name="job",mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
     params['casa_call'] = ''
-    params['casa_log'] = ''
+    params['casa_log'] = '--nologfile'
 
     #if script path doesn't exist and it's not in user's path, assume it's in the calibration directory
     if not os.path.exists(script) and script not in os.environ['PATH']:
