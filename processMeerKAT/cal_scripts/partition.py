@@ -5,7 +5,6 @@ Runs partition on the input MS
 import sys
 import os
 
-#from processMeerKAT import config_parser
 import config_parser
 from config_parser import validate_args as va
 from cal_scripts import get_fields

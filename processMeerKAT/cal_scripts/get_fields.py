@@ -79,7 +79,7 @@ def check_refant(MS,refant,warn=True):
 
 def main():
 
-    args = processMeerKAT.parse_args()[0]
+    args = processMeerKAT.parse_args()
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
     check_refant(args.MS, refant, warn=True)
 
