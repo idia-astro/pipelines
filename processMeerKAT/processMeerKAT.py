@@ -30,7 +30,8 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','cpus_per_task','mem','plane','submit','scripts','verbose']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.0.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
-SCRIPTS = [ ('partition.py',True,''),
+SCRIPTS = [ ('validate_input.py',False,''),
+            ('partition.py',True,''),
             ('flag_round_1.py',True,''),
             ('run_setjy.py',True,''),
             ('parallel_cal.py',False,''),
