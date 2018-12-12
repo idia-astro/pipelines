@@ -28,9 +28,4 @@ if __name__ == '__main__':
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
-    # Check if the reference antenna exists, and complain and quit if it doesn't
-    if not calcrefant:
-        get_fields.check_refant(MS=visname, refant=refant, warn=False)
-
-
     do_partition(visname, spw)
