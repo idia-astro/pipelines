@@ -9,6 +9,7 @@ import os
 import config_parser
 from config_parser import validate_args as va
 from cal_scripts import get_fields
+import processMeerKAT
 
 
 def validateinput():
@@ -16,6 +17,9 @@ def validateinput():
     Parse the input config file (command line argument) and validate that the
     parameters look okay
     """
+
+    print('This is version {0}'.format(processMeerKAT.__version__))
+
     # Get the name of the config file
     args = config_parser.parse_args()
 

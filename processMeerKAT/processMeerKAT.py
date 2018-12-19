@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 #Set global limits for cluster configuration
 TOTAL_NODES_LIMIT = 30
 NTASKS_PER_NODE_LIMIT = 128
-CPUS_PER_NODE_LIMIT = 32
 MEM_PER_NODE_GB_LIMIT = 230
 
 #Set global values for paths and file names
@@ -27,8 +26,8 @@ TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for arguments copied to config file, and some of their default values
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','cpus_per_task','mem','plane','submit','scripts','verbose']
-CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.0.simg'
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose']
+CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
@@ -67,8 +66,6 @@ def parse_args():
                         help="Use this number of nodes [default: 15; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=3,
-                        help="Use this number of CPUs (per task) [default: 3; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=4096*3*8,
                         help="Use this many MB of memory (per node) [default: {0}; max: {1} MB ({2} GB).".format(4096*3*8,MEM_PER_NODE_GB_LIMIT*1024,MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
@@ -130,10 +127,6 @@ def validate_args(args,config,parser=None):
         msg = "The number of nodes [-n --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
         raise_error(config, msg, parser)
 
-    if args['cpus_per_task'] * args['ntasks_per_node'] > CPUS_PER_NODE_LIMIT:
-        msg = "The number of cpus per node [-t --ntasks-per-node] * [-c --cpus-per-task] must not exceed {0}. You input {1}.".format(CPUS_PER_NODE_LIMIT,args['cpus_per_node'])
-        raise_error(config, msg, parser)
-
     if args['mem'] > MEM_PER_NODE_GB_LIMIT * 1024:
         msg = "The memory per node [-m --mem] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
         raise_error(config, msg, parser)
@@ -158,7 +151,7 @@ def write_command(script,args,name="job",mpi_wrapper=MPI_WRAPPER,container=CONTA
     return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
 
 
-def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,cpus=3,mem=98304,name="job",plane=1,
+def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="job",plane=1,
                 mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_task=True):
 
     """Write a SLURM sbatch file calling a certain script with a particular configuration.
@@ -175,10 +168,8 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,cpus=3,mem=98304,
         Number of nodes to use for this job - e.g. '2-2' meaning minimum and maximum of 2 nodes.
     tasks : int
         The number of tasks per node for this job.
-    cpus : int
-        The number of CPUs per task for this job.
     mem : int
-        The memory in MB to use per CPU for this job.
+        The memory in MB to use per node for this job.
     name : str
         Name for this job. This gets used in naming the various output files, as well as deciding which (e.g. CASA) functions to call within this module.
     plane : int
@@ -203,12 +194,14 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,cpus=3,mem=98304,
     contents = """#!/bin/bash
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
-    #SBATCH --cpus-per-task={cpus}
+    #SBATCH --cpus-per-task=1
     #SBATCH --mem={mem}
     #SBATCH --job-name={name}
     #SBATCH --distribution=plane={plane}
     #SBATCH --output={LOG_DIR}/{name}-%j.out
     #SBATCH --error={LOG_DIR}/{name}-%j.err
+
+    export OMP_NUM_THREADS=1
 
     {command}"""
 
@@ -259,7 +252,7 @@ def write_master(filename,scripts=[],submit=False,verbose=False,dir='jobScripts'
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do echo %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
-    write_bash_job_script(master, errorScript, extn, do, 'find errors', dir=dir)
+    write_bash_job_script(master, errorScript, extn, do, 'find errors (after pipeline has run)', dir=dir)
     master.close()
 
     os.chmod(filename, 509)
@@ -280,7 +273,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=15, ntasks_per_node=16,
-                cpus_per_task=3, mem=98304, plane=4, submit=False, verbose=False):
+                mem=98304, plane=4, submit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -301,10 +294,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         name = os.path.splitext(os.path.split(script)[1])[0]
 
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,cpus=cpus_per_task,
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1,mem=196608,plane=1,
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
                         mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
 
     #Build master submission script, replacing all .py with .sbatch
