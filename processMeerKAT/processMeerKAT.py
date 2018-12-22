@@ -10,10 +10,9 @@ from shutil import copyfile
 import logging
 logger = logging.getLogger(__name__)
 
-#Set global limits for cluster configuration
+#Set global limits for ilifu cluster configuration
 TOTAL_NODES_LIMIT = 30
 NTASKS_PER_NODE_LIMIT = 128
-CPUS_PER_NODE_LIMIT = 32
 MEM_PER_NODE_GB_LIMIT = 230
 
 #Set global values for paths and file names
@@ -26,9 +25,9 @@ CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
-#Set global values for arguments copied to config file, and some of their default values
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','cpus_per_task','mem','plane','submit','scripts','verbose']
-CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.0.simg'
+#Set global values for SLURM arguments copied to config file, and some of their default values
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose']
+CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
@@ -42,7 +41,21 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('cross_cal_apply.py',True,''),
             ('split.py',True,'')]
 
+
 def check_path(path):
+
+    """Check in specific location for a script or container, including for one of this pipeline's calibration scripts
+    (in SCRIPT_DIR/CALIB_SCRIPTS_DIR/). If path isn't found, raise IOError, otherwise return the path.
+
+    Arguments:
+    ----------
+    path : str
+        Check for script or container at this path.
+
+    Returns:
+    --------
+    path : str
+        Path to script or container (if path found)."""
 
     if path != '' and not os.path.exists(path) and not os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
         raise IOError('File "{0}" not found.'.format(path))
@@ -51,9 +64,22 @@ def check_path(path):
 
 def parse_args():
 
-    """Parse arguments into this script."""
+    """Parse arguments into this script.
+
+    Returns:
+    --------
+    args : class ``argparse.ArgumentParser``
+        Known and validated arguments."""
 
     def parse_scripts(val):
+
+        """Format individual arguments passed into a list for [ -S --scripts] argument, including paths and boolean values.
+
+        Arguments/Returns:
+        ------------------
+        val : bool or str
+            Path to script or container, or boolean representing whether that script is threadsafe (for MPI)."""
+
         if val.lower() in ('true','false'):
             return (val.lower() == 'true')
         else:
@@ -67,8 +93,6 @@ def parse_args():
                         help="Use this number of nodes [default: 15; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-C","--cpus-per-task", metavar="num", required=False, type=int, default=3,
-                        help="Use this number of CPUs (per task) [default: 3; max: {0} / ntasks-per-node].".format(CPUS_PER_NODE_LIMIT))
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=4096*3*8,
                         help="Use this many MB of memory (per node) [default: {0}; max: {1} MB ({2} GB).".format(4096*3*8,MEM_PER_NODE_GB_LIMIT*1024,MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
@@ -110,10 +134,23 @@ def parse_args():
     if len(args.scripts) > len(SCRIPTS):
         [args.scripts.pop(0) for i in range(len(SCRIPTS))]
 
+    #validate arguments before returning them
     validate_args(vars(args),args.config,parser=parser)
     return args
 
 def raise_error(config,msg,parser=None):
+
+    """Raise error with specified message, either as parser error (when option passed in via command line),
+    or ValueError (when option passed in via config file).
+
+    Arguments:
+    ----------
+    config : str
+        Path to config file.
+    msg : str
+        Error message to display.
+    parser : class ``argparse.ArgumentParser``, optional
+        If this is input, parser error will be raised."""
 
     if parser is None:
         raise ValueError("Bad input found in '{0}'\n{1}".format(config,msg))
@@ -121,6 +158,17 @@ def raise_error(config,msg,parser=None):
         parser.error(msg)
 
 def validate_args(args,config,parser=None):
+
+    """Validate arguments, coming from command line or config file. Raise relevant error (parser error or ValueError) if invalid argument found.
+
+    Arguments:
+    ----------
+    args : dict
+        Dictionary of slurm arguments from command line or config file.
+    config : str
+        Path to config file.
+    parser : class ``argparse.ArgumentParser``, optional
+        If this is input, parser error will be raised."""
 
     if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
         msg = "The number of tasks [-t --ntasks-per-node] per node must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks-per-node'])
@@ -130,85 +178,108 @@ def validate_args(args,config,parser=None):
         msg = "The number of nodes [-n --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
         raise_error(config, msg, parser)
 
-    if args['cpus_per_task'] * args['ntasks_per_node'] > CPUS_PER_NODE_LIMIT:
-        msg = "The number of cpus per node [-t --ntasks-per-node] * [-c --cpus-per-task] must not exceed {0}. You input {1}.".format(CPUS_PER_NODE_LIMIT,args['cpus_per_node'])
-        raise_error(config, msg, parser)
-
     if args['mem'] > MEM_PER_NODE_GB_LIMIT * 1024:
         msg = "The memory per node [-m --mem] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
         raise_error(config, msg, parser)
 
-def write_command(script,args,name="job",mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_task=True,logfile=True):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True):
 
+    """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
+
+    Arguments:
+    ----------
+    script : str
+        Path to script called (assumed to exist or be in PATH or calibration scripts directory).
+    args : str
+        Arguments to pass into script. Use '' for no arguments.
+    name : str, optional
+        Name of this job, to append to CASA output name.
+    mpi_wrapper : str, optional
+        MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
+    container : str, optional
+        Path to singularity container used for this job.
+    casa_script : bool, optional
+        Is the script that is called within this job a CASA script?
+    logfile : bool, optional
+        Write the CASA output to a log file? Only used if casa_script==True.
+
+    Returns:
+    --------
+    command : str
+        Bash command to call with srun or within sbatch file."""
+
+    #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
 
-    #if script path doesn't exist and it's not in user's path, assume it's in the calibration directory
+    #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
     if not os.path.exists(script) and script not in os.environ['PATH']:
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
 
+    #If specified by user, call script via CASA and write output to log file
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
-    if casa_task:
+    if casa_script:
         params['casa_call'] = """"casa" --nologger --nogui {casa_log} -c""".format(**params)
 
-    return "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
+    command = "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
+    return command
 
 
-def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,cpus=3,mem=98304,name="job",plane=1,
-                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_task=True):
+def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="job",plane=1,
+                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True):
 
-    """Write a SLURM sbatch file calling a certain script with a particular configuration.
+    """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
     Arguments:
     ----------
     script : str
-        Path to script that is called within sbatch file.
+        Path to script called within sbatch file (assumed to exist or be in PATH or calibration directory).
     args : str
-        Arguments passed into script that is called within sbatch file.
-    time : str
-        Time limit on this job (not currently used).
-    nodes : str
-        Number of nodes to use for this job - e.g. '2-2' meaning minimum and maximum of 2 nodes.
-    tasks : int
-        The number of tasks per node for this job.
-    cpus : int
-        The number of CPUs per task for this job.
-    mem : int
-        The memory in MB to use per CPU for this job.
-    name : str
-        Name for this job. This gets used in naming the various output files, as well as deciding which (e.g. CASA) functions to call within this module.
-    plane : int
-        Distrubute tasks of this block size before moving onto next node, for this job.
-    mpi_wrapper : str
+        Arguments passed into script called within this sbatch file. Use '' for no arguments.
+    time : str, optional
+        Time limit on this job (option not currently used).
+    nodes : int, optional
+        Number of nodes to use for this job.
+    tasks : int, optional
+        The number of tasks per node to use for this job.
+    mem : int, optional
+        The memory in MB (per node) to use for this job.
+    name : str, optional
+        Name for this job, used in naming the various output files.
+    plane : int, optional
+        Distrubute tasks for this job using this block size before moving onto next node.
+    mpi_wrapper : str, optional
         MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
-    container : str
+    container : str, optional
         Path to singularity container used for this job.
-    casa_task : bool
-        Is the script that is called within this job a CASA task?"""
+    casa_script : bool, optional
+        Is the script that is called within this job a CASA script?"""
 
     if not os.path.exists(LOG_DIR):
         os.mkdir(LOG_DIR)
 
-    #store parameters passed into this function as dictionary, and add to it
+    #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_task=casa_task)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script)
 
     #SBATCH --time={time}
     contents = """#!/bin/bash
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
-    #SBATCH --cpus-per-task={cpus}
+    #SBATCH --cpus-per-task=1
     #SBATCH --mem={mem}
     #SBATCH --job-name={name}
     #SBATCH --distribution=plane={plane}
     #SBATCH --output={LOG_DIR}/{name}-%j.out
     #SBATCH --error={LOG_DIR}/{name}-%j.err
+
+    export OMP_NUM_THREADS=1
 
     {command}"""
 
@@ -223,11 +294,27 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,cpus=3,mem=98304,
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_master(filename,scripts=[],submit=False,verbose=False,dir='jobScripts'):
+def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False):
+
+    """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
+
+    Arguments:
+    ----------
+    filename : str
+        Name of master pipeline submission script.
+    scripts : list, optional
+        List of sbatch scripts to call in order.
+    submit : bool, optional
+        Submit jobs to SLURM queue immediately?
+    dir : str, optional
+        Name of directory to output ancillary job scripts.
+    verbose : bool, optional
+        Verbose output (inserted into master script)?"""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
 
+    #Submit first script with no dependencies and extract job ID
     command = 'sbatch {0}'.format(scripts[0])
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
@@ -235,7 +322,7 @@ def write_master(filename,scripts=[],submit=False,verbose=False,dir='jobScripts'
     master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
     scripts.pop(0)
 
-
+    #Submit each script with dependency on all previous scripts, and extract job IDs
     for script in scripts:
         command = 'sbatch -d afterok:$IDs'
         master.write('\n#{0}\n'.format(script))
@@ -247,22 +334,25 @@ def write_master(filename,scripts=[],submit=False,verbose=False,dir='jobScripts'
     master.write('echo Submitted sbatch jobs with following IDs: $IDs\n')
     master.write('mkdir -p {0}\n'.format(dir))
 
-    #Add time as extn to this pipeline run, to give unique ID
-    master.write('\n#Add time as extn to this pipeline run, to give unique ID')
-    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
-    extn = '_$DATE.sh'
+    #Add time as extn to this pipeline run, to give unique filenames
     killScript = 'killJobs'
     summaryScript = 'summary'
     errorScript = 'findErrors'
+    master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
+    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
+    extn = '_$DATE.sh'
 
-    #Write each job script
+    #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do echo %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
-    write_bash_job_script(master, errorScript, extn, do, 'find errors', dir=dir)
-    master.close()
+    write_bash_job_script(master, errorScript, extn, do, 'find errors (after pipeline has run)', dir=dir)
 
+    #Close master submission script and make executable
+    master.close()
     os.chmod(filename, 509)
+
+    #Submit script or output that it will not run
     if submit:
         logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
@@ -270,6 +360,23 @@ def write_master(filename,scripts=[],submit=False,verbose=False,dir='jobScripts'
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
 def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
+
+    """Write bash job script (e.g. jobs summary, kill all jobs, etc).
+
+    Arguments:
+    ----------
+    master : class ``file``
+        Master script to which to write contents.
+    filename : str
+        Filename of this job script.
+    extn : str
+        Extension to append to this job script (e.g. date & time).
+    do : str
+        Bash command to run in this job script.
+    purpose : str
+        Purpose of this script to append as comment.
+    dir : str, optional
+        Directory to write this script into."""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
     master.write('\n#Create {0} file, make executable and simlink to current version\n'.format(fname))
@@ -279,56 +386,79 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('ln -f -s {0} {1}.sh\n'.format(fname,filename))
     master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
-def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=15, ntasks_per_node=16,
-                cpus_per_task=3, mem=98304, plane=4, submit=False, verbose=False):
+def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=15,
+                ntasks_per_node=16, mem=98304, plane=4, submit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
     Arguments:
     ----------
-    MS : str
-        Path to measurement set.
-    nodes : int
-        The number of nodes to use for all thread-safe CASA tasks.
-    tasks : int
-        The number of tasks per node to use for all thread-safe CASA tasks.
-    submit : bool
-        Don't submit the sbatch job to the SLURM queue, only write the file.
-    verbose : bool
+    config : str
+        Path to config file.
+    scripts : list (of paths), optional
+        List of paths to scripts (assumed to be python -- i.e. extension .py) to call within seperate sbatch jobs.
+    threadsafe : list (of bools), optional
+        Are these scripts threadsafe (for MPI)? List assumed to be same length as scripts.
+    containers : list (of paths), optional
+        List of paths to singularity containers to use for each script. List assumed to be same length as scripts.
+    mpi_wrapper : str, optional
+        Path to MPI wrapper to use for threadsafe tasks (otherwise srun used).
+    nodes : int, optional
+        Number of nodes to use for this job.
+    tasks : int, optional
+        The number of tasks per node to use for this job.
+    mem : int, optional
+        The memory in MB (per node) to use for this job.
+    name : str, optional
+        Name for this job, used in naming the various output files.
+    plane : int, optional
+        Distrubute tasks for this job using this block size before moving onto next node.
+    submit : bool, optional
+        Submit jobs to SLURM queue immediately?
+    verbose : bool, optional
         Verbose output?"""
 
+    #Write sbatch file for each input python script
     for i,script in enumerate(scripts):
         name = os.path.splitext(os.path.split(script)[1])[0]
 
+        #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,cpus=cpus_per_task,
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,cpus=1,mem=196608,plane=1,
-                        mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
+            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
+                        mpi_wrapper='srun',container=containers[i],name=name)
 
-    #Build master submission script, replacing all .py with .sbatch
+    #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
     write_master(MASTER_SCRIPT,scripts=scripts,submit=submit,verbose=verbose)
 
 
 def default_config(arg_dict,filename):
 
-    """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set."""
+    """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set.
+
+    Arguments:
+    ----------
+    arg_dict : dict
+        Dictionary of arguments passed into this script, which is inserted into the config file under section [slurm].
+    filename : str
+        Filename of config file to write."""
 
     #Copy default config to current location
     copyfile('{0}/{1}'.format(SCRIPT_DIR,CONFIG),filename)
 
-    #Add following SLURM arguments to config file
+    #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
-    #Add MS to config file
+    #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(arg_dict['MS'])}, conf_sec='data')
 
-    #Write and submit command to extract fields
+    #Write and submit srun command to extract fields, and insert them into config file under section [fields]
     params =  '-B -M {0} --config {1}'.format(arg_dict['MS'],filename)
-    command = write_command('get_fields.py', params, mpi_wrapper="srun", container=arg_dict['container'],logfile=False)
+    command = write_command('get_fields.py', params, mpi_wrapper='srun', container=arg_dict['container'],logfile=False)
     logger.debug('Extracting fields using the following command:\n{0}'.format(command))
     os.system(command)
 
@@ -337,27 +467,57 @@ def default_config(arg_dict,filename):
 
 def get_slurm_dict(arg_dict,slurm_config_keys):
 
+    """Build a slurm dictionary to be inserted into config file, using specified keys.
+
+    Arguments:
+    ----------
+    arg_dict : dict
+        Dictionary of arguments passed into this script, which is inserted into the config file under section [slurm].
+    slurm_config_keys : list
+        List of keys from arg_dict to insert into config file.
+
+    Returns:
+    --------
+    slurm_dict : dict
+        Dictionary to insert into config file under section [slurm]."""
+
     slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
     return slurm_dict
 
-def format_args(args):
+def format_args(config):
 
-    config_dict = config_parser.parse_config(args.config)[0]
-    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(args.config,TMP_CONFIG))
-    logger.warn("Changing '{0}' will have no effect unless this script is run again with [-R --run].".format(args.config))
-    copyfile(args.config, TMP_CONFIG)
+    """Format (and validate) arguments from config file, to be passed into write_jobs() function.
+
+    Arguments:
+    ----------
+    config : str
+        Path to config file.
+
+    Returns:
+    --------
+    kwargs : dict
+        Keyword arguments extracted from config file, to be passed into write_jobs() function."""
+
+    #Copy config file to TMP_CONFIG and inform user
+    config_dict = config_parser.parse_config(config)[0]
+    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
+    logger.warn("Changing '{0}' will have no effect unless this script is run again with [-R --run].".format(config))
+    copyfile(config, TMP_CONFIG)
+
+    #Ensure [slurm] section exists in config file, otherwise raise ValueError
     if 'slurm' in config_dict.keys():
         kwargs = config_dict['slurm']
     else:
-        raise ValueError("Config file '{0}' has no section [slurm]. Please insert section or build new config with [-B --build].".format(args.config))
+        raise ValueError("Config file '{0}' has no section [slurm]. Please insert section or build new config with [-B --build].".format(config))
 
-    #check that expected keys are present, and validate those keys
+    #Check that expected keys are present, and validate those keys
     missing_keys = list(set(SLURM_CONFIG_KEYS) - set(kwargs))
     if len(missing_keys) > 0:
-        raise KeyError("Keys {0} missing from section [slurm] in '{1}'.".format(missing_keys,args.config))
-    validate_args(kwargs,args.config)
+        raise KeyError("Keys {0} missing from section [slurm] in '{1}'.".format(missing_keys,config))
+    validate_args(kwargs,config)
 
-    #Reformat scripts, to extract scripts, threadsafe, and containers
+    #Reformat scripts tuple/list, to extract scripts, threadsafe, and containers as parallel lists
+    #Check that path to each script and container exists or is ''
     scripts = kwargs['scripts']
     kwargs['scripts'] = [check_path(i[0]) for i in scripts]
     kwargs['threadsafe'] = [i[1] for i in scripts]
@@ -373,7 +533,14 @@ def format_args(args):
 
 def setup_logger(args):
 
-    #Overwrite with verbose mode if written True in config file
+    """Setup logger at debug or info level according to whether verbose option selected (via command line or config file).
+
+    Arguments:
+    ----------
+    args : class ``argparse.Namespace``
+        Arguments passed into this program."""
+
+    #Overwrite with verbose mode if set to True in config file
     verbose = args.verbose
     if args.run and not verbose:
         config = config_parser.parse_config(args.config)[0]
@@ -385,17 +552,17 @@ def setup_logger(args):
 
 def main():
 
-    #Parse command-line arguments
+    #Parse command-line arguments, and setup logger
     args = parse_args()
     setup_logger(args)
 
+    #Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
         logger.info('This is version {0}'.format(__version__))
-    elif args.build:
+    if args.build:
         default_config(vars(args),args.config)
-    elif args.run:
-        #Copy args from config file to TMP_CONFIG and use to write jobs
-        kwargs = format_args(args)
+    if args.run:
+        kwargs = format_args(args.config)
         write_jobs(TMP_CONFIG, **kwargs)
 
 if __name__ == "__main__":
