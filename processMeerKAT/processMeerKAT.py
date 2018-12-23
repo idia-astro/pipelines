@@ -85,20 +85,20 @@ def parse_args():
         else:
             return check_path(val)
 
-    parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA measurement set.')
+    parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA measurement set. Version: {0}'.format(__version__))
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
-    parser.add_argument("--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
+    parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=15,
                         help="Use this number of nodes [default: 15; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+    parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
+                            help="Distribute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=4096*3*8,
                         help="Use this many MB of memory (per node) [default: {0}; max: {1} MB ({2} GB).".format(4096*3*8,MEM_PER_NODE_GB_LIMIT*1024,MEM_PER_NODE_GB_LIMIT))
-    parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
-                        help="Distrubute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
-                        help="Run pipeline with these scripts, in this order, using this container (3nd tuple value - empty string to default to [--container]). Is it threadsafe (2nd tuple value)?")
+                        help="Run pipeline with these scripts, in this order, using this container (3rd tuple value - empty string to default to [--container]). Is it threadsafe (2nd tuple value)?")
     parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
                         help="Use this mpi wrapper when calling scripts [default: '{0}'].".format(MPI_WRAPPER))
     parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
