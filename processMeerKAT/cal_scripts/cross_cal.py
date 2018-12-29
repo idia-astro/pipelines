@@ -14,12 +14,12 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
             field = fields.kcorrfield, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'K',
-            solint = '10min', combine = '', parang = False, append = False)
+            solint = '10min', combine = 'scan', parang = False, append = False)
 
     print " starting bandpass -> %s" % calfiles.bpassfile
     bandpass(vis=visname, caltable = calfiles.bpassfile,
             field = fields.bpassfield,
-            refant = referenceant, minblperant = minbaselines, solnorm = True,
+            refant = referenceant, minblperant = minbaselines, solnorm = False,
             solint = 'inf', combine = 'scan', bandtype = 'B', fillgaps = 8,
             gaintable = calfiles.kcorrfile, gainfield = fields.kcorrfield,
             parang = False, append = False)
@@ -53,19 +53,20 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     print " starting gaincal -> %s" % gain1file
     gaincal(vis=visname, caltable=gain1file, field=fields.fluxfield,
-            refant=referenceant, solint='1min', minblperant=minbaselines,
-            solnorm=False, gaintype='G', gaintable=[calfiles.kcorrfile,
-                calfiles.bpassfile, calfiles.xdelfile],
+            refant=referenceant, solint='10min', minblperant=minbaselines,
+            solnorm=False, gaintype='G',
+            gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
+                calfiles.xdelfile],
             gainfield = [fields.kcorrfield, fields.bpassfield,
                 fields.xdelfield], append=False, parang=True)
 
     gaincal(vis=visname, caltable=gain1file, field=fields.secondaryfield,
-            smodel=[1,0,0,0], refant=referenceant, solint='1min',
+            smodel=[1,0,0,0], refant=referenceant, solint='10min',
             minblperant=minbaselines, solnorm=False, gaintype='G',
             gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
                 calfiles.xdelfile],
-            gainfield = [fields.kcorrfield,
-                    fields.bpassfield, fields.xdelfield],
+            gainfield = [fields.kcorrfield, fields.bpassfield,
+                fields.xdelfield],
             append=True, parang=True)
 
     # implied polarization from instrumental response
@@ -82,7 +83,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 gain1file, calfiles.xdelfile],
             gainfield = [fields.kcorrfield, fields.bpassfield,
                 fields.secondaryfield, fields.xdelfield],
-            append = False, parang = True)
+            append = False)
 
     print "\n Check for x-y phase ambiguity."
     xyamb(xytab=xy0ambpfile, qu=GainQU[int(fields.dpolfield)], xyout = xy0pfile)
@@ -95,7 +96,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     print "Fractional polarization =", p
 
     gaincal(vis=visname, caltable = calfiles.gainfile, field = fields.fluxfield,
-            refant = referenceant, solint = '5min', solnorm = False,
+            refant = referenceant, solint = '10min', solnorm = False,
             gaintype = 'G', minblperant = minbaselines, combine = '',
             minsnr = 3, calmode = 'ap',
             gaintable = [calfiles.kcorrfile, calfiles.bpassfile,
@@ -106,17 +107,19 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     print "\n solution for secondary with parang = true"
     gaincal(vis=visname, caltable = calfiles.gainfile,
             field = fields.secondaryfield, refant = referenceant,
-            solint = '5min', solnorm = False,  gaintype = 'G',
-            minblperant = minbaselines,combine = '', smodel = S, minsnr = 3,
+            solint = '10min', solnorm = False,
+            gaintype = 'G', minblperant = minbaselines,
+            combine = '', smodel = S, minsnr = 3,
             gaintable = [calfiles.kcorrfile, calfiles.bpassfile,
                 calfiles.xdelfile],
-            gainfield = [fields.kcorrfield,fields.bpassfield,fields.xdelfield],
-            append = True, parang = True)
+            gainfield = [fields.kcorrfield, fields.bpassfield,
+                fields.xdelfield],
+            parang = True, append = True)
 
     print "\n now re-solve for Q,U from the new gainfile\n -> %s" \
                                                         % calfiles.gainfile
     Gain2QU = qufromgain(calfiles.gainfile)
-    print GainQU[int(fields.dpolfield)]
+    print Gain2QU[int(fields.dpolfield)]
 
     print "starting \'Dflls\' polcal -> %s"  % calfiles.dpolfile
     polcal(vis=visname, caltable = dtempfile, field = fields.dpolfield,
@@ -134,7 +137,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     if len(fields.gainfields) > 1:
         print " starting fluxscale -> %s", calfiles.fluxfile
         fluxscale(vis=visname, caltable = calfiles.gainfile,
-                reference = fields.fluxfield, transfer = '',
+                reference = fields.fluxfield, transfer = fields.secondaryfield,
                 fluxtable = calfiles.fluxfile,
                 listfile = os.path.join(caldir,'fluxscale.txt'),
                 append = False)
