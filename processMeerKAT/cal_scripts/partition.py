@@ -13,7 +13,12 @@ from cal_scripts import get_fields
 def do_partition(visname, spw):
     # Run partition
     mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
-    partition(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA')
+    msmd.open(visname)
+    nscan = msmd.nscans()
+    msmd.close()
+
+    partition(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA',
+            numsubms=nscan, separationaxis='scan')
 
 if __name__ == '__main__':
 
