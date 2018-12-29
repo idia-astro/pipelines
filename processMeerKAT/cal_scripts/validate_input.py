@@ -1,15 +1,75 @@
-"""
-Validates the input parameters prior to running any of the scripts.
-This can also be run at any stage of the pipeline.
-"""
-
 import sys
 import os
 
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import get_fields
 import processMeerKAT
+from cal_scripts import get_fields, bookkeeping
+
+from scipy.stats import iqr
+
+def get_ref_ant(visname, fluxfield):
+
+    msmd.open(visname)
+    fluxscans = msmd.scansforfield(int(fluxfield))
+    print "Flux field scan no: %d" % fluxscans[0]
+    antennas = msmd.antennasforscan(fluxscans[0])
+    msmd.done()
+    print "\n Antenna statistics on flux field"
+    print " ant    median    rms"
+
+    antamp=[]; antrms = []
+    for ant in antennas:
+        ant = str(ant)
+        t = visstat(vis=visname, field=fluxfield, antenna=ant,
+                timeaverage=True, timebin='500min', timespan='state,scan',
+                reportingaxes='field')
+
+        item = str(t.keys()[0])
+        amp = float(t[item]['median'])
+        rms = float(t[item]['rms'])
+        print "%3s  %8.3f %9.3f " % (ant, amp, rms)
+        antamp.append(amp)
+        antrms.append(rms)
+
+    antamp = np.array(antamp)
+    antrms = np.array(antrms)
+
+    medamp = np.median(antamp)
+    medrms = np.median(antrms)
+
+    iqramp = iqr(antamp)
+    iqrrms = iqr(antrms)
+
+    print "Median: %8.3f  %9.3f" % (medamp,medrms)
+
+    goodrms=[]; goodamp=[]; goodant=[]
+    badants = []
+    for ii in range(len(antamp)):
+        cond1 = antamp[ii] > medamp - iqramp
+        cond1 = cond1 & (antamp[ii] < medamp + iqramp)
+
+        cond2 = antrms[ii] > medrms - iqrrms
+        cond2 = cond1 & (antrms[ii] < medrms + iqrrms)
+
+        if cond1 and cond2:
+            goodant.append(antennas[ii])
+            goodamp.append(antamp[ii])
+            goodrms.append(antrms[ii])
+        else:
+            badants.append(antennas[ii])
+
+    goodrms = np.array(goodrms)
+    jj = np.argmin(goodrms)
+
+    print "best antenna: %2s  amp = %7.2f, rms = %7.2f" % \
+                                (goodant[jj], goodamp[jj], goodrms[jj])
+    print "1st good antenna: %2s  amp = %7.2f, rms = %7.2f" % \
+                                (goodant[0], goodamp[0], goodrms[0])
+    referenceant = str(goodant[jj])
+    print "setting reference antenna to: %s" % referenceant
+
+    return referenceant, badants
 
 
 def validateinput():
@@ -27,18 +87,30 @@ def validateinput():
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-    calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool, default=False)
+    calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
+    fields = bookkeeping.get_field_ids(taskvals['fields'])
+
+    # Check if the reference antenna exists, and complain and quit if it doesn't
+    if calcrefant:
+        if len(fields.fluxfield.split(',')) > 1:
+            field = fields.fluxfield.split(',')[0]
+        else:
+            field = fields.fluxfield
+
+        refant, badants = get_ref_ant(visname, field)
+        # Overwrite config file with new refant
+        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'refant':refant})
+        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'badants':badants})
+    else:
+        refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
+        get_fields.check_refant(MS=visname, refant=refant, warn=False)
 
     if not os.path.exists(visname):
         raise IOError("Path to MS %s not found" % (visname))
 
-    # Check if the reference antenna exists, and complain and quit if it doesn't
-    if not calcrefant:
-        get_fields.check_refant(MS=visname, refant=refant, warn=False)
-
-
 
 if __name__ == '__main__':
     validateinput()
+    sys.exit(0)
 

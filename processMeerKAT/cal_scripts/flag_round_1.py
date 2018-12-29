@@ -5,7 +5,7 @@ import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 
-def do_pre_flag(visname, fields, badfreqranges):
+def do_pre_flag(visname, fields, badfreqranges, badants):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
     cliptarget    = [0., 20.]
@@ -14,6 +14,10 @@ def do_pre_flag(visname, fields, badfreqranges):
         for badfreq in badfreqranges:
             badspw = '0:' + badfreq
             flagdata(vis=visname, mode='manual', spw=badspw)
+
+    if len(badants):
+        badants = ",".join([str(bb) for bb in badants])
+        flagdata(vis=visname, mode='manual', antenna=badants)
 
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
@@ -74,8 +78,9 @@ if __name__ == '__main__':
     visname = os.path.split(visname.replace('.ms', '.mms'))[1]
 
     badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
+    badants = taskvals['crosscal'].pop('badants')
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    do_pre_flag(visname, fields, badfreqranges)
+    do_pre_flag(visname, fields, badfreqranges, badants)
