@@ -7,6 +7,7 @@ calcrefant = True       # Calculate reference antenna in program (overwrites 're
 refant = 'm005'         # Reference antenna name/number
 badfreqranges = ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz']
 standard = 'Perley-Butler 2010'  # Flux density standard for setjy
+badants = []            # List of bad antenna numbers in the MS
 
 [slurm]			#See processMeerKAT.py -h for documentation
 nodes = 15
