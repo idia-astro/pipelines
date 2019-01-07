@@ -11,7 +11,6 @@ standard = 'Perley-Butler 2010'  # Flux density standard for setjy
 [slurm]			#See processMeerKAT.py -h for documentation
 nodes = 15
 ntasks_per_node = 8
-cpus_per_task = 3
 mem = 98304
 plane = 4
 submit = False

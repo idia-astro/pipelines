@@ -11,9 +11,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 #Set global limits for ilifu cluster configuration
-TOTAL_NODES_LIMIT = 30
+TOTAL_NODES_LIMIT = 35
 NTASKS_PER_NODE_LIMIT = 128
-MEM_PER_NODE_GB_LIMIT = 230
+MEM_PER_NODE_GB_LIMIT = 500 #512000 MB
 
 #Set global values for paths and file names
 THIS_PROG = sys.argv[0]
@@ -346,7 +346,7 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do echo %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
-    write_bash_job_script(master, errorScript, extn, do, 'find errors (after pipeline has run)', dir=dir)
+    write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
 
     #Close master submission script and make executable
     master.close()
