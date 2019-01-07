@@ -11,17 +11,18 @@ def split_vis(visname, spw, fields, specave, timeave):
     msmd.open(visname)
     fnames = msmd.namesforfields([int(ff) for ff in fields.targetfield.split(',')])
     secondaryname = msmd.namesforfields(int(fields.secondaryfield))[0]
+    primaryname = msmd.namesforfields(int(fields.fluxfield))[0]
     msmd.close()
 
     for field in fnames:
         split(vis=visname, outputvis = outputbase+'.'+field+'.mms',
                 datacolumn='corrected', field = fields.targetfield, spw = spw,
-                keepflags=True, keepmms = True, width = specave,
+                keepflags=False, keepmms = True, width = specave,
                 timebin = timeave)
 
     split(vis=visname, outputvis = outputbase+'.'+secondaryname+'.mms',
             datacolumn='corrected', field = fields.secondaryfield, spw = spw,
-            keepflags=True, keepmms = True, width = specave, timebin = timeave)
+            keepflags=False, keepmms = True, width = specave, timebin = timeave)
 
 if __name__ == '__main__':
     # Get the name of the config file
