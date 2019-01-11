@@ -28,5 +28,6 @@ scripts = [ ('validate_input.py',False,''),
             ('run_setjy.py',True,''),
             ('cross_cal.py',False,''),
             ('cross_cal_apply.py',True,''),
-            ('split.py',True,'')]
+            ('split.py',True,''),
+            ('plot_solutions.py',False,'')]
 

@@ -37,7 +37,7 @@ def parse_config(filename):
             # Evaluate to the right type()
             try:
                 taskvals[section][option] = ast.literal_eval(config.get(section, option))
-            except ValueError:
+            except (ValueError,SyntaxError):
                 err = "Cannot format field '{0}' in config file '{1}'".format(option,filename)
                 err += ", which is currently set to '{0}'.".format(config.get(section, option))
                 raise ValueError(err)

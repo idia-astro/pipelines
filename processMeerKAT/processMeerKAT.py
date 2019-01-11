@@ -26,7 +26,7 @@ TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for SLURM arguments copied to config file, and some of their default values
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose']
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
@@ -39,7 +39,8 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('run_setjy.py',True,''),
             ('cross_cal.py',False,''),
             ('cross_cal_apply.py',True,''),
-            ('split.py',True,'')]
+            ('split.py',True,''),
+            ('plot_solutions.py',False,'')]
 
 
 def check_path(path):
@@ -57,10 +58,38 @@ def check_path(path):
     path : str
         Path to script or container (if path found)."""
 
+    #check if path is in bash path first
+    if '/' not in path and path != '':
+        path = check_bash_path(path)
     if path != '' and not os.path.exists(path) and not os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
         raise IOError('File "{0}" not found.'.format(path))
     else:
         return path
+
+def check_bash_path(fname):
+
+    """Check if file is in your bash path and executable (i.e. executable from command line), and prepend path to it if so.
+
+    Arguments:
+    ----------
+    fname : str
+        Filename to check.
+
+    Returns:
+    --------
+    fname : str
+        """
+
+    PATH = os.environ['PATH'].split(':')
+    for path in PATH:
+        if os.path.exists('{0}/{1}'.format(path,fname)):
+            if not os.access('{0}/{1}'.format(path,fname), os.X_OK):
+                raise IOError('"{0}" found in "{1}" but file is not executable.'.format(fname,path))
+            else:
+                fname = '{0}/{1}'.format(path,fname)
+            break
+
+    return fname
 
 def parse_args():
 
@@ -216,16 +245,16 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['casa_log'] = '--nologfile'
 
     #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
-    if not os.path.exists(script) and script not in os.environ['PATH']:
+    if not os.path.exists(script):
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
 
     #If specified by user, call script via CASA and write output to log file
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
     if casa_script:
-        params['casa_call'] = """"casa" --nologger --nogui {casa_log} -c""".format(**params)
+        params['casa_call'] = "xvfb-run -d casa --nologger --nogui {casa_log} -c".format(**params)
 
-    command = "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
+    command = "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
     return command
 
 
@@ -451,15 +480,18 @@ def default_config(arg_dict,filename):
 
     #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
+    for key in ['container','mpi_wrapper']:
+        if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(arg_dict['MS'])}, conf_sec='data')
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
-    params =  '-B -M {0} --config {1}'.format(arg_dict['MS'],filename)
+    params =  '-B -M {0} --config {1} 1>/dev/null'.format(arg_dict['MS'],filename)
     command = write_command('get_fields.py', params, mpi_wrapper='srun', container=arg_dict['container'],logfile=False)
-    logger.debug('Extracting fields using the following command:\n{0}'.format(command))
+    logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(arg_dict['MS']))
+    logger.debug('Using the following command:\n\t{0}'.format(command))
     os.system(command)
 
     logger.info('Config "{0}" generated.'.format(filename))
