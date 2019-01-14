@@ -18,19 +18,24 @@ def get_ref_ant(visname, fluxfield):
     print "\n Antenna statistics on flux field"
     print " ant    median    rms"
 
+    tb.open(visname)
+
+    fptr = open('ant_stats.txt', 'w')
+
     antamp=[]; antrms = []
     for ant in antennas:
-        ant = str(ant)
-        t = visstat(vis=visname, field=fluxfield, antenna=ant,
-                timeaverage=True, timebin='500min', timespan='state,scan',
-                reportingaxes='field')
+        antdat = tb.query('ANTENNA1==%d AND FIELD_ID==%d' % (ant, int(fluxfield))).getcol('DATA')
+        antdat = np.abs(antdat)
 
-        item = str(t.keys()[0])
-        amp = float(t[item]['median'])
-        rms = float(t[item]['rms'])
-        print "%3s  %8.3f %9.3f " % (ant, amp, rms)
+        amp = np.median(antdat)
+        rms = np.std(antdat)
+
+        fptr.write('% 02d % 8.3f % 8.3f\n' % (ant, amp, rms))
         antamp.append(amp)
         antrms.append(rms)
+
+    tb.close()
+    tb.done()
 
     antamp = np.array(antamp)
     antrms = np.array(antrms)
@@ -88,7 +93,7 @@ def validateinput():
 
     visname = va(taskvals, 'data', 'vis', str)
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
-    refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
+    refant = va(taskvals, 'crosscal', 'refant', str)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     # Check if the reference antenna exists, and complain and quit if it doesn't
@@ -103,7 +108,7 @@ def validateinput():
         config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'refant':refant})
         config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'badants':badants})
     else:
-        refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
+        refant = va(taskvals, 'crosscal', 'refant', str)
         get_fields.check_refant(MS=visname, refant=refant, warn=False)
 
     if not os.path.exists(visname):
@@ -112,5 +117,3 @@ def validateinput():
 
 if __name__ == '__main__':
     validateinput()
-    sys.exit(0)
-
