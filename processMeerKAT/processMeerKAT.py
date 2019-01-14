@@ -459,7 +459,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
             write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
-                        mpi_wrapper='',container=containers[i],name=name)
+                        mpi_wrapper='srun',container=containers[i],name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
@@ -491,7 +491,7 @@ def default_config(arg_dict,filename):
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
     params =  '-B -M {0} --config {1} 1>/dev/null'.format(arg_dict['MS'],filename)
-    command = write_command('get_fields.py', params, mpi_wrapper='srun', container=arg_dict['container'],logfile=False)
+    command = write_command('get_fields.py', params, mpi_wrapper='', container=arg_dict['container'],logfile=False)
     logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(arg_dict['MS']))
     logger.debug('Using the following command:\n\t{0}'.format(command))
     os.system(command)
