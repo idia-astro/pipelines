@@ -38,12 +38,19 @@ def get_fields(MS):
     intents = ['CALIBRATE_FLUX','CALIBRATE_BANDPASS','CALIBRATE_PHASE','TARGET']
     fieldIDs = {}
 
+    #Set default for any missing intent as field for intent CALIBRATE_FLUX
     default_intent = msmd.fieldsforintent('CALIBRATE_FLUX')
+    if default_intent.size == 0:
+        raise KeyError('You must have a field with intent "CALIBRATE_FLUX".')
 
     for i,intent in enumerate(intents):
         fieldID = msmd.fieldsforintent(intent)
         if fieldID.size > 0:
-            fieldIDs[fields[i]] = "'{0}'".format(','.join([str(fieldID[j]) for j in range(fieldID.size)]))
+            #Extract only one field for bandpass and total flux calibrators
+            if intent in ['CALIBRATE_FLUX','CALIBRATE_BANDPASS']:
+                fieldIDs[fields[i]] = "'{0}'".format(str(fieldID[0]))
+            else:
+                fieldIDs[fields[i]] = "'{0}'".format(','.join([str(fieldID[j]) for j in range(fieldID.size)]))
         else:
             print 'Intent "{0}" not found. Setting {1}={2}'.format(intent,fields[i],default_intent)
             fieldIDs[fields[i]] = "'{0}'".format(default_intent)

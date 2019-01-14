@@ -19,7 +19,6 @@ MEM_PER_NODE_GB_LIMIT = 500 #512000 MB
 THIS_PROG = sys.argv[0]
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
-PLOT_DIR = 'plots'
 CALIB_SCRIPTS_DIR = 'cal_scripts'
 CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
@@ -118,7 +117,7 @@ def parse_args():
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
-    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=15,
+    parser.add_argument("-n","--nodes",metavar="num", required=False, type=int, default=15,
                         help="Use this number of nodes [default: 15; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
@@ -359,7 +358,7 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
             master.write('echo Submitting {0} SLURM queue with following command\necho {1} {0}\n'.format(script,command))
         master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
-    master.write('\n#Output message and create jobScripts directory\n')
+    master.write('\n#Output message and create {0} directory\n'.format(dir))
     master.write('echo Submitted sbatch jobs with following IDs: $IDs\n')
     master.write('mkdir -p {0}\n'.format(dir))
 
@@ -370,6 +369,9 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
     master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
     extn = '_$DATE.sh'
+
+    #Copy contents of config file to jobScripts directory
+    master.write('cp .config.tmp {0}/config{1}'.format(dir,extn))
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
@@ -457,7 +459,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
             write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
-                        mpi_wrapper='srun',container=containers[i],name=name)
+                        mpi_wrapper='',container=containers[i],name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
