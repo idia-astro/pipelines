@@ -322,7 +322,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="j
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbose=False):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -330,6 +330,8 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     ----------
     filename : str
         Name of master pipeline submission script.
+    config : str
+        Path to config file.
     scripts : list, optional
         List of sbatch scripts to call in order.
     submit : bool, optional
@@ -341,6 +343,10 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
+
+    #Copy config file to TMP_CONFIG and inform user
+    master.write("\necho Copying '{0}' to '{1}', and using this to run pipeline.\n".format(config,TMP_CONFIG))
+    master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Submit first script with no dependencies and extract job ID
     command = 'sbatch {0}'.format(scripts[0])
@@ -373,7 +379,7 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
 
     #Copy contents of config file to jobScripts directory
     master.write('\n#Copy contents of config file to {0} directory\n'.format(dir))
-    master.write('cp {0} {1}/config_$DATE.txt\n'.format(TMP_CONFIG,dir))
+    master.write('cp {0} {1}/{2}_$DATE.txt\n'.format(config,dir,os.path.splitext(config)[0]))
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
@@ -414,7 +420,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
         Directory to write this script into."""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
-    master.write('\n#Create {0} file, make executable and simlink to current version\n'.format(fname))
+    master.write('\n#Create {0}.sh file, make executable and simlink to current version\n'.format(filename))
     master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
     master.write('{0} >> {1}\n'.format(do,fname))
     master.write('chmod u+x {0}\n'.format(fname))
@@ -459,15 +465,15 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
 
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
                         mpi_wrapper='srun',container=containers[i],name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
-    write_master(MASTER_SCRIPT,scripts=scripts,submit=submit,verbose=verbose)
+    write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,verbose=verbose)
 
 
 def default_config(arg_dict,filename):
@@ -536,11 +542,7 @@ def format_args(config):
     kwargs : dict
         Keyword arguments extracted from config file, to be passed into write_jobs() function."""
 
-    #Copy config file to TMP_CONFIG and inform user
     config_dict = config_parser.parse_config(config)[0]
-    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
-    logger.warn("Changing '{0}' will have no effect unless this script is run again with [-R --run].".format(config))
-    copyfile(config, TMP_CONFIG)
 
     #Ensure [slurm] section exists in config file, otherwise raise ValueError
     if 'slurm' in config_dict.keys():
@@ -601,7 +603,7 @@ def main():
         default_config(vars(args),args.config)
     if args.run:
         kwargs = format_args(args.config)
-        write_jobs(TMP_CONFIG, **kwargs)
+        write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":
     main()
