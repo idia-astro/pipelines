@@ -26,7 +26,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for SLURM arguments copied to config file, and some of their default values
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper']
-CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.simg'
+CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
