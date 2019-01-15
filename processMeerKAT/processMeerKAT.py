@@ -366,18 +366,22 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     killScript = 'killJobs'
     summaryScript = 'summary'
     errorScript = 'findErrors'
+    timingScript = 'displayTimes'
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
     master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
     extn = '_$DATE.sh'
 
     #Copy contents of config file to jobScripts directory
-    master.write('cp .config.tmp {0}/config{1}'.format(dir,extn))
+    master.write('\n#Copy contents of config file to {0} directory\n'.format(dir))
+    master.write('cp {0} {1}/config_$DATE.txt\n'.format(TMP_CONFIG,dir))
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
-    do = """echo "for ID in {$IDs,}; do echo %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
+    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
+    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; head -n 1 %s/*\$ID.casa | cut -d 'I' -f1; tail -n 1 %s/*\$ID.casa | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
+    write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir)
 
     #Close master submission script and make executable
     master.close()
