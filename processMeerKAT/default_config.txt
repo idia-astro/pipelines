@@ -1,15 +1,18 @@
 [crosscal]
-minbaselines = 4        # Minimum number of baseline while calibrating
-specave = 1             # Number of chans to avg after calibration
-timeave = '8s'          # Time interval to avg after calibration
-spw = '0:860~1700MHz'   # spw to use for calibration
-calcrefant = True       # Calculate reference antenna in program (overwrites 'refant')
-refant = 'm005'         # Reference antenna name/number
-badfreqranges = ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz']
-standard = 'Perley-Butler 2010'  # Flux density standard for setjy
-badants = []            # List of bad antenna numbers in the MS
+minbaselines = 4                  # Minimum number of baselines to use while calibrating
+specave = 1                       # Number of chans to avg after calibration
+timeave = '8s'                    # Time interval to avg after calibration
+spw = '0:860~1700MHz'             # spw to use for calibration
+calcrefant = True                 # Calculate reference antenna in program (overwrites 'refant')
+refant = 'm005'                   # Reference antenna name/number
+standard = 'Perley-Butler 2010'   # Flux density standard for setjy
+badants = []                      # List of bad antenna numbers in the MS
+badfreqranges = [ '944~947MHz',   # List of bad frequency ranges
+                  '1160~1310MHz',
+                  '1476~1611MHz',
+                  '1670~1700MHz']
 
-[slurm]			#See processMeerKAT.py -h for documentation
+[slurm]			                      # See processMeerKAT.py -h for documentation
 nodes = 15
 ntasks_per_node = 8
 mem = 98304

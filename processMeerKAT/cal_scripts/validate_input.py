@@ -83,7 +83,7 @@ def validateinput():
     parameters look okay
     """
 
-    print('This is version {0}'.format(processMeerKAT.__version__))
+    print('This is version {0} of the pipeline'.format(processMeerKAT.__version__))
 
     # Get the name of the config file
     args = config_parser.parse_args()

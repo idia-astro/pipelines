@@ -345,14 +345,15 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
     master.write('#!/bin/bash\n')
 
     #Copy config file to TMP_CONFIG and inform user
-    master.write("\necho Copying '{0}' to '{1}', and using this to run pipeline.\n".format(config,TMP_CONFIG))
+    if verbose:
+        master.write("\necho Copying \'{0}\' to \'{1}\', and using this to run pipeline.\n".format(config,TMP_CONFIG))
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Submit first script with no dependencies and extract job ID
     command = 'sbatch {0}'.format(scripts[0])
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
-        master.write('echo Submitting {0} SLURM queue with following command\necho {1}\n'.format(scripts[0],command))
+        master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
     master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
     scripts.pop(0)
 
@@ -542,7 +543,10 @@ def format_args(config):
     kwargs : dict
         Keyword arguments extracted from config file, to be passed into write_jobs() function."""
 
+    #Copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     config_dict = config_parser.parse_config(config)[0]
+    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
+    copyfile(config, TMP_CONFIG)
 
     #Ensure [slurm] section exists in config file, otherwise raise ValueError
     if 'slurm' in config_dict.keys():
