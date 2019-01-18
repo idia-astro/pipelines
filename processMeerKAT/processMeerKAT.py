@@ -19,15 +19,14 @@ MEM_PER_NODE_GB_LIMIT = 500 #512000 MB
 THIS_PROG = sys.argv[0]
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
-PLOT_DIR = 'plots'
 CALIB_SCRIPTS_DIR = 'cal_scripts'
 CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for SLURM arguments copied to config file, and some of their default values
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose']
-CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.simg'
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper']
+CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
@@ -39,7 +38,8 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('run_setjy.py',True,''),
             ('cross_cal.py',False,''),
             ('cross_cal_apply.py',True,''),
-            ('split.py',True,'')]
+            ('split.py',True,''),
+            ('plot_solutions.py',False,'')]
 
 
 def check_path(path):
@@ -57,10 +57,38 @@ def check_path(path):
     path : str
         Path to script or container (if path found)."""
 
+    #check if path is in bash path first
+    if '/' not in path and path != '':
+        path = check_bash_path(path)
     if path != '' and not os.path.exists(path) and not os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
         raise IOError('File "{0}" not found.'.format(path))
     else:
         return path
+
+def check_bash_path(fname):
+
+    """Check if file is in your bash path and executable (i.e. executable from command line), and prepend path to it if so.
+
+    Arguments:
+    ----------
+    fname : str
+        Filename to check.
+
+    Returns:
+    --------
+    fname : str
+        """
+
+    PATH = os.environ['PATH'].split(':')
+    for path in PATH:
+        if os.path.exists('{0}/{1}'.format(path,fname)):
+            if not os.access('{0}/{1}'.format(path,fname), os.X_OK):
+                raise IOError('"{0}" found in "{1}" but file is not executable.'.format(fname,path))
+            else:
+                fname = '{0}/{1}'.format(path,fname)
+            break
+
+    return fname
 
 def parse_args():
 
@@ -89,7 +117,7 @@ def parse_args():
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
-    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=15,
+    parser.add_argument("-n","--nodes",metavar="num", required=False, type=int, default=15,
                         help="Use this number of nodes [default: 15; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
@@ -216,16 +244,16 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['casa_log'] = '--nologfile'
 
     #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
-    if not os.path.exists(script) and script not in os.environ['PATH']:
+    if not os.path.exists(script):
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
 
     #If specified by user, call script via CASA and write output to log file
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
     if casa_script:
-        params['casa_call'] = """"casa" --nologger --nogui {casa_log} -c""".format(**params)
+        params['casa_call'] = "xvfb-run -d casa --nologger --nogui {casa_log} -c".format(**params)
 
-    command = "{mpi_wrapper} /usr/bin/singularity exec {container} {casa_call} {script} {args}".format(**params)
+    command = "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
     return command
 
 
@@ -294,7 +322,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="j
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbose=False):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -302,6 +330,8 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     ----------
     filename : str
         Name of master pipeline submission script.
+    config : str
+        Path to config file.
     scripts : list, optional
         List of sbatch scripts to call in order.
     submit : bool, optional
@@ -314,11 +344,16 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
 
+    #Copy config file to TMP_CONFIG and inform user
+    if verbose:
+        master.write("\necho Copying \'{0}\' to \'{1}\', and using this to run pipeline.\n".format(config,TMP_CONFIG))
+    master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
+
     #Submit first script with no dependencies and extract job ID
     command = 'sbatch {0}'.format(scripts[0])
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
-        master.write('echo Submitting {0} SLURM queue with following command\necho {1}\n'.format(scripts[0],command))
+        master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
     master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
     scripts.pop(0)
 
@@ -330,7 +365,7 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
             master.write('echo Submitting {0} SLURM queue with following command\necho {1} {0}\n'.format(script,command))
         master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
-    master.write('\n#Output message and create jobScripts directory\n')
+    master.write('\n#Output message and create {0} directory\n'.format(dir))
     master.write('echo Submitted sbatch jobs with following IDs: $IDs\n')
     master.write('mkdir -p {0}\n'.format(dir))
 
@@ -338,15 +373,22 @@ def write_master(filename,scripts=[],submit=False,dir='jobScripts',verbose=False
     killScript = 'killJobs'
     summaryScript = 'summary'
     errorScript = 'findErrors'
+    timingScript = 'displayTimes'
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
     master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
     extn = '_$DATE.sh'
 
+    #Copy contents of config file to jobScripts directory
+    master.write('\n#Copy contents of config file to {0} directory\n'.format(dir))
+    master.write('cp {0} {1}/{2}_$DATE.txt\n'.format(config,dir,os.path.splitext(config)[0]))
+
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
-    do = """echo "for ID in {$IDs,}; do echo %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
+    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
+    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; head -n 1 %s/*\$ID.casa | cut -d 'I' -f1; tail -n 1 %s/*\$ID.casa | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
+    write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir)
 
     #Close master submission script and make executable
     master.close()
@@ -379,7 +421,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
         Directory to write this script into."""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
-    master.write('\n#Create {0} file, make executable and simlink to current version\n'.format(fname))
+    master.write('\n#Create {0}.sh file, make executable and simlink to current version\n'.format(filename))
     master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
     master.write('{0} >> {1}\n'.format(do,fname))
     master.write('chmod u+x {0}\n'.format(fname))
@@ -424,15 +466,15 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
 
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
-            write_sbatch(script,'--config {0}'.format(config),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
                         mpi_wrapper='srun',container=containers[i],name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
-    write_master(MASTER_SCRIPT,scripts=scripts,submit=submit,verbose=verbose)
+    write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,verbose=verbose)
 
 
 def default_config(arg_dict,filename):
@@ -451,15 +493,18 @@ def default_config(arg_dict,filename):
 
     #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
+    for key in ['container','mpi_wrapper']:
+        if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(arg_dict['MS'])}, conf_sec='data')
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
-    params =  '-B -M {0} --config {1}'.format(arg_dict['MS'],filename)
-    command = write_command('get_fields.py', params, mpi_wrapper='srun', container=arg_dict['container'],logfile=False)
-    logger.debug('Extracting fields using the following command:\n{0}'.format(command))
+    params =  '-B -M {0} --config {1} 1>/dev/null'.format(arg_dict['MS'],filename)
+    command = write_command('get_fields.py', params, mpi_wrapper='', container=arg_dict['container'],logfile=False)
+    logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(arg_dict['MS']))
+    logger.debug('Using the following command:\n\t{0}'.format(command))
     os.system(command)
 
     logger.info('Config "{0}" generated.'.format(filename))
@@ -498,10 +543,9 @@ def format_args(config):
     kwargs : dict
         Keyword arguments extracted from config file, to be passed into write_jobs() function."""
 
-    #Copy config file to TMP_CONFIG and inform user
+    #Copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     config_dict = config_parser.parse_config(config)[0]
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
-    logger.warn("Changing '{0}' will have no effect unless this script is run again with [-R --run].".format(config))
     copyfile(config, TMP_CONFIG)
 
     #Ensure [slurm] section exists in config file, otherwise raise ValueError
@@ -563,7 +607,7 @@ def main():
         default_config(vars(args),args.config)
     if args.run:
         kwargs = format_args(args.config)
-        write_jobs(TMP_CONFIG, **kwargs)
+        write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":
     main()
