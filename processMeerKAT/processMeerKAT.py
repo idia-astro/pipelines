@@ -40,6 +40,7 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('cross_cal_apply.py',True,''),
             ('split.py',True,''),
             ('plot_solutions.py',False,'')]
+            ('quick_tclean.py',True,'')]
 
 
 def check_path(path):
