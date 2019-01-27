@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 import os
 import shutil
@@ -7,16 +9,19 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 
+import logging
+logger = logging.getLogger(__name__)
+
 def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard, do_clearcal=False):
 
-    print " starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile
+    logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
             field = fields.kcorrfield, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'K',
             solint = '10min', combine = 'scan', parang = False, append = False)
 
-    print " starting bandpass -> %s" % calfiles.bpassfile
+    logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
             field = fields.bpassfield,
             refant = referenceant, minblperant = minbaselines, solnorm = False,
@@ -24,7 +29,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gaintable = calfiles.kcorrfile, gainfield = fields.kcorrfield,
             parang = False, append = False)
 
-    print " starting cross hand delay -> %s" % calfiles.xdelfile
+    logger.info(" starting cross hand delay -> %s" % calfiles.xdelfile)
     gaincal(vis=visname, caltable = calfiles.xdelfile, field = fields.xdelfield,
             refant = referenceant, smodel=[1., 0., 1., 0.],
             solint = 'inf', minblperant = minbaselines, gaintype = 'KCROSS',
@@ -51,7 +56,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     if os.path.exists(xy0pfile):
         shutil.rmtree(xy0pfile)
 
-    print " starting gaincal -> %s" % gain1file
+    logger.info(" starting gaincal -> %s" % gain1file)
     gaincal(vis=visname, caltable=gain1file, field=fields.fluxfield,
             refant=referenceant, solint='10min', minblperant=minbaselines,
             solnorm=False, gaintype='G',
@@ -70,11 +75,11 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             append=True, parang=True)
 
     # implied polarization from instrumental response
-    print "\n Solve for Q, U from initial gain solution"
+    logger.info("\n Solve for Q, U from initial gain solution")
     GainQU = qufromgain(gain1file)
-    print GainQU[int(fields.dpolfield)]
+    logger.info(ainQU[int(fields.dpolfield)])
 
-    print "\n Starting x-y phase calibration\n -> %s" % xy0ambpfile
+    logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
     gaincal(vis=visname, caltable = xy0ambpfile, field = fields.dpolfield,
             refant = referenceant, solint = 'inf', combine = 'scan',
             gaintype = 'XYf+QU', minblperant = minbaselines,
@@ -85,15 +90,15 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 fields.secondaryfield, fields.xdelfield],
             append = False)
 
-    print "\n Check for x-y phase ambiguity."
+    logger.info("\n Check for x-y phase ambiguity.")
     xyamb(xytab=xy0ambpfile, qu=GainQU[int(fields.dpolfield)], xyout = xy0pfile)
 
     S = [1.0, GainQU[int(fields.dpolfield)][0],
             GainQU[int(fields.dpolfield)][1], 0.0]
 
     p = np.sqrt(S[1]**2 + S[2]**2)
-    print "Model for polarization calibrator S =", S
-    print "Fractional polarization =", p
+    logger.info("Model for polarization calibrator S =", S)
+    logger.info("Fractional polarization =", p)
 
     gaincal(vis=visname, caltable = calfiles.gainfile, field = fields.fluxfield,
             refant = referenceant, solint = '10min', solnorm = False,
@@ -104,7 +109,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gainfield = [fields.kcorrfield,fields.bpassfield,fields.xdelfield],
             parang = True, append = False)
 
-    print "\n solution for secondary with parang = true"
+    logger.info("\n solution for secondary with parang = true")
     gaincal(vis=visname, caltable = calfiles.gainfile,
             field = fields.secondaryfield, refant = referenceant,
             solint = '10min', solnorm = False,
@@ -116,12 +121,12 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 fields.xdelfield],
             parang = True, append = True)
 
-    print "\n now re-solve for Q,U from the new gainfile\n -> %s" \
-                                                        % calfiles.gainfile
+    logger.info("\n now re-solve for Q,U from the new gainfile\n -> %s" \
+                                                        % calfiles.gainfile)
     Gain2QU = qufromgain(calfiles.gainfile)
-    print Gain2QU[int(fields.dpolfield)]
+    logger.info(ain2QU[int(fields.dpolfield)])
 
-    print "starting \'Dflls\' polcal -> %s"  % calfiles.dpolfile
+    logger.info("starting \'Dflls\' polcal -> %s"  % calfiles.dpolfile)
     polcal(vis=visname, caltable = dtempfile, field = fields.dpolfield,
             refant = '', solint = 'inf', combine = 'scan',
             poltype = 'Dflls', smodel = S, preavg= 200.0,
@@ -135,7 +140,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     # Only run fluxscale if bootstrapping
     if len(fields.gainfields) > 1:
-        print " starting fluxscale -> %s", calfiles.fluxfile
+        logger.info(" starting fluxscale -> %s", calfiles.fluxfile)
         fluxscale(vis=visname, caltable = calfiles.gainfile,
                 reference = fields.fluxfield, transfer = fields.secondaryfield,
                 fluxtable = calfiles.fluxfile,

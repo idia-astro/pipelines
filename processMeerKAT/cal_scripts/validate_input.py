@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 import os
 
@@ -8,15 +10,18 @@ from cal_scripts import get_fields, bookkeeping
 
 from scipy.stats import iqr
 
+import logging
+logger = logging.getLogger(__name__)
+
 def get_ref_ant(visname, fluxfield):
 
     msmd.open(visname)
     fluxscans = msmd.scansforfield(int(fluxfield))
-    print "Flux field scan no: %d" % fluxscans[0]
+    logger.info("Flux field scan no: %d" % fluxscans[0])
     antennas = msmd.antennasforscan(fluxscans[0])
     msmd.done()
-    print "\n Antenna statistics on flux field"
-    print " ant    median    rms"
+    logger.info("\n Antenna statistics on flux field")
+    logger.info(" ant    median    rms")
 
     tb.open(visname)
 
@@ -46,7 +51,7 @@ def get_ref_ant(visname, fluxfield):
     iqramp = iqr(antamp)
     iqrrms = iqr(antrms)
 
-    print "Median: %8.3f  %9.3f" % (medamp,medrms)
+    logger.info("Median: %8.3f  %9.3f" % (medamp,medrms))
 
     goodrms=[]; goodamp=[]; goodant=[]
     badants = []
@@ -67,12 +72,12 @@ def get_ref_ant(visname, fluxfield):
     goodrms = np.array(goodrms)
     jj = np.argmin(goodrms)
 
-    print "best antenna: %2s  amp = %7.2f, rms = %7.2f" % \
+    logger.info("best antenna: %2s  amp = %7.2f, rms = %7.2f" % \)
                                 (goodant[jj], goodamp[jj], goodrms[jj])
-    print "1st good antenna: %2s  amp = %7.2f, rms = %7.2f" % \
+    logger.info("1st good antenna: %2s  amp = %7.2f, rms = %7.2f" % \)
                                 (goodant[0], goodamp[0], goodrms[0])
     referenceant = str(goodant[jj])
-    print "setting reference antenna to: %s" % referenceant
+    logger.info("setting reference antenna to: %s" % referenceant)
 
     return referenceant, badants
 

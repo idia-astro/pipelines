@@ -1,9 +1,13 @@
+from __future__ import print_function
+
 import os, sys
 
 import config_parser
 from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
+import logging
+logger = logging.getLogger(__name__)
 
 def do_setjy(visname, spw, fields, standard):
     clearcal(vis=visname)
@@ -29,10 +33,10 @@ def do_setjy(visname, spw, fields, standard):
         spix = [-1.179]
         reffreq="1284MHz"
 
-        print "Using manual flux density scale - "
-        print "Flux model: ", smodel
-        print "Spix: ", spix
-        print "Ref freq ", reffreq
+        logger.info("Using manual flux density scale - ")
+        logger.info("Flux model: ", smodel)
+        logger.info("Spix: ", spix)
+        logger.info("Ref freq ", reffreq)
 
         setjy(vis=visname, field=ff, scalebychan=True, standard='manual',
                 fluxdensity=smodel, spix=spix, reffreq=reffreq)
