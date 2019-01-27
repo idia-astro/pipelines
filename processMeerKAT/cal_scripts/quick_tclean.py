@@ -32,6 +32,8 @@ def run_tclean(visname, fields):
             savemodel='none', gridder='standard', wprojplanes=1,
             restoration=True, pblimit=0, parallel=True)
 
+    exportfits(imagename=secimname+'.image.tt0', fitsimage=secimname+'.fits')
+
     for ind, tt in targimname:
         if len(targimname) > 1:
             field = fields.targetfield[ind]
@@ -44,6 +46,8 @@ def run_tclean(visname, fields):
                 specmode='mfs', deconvolver='mtmfs', nterms=2, scales=[],
                 savemodel='none', gridder='wproject', wprojplanes=16,
                 restoration=True, pblimit=0, parallel=True)
+
+        exportfits(imagename=tt+'.image.tt0', fitsimage=tt+'.fits')
 
 
 if __name__ == '__main__':
