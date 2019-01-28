@@ -12,6 +12,7 @@ from scipy.stats import iqr
 
 import logging
 logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def get_ref_ant(visname, fluxfield):
 

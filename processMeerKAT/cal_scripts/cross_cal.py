@@ -11,6 +11,7 @@ from recipes.almapolhelpers import *
 
 import logging
 logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard, do_clearcal=False):
@@ -77,7 +78,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     # implied polarization from instrumental response
     logger.info("\n Solve for Q, U from initial gain solution")
     GainQU = qufromgain(gain1file)
-    logger.info(ainQU[int(fields.dpolfield)])
+    logger.info(GainQU[int(fields.dpolfield)])
 
     logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
     gaincal(vis=visname, caltable = xy0ambpfile, field = fields.dpolfield,
@@ -124,7 +125,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     logger.info("\n now re-solve for Q,U from the new gainfile\n -> %s" \
                                                         % calfiles.gainfile)
     Gain2QU = qufromgain(calfiles.gainfile)
-    logger.info(ain2QU[int(fields.dpolfield)])
+    logger.info(Gain2QU[int(fields.dpolfield)])
 
     logger.info("starting \'Dflls\' polcal -> %s"  % calfiles.dpolfile)
     polcal(vis=visname, caltable = dtempfile, field = fields.dpolfield,

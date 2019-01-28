@@ -8,21 +8,29 @@ from config_parser import validate_args as va
 def split_vis(visname, spw, fields, specave, timeave):
     outputbase = visname.replace('.mms', '')
 
+    targfields = fields.targetfield.split(',')
+    secfields = fields.secondaryfield.split(',')
+
     msmd.open(visname)
-    fnames = msmd.namesforfields([int(ff) for ff in fields.targetfield.split(',')])
-    secondaryname = msmd.namesforfields(int(fields.secondaryfield))[0]
-    primaryname = msmd.namesforfields(int(fields.fluxfield))[0]
+    fnames = msmd.namesforfields([int(ff) for ff in targfields])
+    secondaryname = msmd.namesforfields([int(ss) for ss in secfields])
+    primaryname = msmd.namesforfields(int(fields.fluxfield))
     msmd.close()
 
-    for field in fnames:
+
+    for ind, field in enumerate(fnames):
         split(vis=visname, outputvis = outputbase+'.'+field+'.mms',
-                datacolumn='corrected', field = fields.targetfield, spw = spw,
+                datacolumn='corrected', field = targfields[ind], spw = spw,
                 keepflags=False, keepmms = True, width = specave,
                 timebin = timeave)
 
-    split(vis=visname, outputvis = outputbase+'.'+secondaryname+'.mms',
-            datacolumn='corrected', field = fields.secondaryfield, spw = spw,
-            keepflags=False, keepmms = True, width = specave, timebin = timeave)
+
+    if len(secondaryname) > 1:
+        for ind, sname in enumerate(secondaryname):
+            split(vis=visname, outputvis = outputbase+'.'+sname+'.mms',
+                    datacolumn='corrected', field = secfields[ind], spw = spw,
+                    keepflags=False, keepmms = True, width = specave, timebin = timeave)
+
 
 if __name__ == '__main__':
     # Get the name of the config file

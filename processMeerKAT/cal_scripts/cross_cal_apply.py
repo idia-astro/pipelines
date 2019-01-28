@@ -11,6 +11,7 @@ from recipes.almapolhelpers import *
 
 import logging
 logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_cross_cal_apply(visname, fields, calfiles, caldir):
     """

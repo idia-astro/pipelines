@@ -17,6 +17,7 @@ msmd = casac.casac.msmetadata()
 
 import logging
 logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def get_fields(MS):
 
