@@ -1,8 +1,9 @@
-#! /usr/bin/env python
+#!/usr/bin/env python2.7
 
 import argparse
 import ConfigParser
 import ast
+import processMeerKAT
 
 def parse_args():
     """
@@ -45,11 +46,13 @@ def parse_config(filename):
     return taskvals, config
 
 
-def overwrite_config(filename, conf_sec='', conf_dict={}):
+def overwrite_config(filename, conf_dict={}, conf_sec=''):
 
     config_dict,config = parse_config(filename)
 
     if conf_sec not in config.sections():
+        processMeerKAT.logger.debug('Writing [{0}] section in config file "{1}" with:\n{2}.'.format(conf_sec,filename,conf_dict))
+
         config.add_section(conf_sec)
 
         for key in conf_dict.keys():
@@ -60,6 +63,8 @@ def overwrite_config(filename, conf_sec='', conf_dict={}):
         config_file.close()
 
     else:
+        processMeerKAT.logger.debug('Overwritting [{0}] section in config file "{1}" with:\n{2}.'.format(conf_sec,filename,conf_dict))
+
         for key in conf_dict.keys():
             config.set(conf_sec, key, str(conf_dict[key]))
 
