@@ -1,9 +1,15 @@
+from __future__ import print_function
+
 import sys
 import os
 
 import config_parser
 from cal_scripts import bookkeeping
 from config_parser import validate_args as va
+
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_parallel_cal_apply(visname, fields, calfiles):
 
@@ -12,20 +18,20 @@ def do_parallel_cal_apply(visname, fields, calfiles):
     else:
         fluxfile = calfiles.gainfile
 
-    print " applying calibration -> primary calibrator"
+    logger.info(" applying calibration -> primary calibrator")
     applycal(vis=visname, field=fields.fluxfield, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
                 fluxfile], gainfield=[fields.kcorrfield,
                     fields.bpassfield, fields.fluxfield], parang=True)
 
-    print " applying calibration -> secondary calibrator"
+    logger.info(" applying calibration -> secondary calibrator")
     applycal(vis=visname, field=fields.secondaryfield,
             selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile],
             gainfield=[fields.kcorrfield, fields.bpassfield,
                 fields.secondaryfield], parang=True)
 
-    print " applying calibration -> target calibrator"
+    logger.info(" applying calibration -> target calibrator")
     applycal(vis=visname, field=fields.targetfield, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
                 fluxfile], gainfield=[fields.kcorrfield,

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 import os
 
@@ -8,15 +10,19 @@ from cal_scripts import get_fields, bookkeeping
 
 from scipy.stats import iqr
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
+
 def get_ref_ant(visname, fluxfield):
 
     msmd.open(visname)
     fluxscans = msmd.scansforfield(int(fluxfield))
-    print "Flux field scan no: %d" % fluxscans[0]
+    logger.info("Flux field scan no: %d" % fluxscans[0])
     antennas = msmd.antennasforscan(fluxscans[0])
     msmd.done()
-    print "\n Antenna statistics on flux field"
-    print " ant    median    rms"
+    logger.info("\n Antenna statistics on flux field")
+    logger.info(" ant    median    rms")
 
     tb.open(visname)
 
@@ -43,19 +49,24 @@ def get_ref_ant(visname, fluxfield):
     medamp = np.median(antamp)
     medrms = np.median(antrms)
 
-    iqramp = iqr(antamp)
-    iqrrms = iqr(antrms)
+    #iqramp = iqr(antamp)
+    #iqrrms = iqr(antrms)
+    lowamp = np.percentile(antamp, 5)
+    highamp = np.percentile(antamp, 95)
 
-    print "Median: %8.3f  %9.3f" % (medamp,medrms)
+    lowrms = np.percentile(antrms, 5)
+    highrms = np.percentile(antrms, 95)
+
+    logger.info("Median: %8.3f  %9.3f" % (medamp,medrms))
 
     goodrms=[]; goodamp=[]; goodant=[]
     badants = []
     for ii in range(len(antamp)):
-        cond1 = antamp[ii] > medamp - iqramp
-        cond1 = cond1 & (antamp[ii] < medamp + iqramp)
+        cond1 = antamp[ii] > lowamp
+        cond1 = cond1 & (antamp[ii] < highamp)
 
-        cond2 = antrms[ii] > medrms - iqrrms
-        cond2 = cond1 & (antrms[ii] < medrms + iqrrms)
+        cond2 = antrms[ii] > lowrms
+        cond2 = cond1 & (antrms[ii] < highrms)
 
         if cond1 and cond2:
             goodant.append(antennas[ii])
@@ -67,12 +78,12 @@ def get_ref_ant(visname, fluxfield):
     goodrms = np.array(goodrms)
     jj = np.argmin(goodrms)
 
-    print "best antenna: %2s  amp = %7.2f, rms = %7.2f" % \
-                                (goodant[jj], goodamp[jj], goodrms[jj])
-    print "1st good antenna: %2s  amp = %7.2f, rms = %7.2f" % \
-                                (goodant[0], goodamp[0], goodrms[0])
+    logger.info("best antenna: %2s  amp = %7.2f, rms = %7.2f" %
+                                (goodant[jj], goodamp[jj], goodrms[jj]))
+    logger.info("1st good antenna: %2s  amp = %7.2f, rms = %7.2f" %
+                                (goodant[0], goodamp[0], goodrms[0]))
     referenceant = str(goodant[jj])
-    print "setting reference antenna to: %s" % referenceant
+    logger.info("setting reference antenna to: %s" % referenceant)
 
     return referenceant, badants
 

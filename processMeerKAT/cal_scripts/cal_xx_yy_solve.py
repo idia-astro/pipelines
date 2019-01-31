@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 import os
 
@@ -5,16 +7,20 @@ import config_parser
 from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
+
 def do_parallel_cal(visname, fields, calfiles, referenceant,
         minbaselines, standard, do_clearcal=False):
 
-    print " starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile
+    logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile, field
             = fields.kcorrfield, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'K',
             solint = 'inf', combine = '', parang = False, append = False)
 
-    print " starting bandpass -> %s" % calfiles.bpassfile
+    logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
             field = fields.bpassfield, refant = referenceant,
             minblperant = minbaselines, solnorm = True,  solint = 'inf',
@@ -22,7 +28,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant,
             gaintable = calfiles.kcorrfile, gainfield = fields.kcorrfield,
             parang = False, append = False)
 
-    print " starting gain calibration\n -> %s" % calfiles.gainfile
+    logger.info(" starting gain calibration\n -> %s" % calfiles.gainfile)
     gaincal(vis=visname, caltable = calfiles.gainfile,
             field = fields.gainfields, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'G',

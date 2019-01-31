@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+from __future__ import print_function
 
 import sys
 import os
@@ -6,13 +7,13 @@ import os
 import processMeerKAT
 import config_parser
 
-import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
-
 # Get access to the msmd module for get_fields.py
 import casac
 msmd = casac.casac.msmetadata()
+
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def get_fields(MS):
 
@@ -50,17 +51,17 @@ def get_fields(MS):
 
     #Put any extra fields from 'CALIBRATE_FLUX' in phasecal fields
     fieldIDs['fluxfield'] = get_field(MS,'CALIBRATE_FLUX',multiple=False)
-    extra_fields = list(set(default[1:]) - set(msmd.fieldsforintent(phasecal_intent)))
-    if len(extra_fields) > 0:
-        logger.warn('Putting extra fields with intent "CALIBRATE_FLUX" in "phasecalfield"')
+    #extra_fields = list(set(default[1:]) - set(msmd.fieldsforintent(phasecal_intent)))
+    #if len(extra_fields) > 0:
+    #    logger.warn('Putting extra fields with intent "CALIBRATE_FLUX" in "phasecalfield"')
 
     fieldIDs['bpassfield'] = get_field(MS,'CALIBRATE_BANDPASS',default=default)
-    fieldIDs['phasecalfield'] = get_field(MS,phasecal_intent,default=default)
+    fieldIDs['phasecalfield'] = get_field(MS,phasecal_intent,default=default, multiple=False)
     fieldIDs['targetfields'] = get_field(MS,'TARGET',default=default)
 
     #Put any extra fields with intent CALIBRATE_BANDPASS in phasecal field
-    if len(extra_fields) > 0:
-        fieldIDs['phasecalfield'] = "{0},{1}'".format(fieldIDs['phasecalfield'][:-1],','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
+    #if len(extra_fields) > 0:
+    #    fieldIDs['phasecalfield'] = "{0},{1}'".format(fieldIDs['phasecalfield'][:-1],','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
 
     return fieldIDs
 
@@ -86,19 +87,31 @@ def get_field(MS,intent,default=0,multiple=True):
         Extracted field ID(s)"""
 
     fields = msmd.fieldsforintent(intent)
+
+    maxfield, maxscan = 0, 0
+    if fields.size > 1 and not multiple:
+        scans = [msmd.scansforfield(ff) for ff in fields]
+        # scans is an array of arrays
+        for ind, ss in enumerate(scans):
+            if len(ss) > maxscan:
+                maxscan = len(ss)
+                maxfield = fields[ind]
+    else:
+        maxfield = fields[0]
+
     if fields.size == 0:
         logger.warn('Intent "{0}" not found in dataset "{1}". Setting to "{2}"'.format(intent,MS,default))
         fields = "'{0}'".format(default)
     elif fields.size > 1:
         if not multiple:
-            logger.warn('Multiple fields found with intent "{0}" in dataset "{1}" - {2}. Only using field "{3}".'.format(intent,MS,fields,fields[0]))
+            logger.warn('Multiple fields found with intent "{0}" in dataset "{1}" - {2}. Only using field "{3}".'.format(intent,MS,fields,maxfield))
         else:
             logger.info('Multiple fields found with intent "{0}" in dataset "{1}" - {2}. Will use all of them.'.format(intent,MS,fields))
 
     if multiple:
         fields = "'{0}'".format(','.join([str(fields[i]) for i in range(fields.size)]))
     else:
-        fields = "'{0}'".format(fields[0])
+        fields = "'{0}'".format(maxfield)
 
     return fields
 
