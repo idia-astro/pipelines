@@ -21,7 +21,7 @@ def run_tclean(visname, fields):
     targimname = []
     if len(fields.targetfield) > 1:
         for tt in fields.targetfield:
-        targimname.append(visname.replace('.mms', '') + '_%s.im' % (tt))
+            targimname.append(visname.replace('.mms', '') + '_%s.im' % (tt))
     else:
         targimname.append(visname.replace('.mms', '') + '_%s.im' % (fields.targetfield))
 
@@ -34,7 +34,7 @@ def run_tclean(visname, fields):
 
     exportfits(imagename=secimname+'.image.tt0', fitsimage=secimname+'.fits')
 
-    for ind, tt in targimname:
+    for ind, tt in enumerate(targimname):
         if len(targimname) > 1:
             field = fields.targetfield[ind]
         else:
