@@ -109,7 +109,9 @@ def validateinput():
         config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'badants':badants})
     else:
         refant = va(taskvals, 'crosscal', 'refant', str)
+        msmd.open(visname)
         get_fields.check_refant(MS=visname, refant=refant, warn=False)
+        msmd.close()
 
     if not os.path.exists(visname):
         raise IOError("Path to MS %s not found" % (visname))

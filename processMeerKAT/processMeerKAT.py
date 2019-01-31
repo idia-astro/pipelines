@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 #Set global limits for ilifu cluster configuration
 TOTAL_NODES_LIMIT = 35
 NTASKS_PER_NODE_LIMIT = 128
-MEM_PER_NODE_GB_LIMIT = 500 #512000 MB
+MEM_PER_NODE_GB_LIMIT = 244 #250000 MB
 
 #Set global values for paths and file names
 THIS_PROG = sys.argv[0]
@@ -77,7 +77,7 @@ def check_bash_path(fname):
     Returns:
     --------
     fname : str
-        """
+        Potentially updated filename with absolute path prepended."""
 
     PATH = os.environ['PATH'].split(':')
     for path in PATH:
@@ -118,13 +118,13 @@ def parse_args():
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
     parser.add_argument("-n","--nodes",metavar="num", required=False, type=int, default=15,
-                        help="Use this number of nodes [default: 15; max: {0}].".format(TOTAL_NODES_LIMIT))
+                        help="Use this number of nodes [default: 10; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
     parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
                             help="Distribute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
-    parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=4096*3*8,
-                        help="Use this many MB of memory (per node) [default: {0}; max: {1} MB ({2} GB).".format(4096*3*8,MEM_PER_NODE_GB_LIMIT*1024,MEM_PER_NODE_GB_LIMIT))
+    parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
+                        help="Use this many GB of memory (per node) [default: {0}; max: {0}.".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
                         help="Run pipeline with these scripts, in this order, using this container (3rd tuple value - empty string to default to [--container]). Is it threadsafe (2nd tuple value)?")
     parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
@@ -132,6 +132,7 @@ def parse_args():
     parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
 
+    parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
 
@@ -206,7 +207,7 @@ def validate_args(args,config,parser=None):
         msg = "The number of nodes [-n --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
         raise_error(config, msg, parser)
 
-    if args['mem'] > MEM_PER_NODE_GB_LIMIT * 1024:
+    if args['mem'] > MEM_PER_NODE_GB_LIMIT:
         msg = "The memory per node [-m --mem] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
         raise_error(config, msg, parser)
 
@@ -275,7 +276,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="j
     tasks : int, optional
         The number of tasks per node to use for this job.
     mem : int, optional
-        The memory in MB (per node) to use for this job.
+        The memory in GB (per node) to use for this job.
     name : str, optional
         Name for this job, used in naming the various output files.
     plane : int, optional
@@ -301,7 +302,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="j
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
     #SBATCH --cpus-per-task=1
-    #SBATCH --mem={mem}
+    #SBATCH --mem={mem}GB
     #SBATCH --job-name={name}
     #SBATCH --distribution=plane={plane}
     #SBATCH --output={LOG_DIR}/{name}-%j.out
@@ -450,7 +451,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
     tasks : int, optional
         The number of tasks per node to use for this job.
     mem : int, optional
-        The memory in MB (per node) to use for this job.
+        The memory in GB (per node) to use for this job.
     name : str, optional
         Name for this job, used in naming the various output files.
     plane : int, optional
@@ -477,16 +478,17 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
     write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,verbose=verbose)
 
 
-def default_config(arg_dict,filename):
+def default_config(arg_dict):
 
     """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set.
 
     Arguments:
     ----------
     arg_dict : dict
-        Dictionary of arguments passed into this script, which is inserted into the config file under section [slurm].
-    filename : str
-        Filename of config file to write."""
+        Dictionary of arguments passed into this script, which is inserted into the config file under section [slurm]."""
+
+    filename = arg_dict['config']
+    MS = arg_dict['MS']
 
     #Copy default config to current location
     copyfile('{0}/{1}'.format(SCRIPT_DIR,CONFIG),filename)
@@ -498,12 +500,15 @@ def default_config(arg_dict,filename):
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file under section [data]
-    config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(arg_dict['MS'])}, conf_sec='data')
+    config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
+
+    #Don't call srun if option --local used
+    mpi_wrapper = '' if arg_dict['local'] else 'srun --nodes=1 --ntasks=1 --time=5 --mem=4GB'
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
-    params =  '-B -M {0} --config {1} 1>/dev/null'.format(arg_dict['MS'],filename)
-    command = write_command('get_fields.py', params, mpi_wrapper='', container=arg_dict['container'],logfile=False)
-    logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(arg_dict['MS']))
+    params =  '-B -M {MS} -C {config} -n {nodes} -t {ntasks_per_node}'.format(**arg_dict)
+    command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False)
+    logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
     logger.debug('Using the following command:\n\t{0}'.format(command))
     os.system(command)
 
@@ -548,11 +553,12 @@ def format_args(config):
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
 
-    #Ensure [slurm] section exists in config file, otherwise raise ValueError
-    if 'slurm' in config_dict.keys():
-        kwargs = config_dict['slurm']
-    else:
-        raise ValueError("Config file '{0}' has no section [slurm]. Please insert section or build new config with [-B --build].".format(config))
+    #Ensure all sections exist in config file, otherwise raise ValueError
+    for sec in ['slurm','data','fields']:
+        if sec not in config_dict.keys():
+            raise ValueError("Config file '{0}' has no section [{1}]. Please insert section or build new config with [-B --build].".format(config,sec))
+
+    kwargs = config_dict['slurm']
 
     #Check that expected keys are present, and validate those keys
     missing_keys = list(set(SLURM_CONFIG_KEYS) - set(kwargs))
@@ -575,21 +581,22 @@ def format_args(config):
 
     return kwargs
 
-def setup_logger(args):
+def setup_logger(config,verbose=False):
 
     """Setup logger at debug or info level according to whether verbose option selected (via command line or config file).
 
     Arguments:
     ----------
-    args : class ``argparse.Namespace``
-        Arguments passed into this program."""
+    config : str
+        Path to config file.
+    verbose : bool
+        Verbose output? This will display all logger debug output."""
 
     #Overwrite with verbose mode if set to True in config file
-    verbose = args.verbose
-    if args.run and not verbose:
-        config = config_parser.parse_config(args.config)[0]
-        if 'slurm' in config.keys() and 'verbose' in config['slurm']:
-            verbose = config['slurm']['verbose']
+    if not verbose:
+        config_dict = config_parser.parse_config(config)[0]
+        if 'slurm' in config_dict.keys() and 'verbose' in config_dict['slurm']:
+            verbose = config_dict['slurm']['verbose']
 
     loglevel = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=loglevel)
@@ -598,13 +605,13 @@ def main():
 
     #Parse command-line arguments, and setup logger
     args = parse_args()
-    setup_logger(args)
+    setup_logger(args.config,args.verbose)
 
     #Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
         logger.info('This is version {0}'.format(__version__))
     if args.build:
-        default_config(vars(args),args.config)
+        default_config(vars(args))
     if args.run:
         kwargs = format_args(args.config)
         write_jobs(args.config, **kwargs)
