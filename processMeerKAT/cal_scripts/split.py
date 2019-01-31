@@ -8,28 +8,18 @@ from config_parser import validate_args as va
 def split_vis(visname, spw, fields, specave, timeave):
     outputbase = visname.replace('.mms', '')
 
-    targfields = fields.targetfield.split(',')
-    secfields = fields.secondaryfield.split(',')
-
     msmd.open(visname)
-    fnames = msmd.namesforfields([int(ff) for ff in targfields])
-    secondaryname = msmd.namesforfields([int(ss) for ss in secfields])
-    primaryname = msmd.namesforfields(int(fields.fluxfield))
-    msmd.close()
 
+    for field in fields:
+        for subf in field.split(','):
+            fname = msmd.namesforfields(int(subf))[0]
 
-    for ind, field in enumerate(fnames):
-        split(vis=visname, outputvis = outputbase+'.'+field+'.mms',
-                datacolumn='corrected', field = targfields[ind], spw = spw,
-                keepflags=False, keepmms = True, width = specave,
-                timebin = timeave)
-
-
-    if len(secondaryname) > 1:
-        for ind, sname in enumerate(secondaryname):
-            split(vis=visname, outputvis = outputbase+'.'+sname+'.mms',
-                    datacolumn='corrected', field = secfields[ind], spw = spw,
-                    keepflags=False, keepmms = True, width = specave, timebin = timeave)
+            outname = '%s.%s.mms' % (outputbase, fname)
+            if not os.path.exists(outname):
+                split(vis=visname, outputvis=outname,
+                        datacolumn='corrected', field=fname, spw=spw,
+                        keepflags=False, keepmms=True, width=specave,
+                        timebin=timeave)
 
 
 if __name__ == '__main__':
