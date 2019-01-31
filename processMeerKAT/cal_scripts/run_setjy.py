@@ -39,10 +39,10 @@ def do_setjy(visname, spw, fields, standard):
         logger.info("Spix: ", spix)
         logger.info("Ref freq ", reffreq)
 
-        setjy(vis=visname, field=ff, scalebychan=True, standard='manual',
+        setjy(vis=visname, field=setjyname, scalebychan=True, standard='manual',
                 fluxdensity=smodel, spix=spix, reffreq=reffreq)
     else:
-        setjy(vis=visname, field = fields.fluxfield, spw = spw,
+        setjy(vis=visname, field = setjyname, spw = spw,
                 scalebychan=True, standard=standard)
 
 if __name__ == '__main__':
