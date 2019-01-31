@@ -7,10 +7,6 @@ import os
 import processMeerKAT
 import config_parser
 
-import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
-
 # Get access to the msmd module for get_fields.py
 import casac
 msmd = casac.casac.msmetadata()
