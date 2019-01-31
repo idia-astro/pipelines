@@ -17,13 +17,16 @@ def run_tclean(visname, fields):
         os.makedirs(impath)
 
     secimname = visname.replace('.mms', '') + '_%s.im' % (fields.secondaryfield)
+    secimname = os.path.join(impath, secimname)
 
     targimname = []
     if len(fields.targetfield) > 1:
         for tt in fields.targetfield:
-            targimname.append(visname.replace('.mms', '') + '_%s.im' % (tt))
+            tmpname = visname.replace('.mms', '') + '_%s.im' % (tt)
+            targimname.append(os.path.join(impath, tmpname))
     else:
-        targimname.append(visname.replace('.mms', '') + '_%s.im' % (fields.targetfield))
+        tmpname = visname.replace('.mms', '') + '_%s.im' % (fields.targetfield)
+        targimname.append(os.path.join(impath, tmpname))
 
     tclean(vis=visname, imagename=secimname, datacolumn='corrected',
             field=fields.secondaryfield, imsize=[512,512], threshold=0,
