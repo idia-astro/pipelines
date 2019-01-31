@@ -44,7 +44,7 @@ def run_tclean(visname, fields):
                 field=field, imsize=[1024,1024], threshold=0,
                 niter=1000, weighting='briggs', robust=0, cell='1arcsec',
                 specmode='mfs', deconvolver='mtmfs', nterms=2, scales=[],
-                savemodel='none', gridder='wproject', wprojplanes=16,
+                savemodel='none', gridder='standard', wprojplanes=1,
                 restoration=True, pblimit=0, parallel=True)
 
         exportfits(imagename=tt+'.image.tt0', fitsimage=tt+'.fits')
