@@ -32,14 +32,15 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
             ('flag_round_1.py',True,''),
             ('run_setjy.py',True,''),
-            ('parallel_cal.py',False,''),
-            ('parallel_cal_apply.py',True,''),
+            ('cal_xx_yy_solve.py',False,''),
+            ('cal_xx_yy_apply.py',True,''),
             ('flag_round_2.py',True,''),
             ('run_setjy.py',True,''),
-            ('cross_cal.py',False,''),
-            ('cross_cal_apply.py',True,''),
+            ('cal_xy_yx_solve.py',False,''),
+            ('cal_xy_yx_apply.py',True,''),
             ('split.py',True,''),
-            ('plot_solutions.py',False,'')]
+            ('plot_solutions.py',False,''),
+            ('quick_tclean.py',True,'')]
 
 
 def check_path(path):
@@ -258,7 +259,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     return command
 
 
-def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=98304,name="job",plane=1,
+def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=244,name="job",plane=1,
                 mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
@@ -430,7 +431,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=15,
-                ntasks_per_node=16, mem=98304, plane=4, submit=False, verbose=False):
+                ntasks_per_node=16, mem=244, plane=4, submit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -470,7 +471,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=196608,plane=1,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=192,plane=1,
                         mpi_wrapper='srun',container=containers[i],name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch

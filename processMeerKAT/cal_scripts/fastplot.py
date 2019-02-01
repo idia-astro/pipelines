@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+from __future__ import print_function
 
 from matplotlib import use
 use('Agg', warn=False)
@@ -38,7 +39,7 @@ def get_axis(axis,data,times):
     elif axis == 'Time':
         data = times
     else:
-        print "Unknown axis - '{0}'".format(axis)
+        print("Unknown axis - '{0}'".format(axis))
         plt.close()
         sys.exit()
 
@@ -88,7 +89,7 @@ def fastplot(MS, col='DATA', field='', xaxis='Chan', yaxis='Amp', fname='fastplo
         dat = table.query(query, columns='{0},TIME'.format(col))
         data = dat.getcol(col)
         if data is None:
-            print "Field '{0}' may not exist".format(field)
+            print("Field '{0}' may not exist".format(field))
             sys.exit()
 
         #put channel as last axis, and get antennas and timestamps
@@ -96,14 +97,14 @@ def fastplot(MS, col='DATA', field='', xaxis='Chan', yaxis='Amp', fname='fastplo
         times = dat.getcol('TIME')
         loadtime = time.clock()
     except (RuntimeError,AttributeError),e:
-        print "Column '{0}' may not exist. Use 'CPARAM' for calibration tables and 'DATA' for MSs.".format(col,field)
-        print "Columns are {0}.".format(table.colnames())
-        print e
+        print("Column '{0}' may not exist. Use 'CPARAM' for calibration tables and 'DATA' for MSs.".format(col,field))
+        print("Columns are {0}.".format(table.colnames()))
+        print(e)
         sys.exit()
 
     table.close()
 
-    print 'Extracted data with shape {0} in {1:.0f} seconds.'.format(data.shape,loadtime-start)
+    print('Extracted data with shape {0} in {1:.0f} seconds.'.format(data.shape,loadtime-start))
 
     fig = plt.figure()
 
@@ -133,11 +134,11 @@ def fastplot(MS, col='DATA', field='', xaxis='Chan', yaxis='Amp', fname='fastplo
         plt.yscale('log')
 
     plottime = time.clock()
-    print 'Plotted {0} points in {1:.0f} seconds.'.format(data.size,plottime - loadtime)
+    print('Plotted {0} points in {1:.0f} seconds.'.format(data.size,plottime - loadtime))
 
     plt.savefig(fname)
     savetime = time.clock()
-    print "Wrote figure '{0}' in {1:.0f} seconds.".format(fname,savetime - plottime)
+    print("Wrote figure '{0}' in {1:.0f} seconds.".format(fname,savetime - plottime))
     plt.close()
 
 
