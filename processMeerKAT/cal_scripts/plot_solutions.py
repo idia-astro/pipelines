@@ -26,6 +26,7 @@ def main():
     plotms(vis=calfiles.bpassfile, xaxis='chan', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_chan_phase.png'.format(PLOT_DIR),showgui=False)
 
     #Plot solutions for phase calibrator
+    plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='antenna1', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
     plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/phasecal_time_amp.png'.format(PLOT_DIR),showgui=False)
     plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/phasecal_time_phase.png'.format(PLOT_DIR),showgui=False)
 

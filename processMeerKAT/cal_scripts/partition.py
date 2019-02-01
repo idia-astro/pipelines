@@ -9,7 +9,6 @@ import config_parser
 from config_parser import validate_args as va
 from cal_scripts import get_fields
 
-
 def do_partition(visname, spw):
     # Run partition
     mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
@@ -21,7 +20,7 @@ def do_partition(visname, spw):
     partition(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA',
             numsubms=nscan, separationaxis='scan')
 
-if __name__ == '__main__':
+def main():
 
     # Get the name of the config file
     args = config_parser.parse_args()
@@ -35,3 +34,7 @@ if __name__ == '__main__':
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
     do_partition(visname, spw)
+
+if __name__ == '__main__':
+    main()
+

@@ -30,6 +30,7 @@ CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
+            ('calc_refant.py',False,''),
             ('flag_round_1.py',True,''),
             ('run_setjy.py',True,''),
             ('cal_xx_yy_solve.py',False,''),
@@ -259,8 +260,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     return command
 
 
-def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=244,name="job",plane=1,
-                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True):
+def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",
+                plane=1,mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -297,19 +298,20 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=244,name="job
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script)
+    params['cpus'] = 4 if 'tclean' in script else 1
 
     #SBATCH --time={time}
     contents = """#!/bin/bash
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
-    #SBATCH --cpus-per-task=1
+    #SBATCH --cpus-per-task={cpus}
     #SBATCH --mem={mem}GB
     #SBATCH --job-name={name}
     #SBATCH --distribution=plane={plane}
     #SBATCH --output={LOG_DIR}/{name}-%j.out
     #SBATCH --error={LOG_DIR}/{name}-%j.err
 
-    export OMP_NUM_THREADS=1
+    export OMP_NUM_THREADS={cpus}
 
     {command}"""
 
@@ -431,7 +433,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=15,
-                ntasks_per_node=16, mem=244, plane=4, submit=False, verbose=False):
+                ntasks_per_node=16, mem=MEM_PER_NODE_GB_LIMIT, plane=4, submit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -471,7 +473,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
                         mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
         else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=192,plane=1,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=100,plane=1,
                         mpi_wrapper='srun',container=containers[i],name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
@@ -498,6 +500,8 @@ def default_config(arg_dict):
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
     for key in ['container','mpi_wrapper']:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
+
+    #Overwrite parameters in config under section [slurm]
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file under section [data]
