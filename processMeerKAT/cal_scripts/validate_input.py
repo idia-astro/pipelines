@@ -111,6 +111,7 @@ def validateinput():
         refant = va(taskvals, 'crosscal', 'refant', str)
         msmd.open(visname)
         get_fields.check_refant(MS=visname, refant=refant, warn=False)
+        msmd.done()
         msmd.close()
 
     if not os.path.exists(visname):

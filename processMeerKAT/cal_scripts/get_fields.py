@@ -144,7 +144,7 @@ def check_scans(MS,nodes,tasks):
         A dictionary with updated values for nodes and tasks per node to match the number of scans."""
 
     nscans = msmd.nscans()
-    limit = int(1.1*(nscans + 1))
+    limit = int(1.1*(nscans/2 + 1))
 
     if abs(nodes * tasks - limit) > 0.1*limit:
         logger.warn('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
@@ -182,6 +182,7 @@ def main():
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node)
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
 
+    msmd.done()
     msmd.close()
 
 if __name__ == "__main__":

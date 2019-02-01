@@ -12,6 +12,7 @@ def split_vis(visname, spw, fields, specave, timeave):
     fnames = msmd.namesforfields([int(ff) for ff in fields.targetfield.split(',')])
     secondaryname = msmd.namesforfields(int(fields.secondaryfield))[0]
     primaryname = msmd.namesforfields(int(fields.fluxfield))[0]
+    msmd.done()
     msmd.close()
 
     for field in fnames:
