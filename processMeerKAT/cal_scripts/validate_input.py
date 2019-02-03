@@ -36,8 +36,8 @@ def validateinput():
         refant = va(taskvals, 'crosscal', 'refant', str)
         msmd.open(visname)
         get_fields.check_refant(MS=visname, refant=refant, warn=False)
-        msmd.done()
         msmd.close()
+        msmd.done()
 
     if not os.path.exists(visname):
         raise IOError("Path to MS %s not found" % (visname))

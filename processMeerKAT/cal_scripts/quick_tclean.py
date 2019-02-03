@@ -16,8 +16,6 @@ def run_tclean(visname, fields):
     #Store bandwidth in MHz
     msmd.open(visname)
     BW = msmd.bandwidths(-1)/1e6
-    msmd.done()
-    msmd.close()
 
     #Use 1 taylor term for BW < 100 MHz
     if BW < 100:
@@ -80,6 +78,9 @@ def run_tclean(visname, fields):
                         restoration=True, pblimit=0, parallel=True)
 
                 exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
+
+    msmd.close()
+    msmd.done()
 
 
 if __name__ == '__main__':

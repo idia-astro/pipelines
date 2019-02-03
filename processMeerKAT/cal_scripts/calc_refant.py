@@ -1,9 +1,11 @@
 """
 Calculates the reference antenna
 """
-import os
 import config_parser
 from config_parser import validate_args as va
+from cal_scripts import bookkeeping
+
+import os
 import numpy as np
 
 import logging
@@ -98,6 +100,8 @@ def main():
 
     visname = va(taskvals, 'data', 'vis', str)
     visname = os.path.split(visname.replace('.ms', '.mms'))[1]
+
+    fields = bookkeeping.get_field_ids(taskvals['fields'])
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool, default=False)
 
     # Calculate reference antenna

@@ -17,8 +17,8 @@ def do_setjy(visname, spw, fields, standard):
 
     msmd.open(visname)
     fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(',')])
-    msmd.done()
     msmd.close()
+    msmd.done()
 
     do_manual=False
     for ff in fluxlist:

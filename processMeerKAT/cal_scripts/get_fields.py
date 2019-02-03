@@ -195,8 +195,8 @@ def main():
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node)
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
 
-    msmd.done()
     msmd.close()
+    msmd.done()
 
 if __name__ == "__main__":
     main()
