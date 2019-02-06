@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import os, sys
+import os, sys, shutil
 
 import config_parser
 from cal_scripts import bookkeeping
@@ -55,6 +55,9 @@ if __name__ == '__main__':
 
     visname = va(taskvals, 'data', 'vis', str)
     visname = os.path.split(visname.replace('.ms', '.mms'))[1]
+
+    if os.path.exists(os.path.join(os.getcwd(), 'caltables')):
+        shutil.rmtree(os.path.join(os.getcwd(), 'caltables'))
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
