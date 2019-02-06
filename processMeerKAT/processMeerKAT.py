@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 #Set global limits for ilifu cluster configuration
 TOTAL_NODES_LIMIT = 35
 NTASKS_PER_NODE_LIMIT = 128
-MEM_PER_NODE_GB_LIMIT = 244 #250000 MB
+MEM_PER_NODE_GB_LIMIT = 240 #250000 MB
 
 #Set global values for paths and file names
 THIS_PROG = sys.argv[0]
@@ -391,7 +391,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
-    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; head -n 1 %s/*\$ID.casa | cut -d 'I' -f1; tail -n 1 %s/*\$ID.casa | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
+    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; cat %s/*\$ID.casa | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID.casa | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir)
 
     #Close master submission script and make executable
