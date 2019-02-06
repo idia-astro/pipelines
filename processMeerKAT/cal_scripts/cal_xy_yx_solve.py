@@ -57,6 +57,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     if os.path.exists(xy0pfile):
         shutil.rmtree(xy0pfile)
 
+    # TODO: Look into deleting this first call
     logger.info(" starting gaincal -> %s" % gain1file)
     gaincal(vis=visname, caltable=gain1file, field=fields.fluxfield,
             refant=referenceant, solint='10min', minblperant=minbaselines,
@@ -98,8 +99,8 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             GainQU[int(fields.dpolfield)][1], 0.0]
 
     p = np.sqrt(S[1]**2 + S[2]**2)
-    logger.info("Model for polarization calibrator S =", S)
-    logger.info("Fractional polarization =", p)
+    logger.info("Model for polarization calibrator S = {0:.4}".format(S))
+    logger.info("Fractional polarization = {0:.4}".format(p))
 
     gaincal(vis=visname, caltable = calfiles.gainfile, field = fields.fluxfield,
             refant = referenceant, solint = '10min', solnorm = False,
@@ -143,7 +144,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     if len(fields.gainfields) > 1:
         logger.info(" starting fluxscale -> %s", calfiles.fluxfile)
         fluxscale(vis=visname, caltable = calfiles.gainfile,
-                reference = fields.fluxfield, transfer = fields.secondaryfield,
+                reference = fields.fluxfield, transfer = '',
                 fluxtable = calfiles.fluxfile,
                 listfile = os.path.join(caldir,'fluxscale.txt'),
                 append = False)

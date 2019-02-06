@@ -7,18 +7,18 @@ import os
 import processMeerKAT
 import config_parser
 
-# Get access to the msmd module for get_fields.py
-import casac
-msmd = casac.casac.msmetadata()
-
 import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
+# Get access to the msmd module for get_fields.py
+import casac
+msmd = casac.casac.msmetadata()
+
 def get_fields(MS):
 
-    """Extract field numbers from intent, including calibrators for bandpass, flux, phase & amplitude, and the target.
-    All fields except the total flux calibrator allow for multiple field IDs.
+    """Extract field numbers from intent, including calibrators for bandpass, flux, phase & amplitude, and the target. Only the
+    target allows for multiple field IDs, while all others extract the field with the most scans and put all other IDs as target fields.
 
     Arguments:
     ----------
@@ -38,6 +38,7 @@ def get_fields(MS):
             Target field."""
 
     fieldIDs = {}
+    extra_fields = []
 
     #Set default for any missing intent as field for intent CALIBRATE_FLUX
     default = msmd.fieldsforintent('CALIBRATE_FLUX')
@@ -49,26 +50,22 @@ def get_fields(MS):
     if phasecal_intent not in msmd.intents():
         phasecal_intent = 'CALIBRATE_AMPLI'
 
-    #Put any extra fields from 'CALIBRATE_FLUX' in phasecal fields
-    fieldIDs['fluxfield'] = get_field(MS,'CALIBRATE_FLUX',multiple=False)
-    #extra_fields = list(set(default[1:]) - set(msmd.fieldsforintent(phasecal_intent)))
-    #if len(extra_fields) > 0:
-    #    logger.warn('Putting extra fields with intent "CALIBRATE_FLUX" in "phasecalfield"')
+    fieldIDs['fluxfield'] = get_field(MS,'CALIBRATE_FLUX','fluxfield',extra_fields)
+    fieldIDs['bpassfield'] = get_field(MS,'CALIBRATE_BANDPASS','bpassfield',extra_fields,default=default)
+    fieldIDs['phasecalfield'] = get_field(MS,phasecal_intent,'phasecalfield',extra_fields,default=default)
+    fieldIDs['targetfields'] = get_field(MS,'TARGET','targetfields',extra_fields,default=default,multiple=True)
 
-    fieldIDs['bpassfield'] = get_field(MS,'CALIBRATE_BANDPASS',default=default)
-    fieldIDs['phasecalfield'] = get_field(MS,phasecal_intent,default=default, multiple=False)
-    fieldIDs['targetfields'] = get_field(MS,'TARGET',default=default)
-
-    #Put any extra fields with intent CALIBRATE_BANDPASS in phasecal field
-    #if len(extra_fields) > 0:
-    #    fieldIDs['phasecalfield'] = "{0},{1}'".format(fieldIDs['phasecalfield'][:-1],','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
+    #Put any extra fields in target fields
+    if len(extra_fields) > 0:
+        fieldIDs['targetfields'] = "{0},{1}'".format(fieldIDs['targetfields'][:-1],','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
 
     return fieldIDs
 
 
-def get_field(MS,intent,default=0,multiple=True):
+def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
 
-    """Extract a field ID based on intent. If multiple is True, return comma-seperated string, otherwise single field string.
+    """Extract field IDs based on intent. When multiple fields are present, if multiple is True, return a
+    comma-seperated string, otherwise return a single field string corresponding to the field with the most scans.
 
     Arguments:
     ----------
@@ -76,6 +73,10 @@ def get_field(MS,intent,default=0,multiple=True):
         Input measurement set (relative or absolute path).
     intent : str
         Calibration intent.
+    fieldname : str
+        The name given by the pipeline to the field being extracted (for output).
+    extra_fields : list
+        List of extra fields (passed by reference).
     default : int, optional
         Default field to return if intent missing.
     multiple : bool, optional
@@ -83,37 +84,41 @@ def get_field(MS,intent,default=0,multiple=True):
 
     Returns:
     --------
-    fields : str
-        Extracted field ID(s)"""
+    fieldIDs : str
+        Extracted field ID(s), comma-seperated for multiple fields."""
 
     fields = msmd.fieldsforintent(intent)
 
-    maxfield, maxscan = 0, 0
-    if fields.size > 1 and not multiple:
-        scans = [msmd.scansforfield(ff) for ff in fields]
-        # scans is an array of arrays
-        for ind, ss in enumerate(scans):
-            if len(ss) > maxscan:
-                maxscan = len(ss)
-                maxfield = fields[ind]
-    else:
-        maxfield = fields[0]
-
     if fields.size == 0:
         logger.warn('Intent "{0}" not found in dataset "{1}". Setting to "{2}"'.format(intent,MS,default))
-        fields = "'{0}'".format(default)
-    elif fields.size > 1:
-        if not multiple:
-            logger.warn('Multiple fields found with intent "{0}" in dataset "{1}" - {2}. Only using field "{3}".'.format(intent,MS,fields,maxfield))
-        else:
-            logger.info('Multiple fields found with intent "{0}" in dataset "{1}" - {2}. Will use all of them.'.format(intent,MS,fields))
-
-    if multiple:
-        fields = "'{0}'".format(','.join([str(fields[i]) for i in range(fields.size)]))
+        fieldIDs = "'{0}'".format(default)
+    elif fields.size == 1:
+        fieldIDs = "'{0}'".format(fields[0])
     else:
-        fields = "'{0}'".format(maxfield)
+        logger.info('Multiple fields found with intent "{0}" in dataset "{1}" - {2}.'.format(intent,MS,fields))
 
-    return fields
+        if multiple:
+            logger.info('Will use all of them for "{0}".'.format(fieldname))
+            fieldIDs = "'{0}'".format(','.join([str(fields[i]) for i in range(fields.size)]))
+        else:
+            maxfield, maxscan = 0, 0
+            scans = [msmd.scansforfield(ff) for ff in fields]
+            # scans is an array of arrays
+            for ind, ss in enumerate(scans):
+                if len(ss) > maxscan:
+                    maxscan = len(ss)
+                    maxfield = fields[ind]
+
+            logger.warn('Only using field "{0}" for "{1}", which has the most scans ({2}).'.format(maxfield,fieldname,maxscan))
+            fieldIDs = "'{0}'".format(maxfield)
+
+            #Put any extra fields with intent CALIBRATE_BANDPASS in target field
+            extras = list(set(fields) - set(extra_fields) - set([maxfield]))
+            if len(extras) > 0:
+               logger.warn('Putting extra fields with intent "{0}" in "target" - {1}'.format(intent,extras))
+               extra_fields += extras
+
+    return fieldIDs
 
 def check_refant(MS,refant,warn=True):
 
@@ -157,7 +162,7 @@ def check_scans(MS,nodes,tasks):
         A dictionary with updated values for nodes and tasks per node to match the number of scans."""
 
     nscans = msmd.nscans()
-    limit = int(1.1*(nscans + 1))
+    limit = int(1.1*(nscans/2 + 1))
 
     if abs(nodes * tasks - limit) > 0.1*limit:
         logger.warn('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
@@ -196,6 +201,7 @@ def main():
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
 
     msmd.close()
+    msmd.done()
 
 if __name__ == "__main__":
     main()
