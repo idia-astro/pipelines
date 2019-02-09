@@ -25,7 +25,7 @@ TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for SLURM arguments copied to config file, and some of their default values
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper']
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
@@ -132,6 +132,7 @@ def parse_args():
     parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
                         help="Use this mpi wrapper when calling scripts [default: '{0}'].".format(MPI_WRAPPER))
     parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
+    parser.add_argument("-P","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: Main].")
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -261,7 +262,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",
-                plane=1,mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True):
+                plane=1,mpi_wrapper=MPI_WRAPPER,container=CONTAINER,partition="Main",casa_script=True):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -287,6 +288,8 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=MEM_PER_NODE_
         MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
     container : str, optional
         Path to singularity container used for this job.
+    partition : str, optional
+        SLURM partition to use (default: "Main").
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?"""
 
@@ -310,6 +313,7 @@ def write_sbatch(script,args,time="00:10:00",nodes=15,tasks=16,mem=MEM_PER_NODE_
     #SBATCH --distribution=plane={plane}
     #SBATCH --output={LOG_DIR}/{name}-%j.out
     #SBATCH --error={LOG_DIR}/{name}-%j.err
+    #SBATCH --partition={partition}
 
     export OMP_NUM_THREADS={cpus}
 
