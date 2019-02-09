@@ -437,7 +437,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=15,
-                ntasks_per_node=16, mem=MEM_PER_NODE_GB_LIMIT, plane=4, submit=False, verbose=False):
+                ntasks_per_node=16, mem=MEM_PER_NODE_GB_LIMIT, plane=4, partition='Main', submit=False, verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -463,6 +463,8 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         Name for this job, used in naming the various output files.
     plane : int, optional
         Distrubute tasks for this job using this block size before moving onto next node.
+    partition : str, optional
+        SLURM partition to use (default: "Main").
     submit : bool, optional
         Submit jobs to SLURM queue immediately?
     verbose : bool, optional
@@ -475,10 +477,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=nodes,tasks=ntasks_per_node,
-                        mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],name=name)
+                        mem=mem,plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,name=name)
         else:
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),time="01:00:00",nodes=1,tasks=1,mem=100,plane=1,
-                        mpi_wrapper='srun',container=containers[i],name=name)
+                        mpi_wrapper='srun',container=containers[i],partition=partition,name=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
