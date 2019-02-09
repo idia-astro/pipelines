@@ -15,11 +15,12 @@ badfreqranges = [ '944~947MHz',   # List of bad frequency ranges
 [slurm]			                      # See processMeerKAT.py -h for documentation
 nodes = 15
 ntasks_per_node = 8
-mem = 98304
+mem = 240
 plane = 4
 submit = False
 container = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 mpi_wrapper = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
+partition = 'Main'
 verbose = False
 scripts = [ ('validate_input.py',False,''),
             ('partition.py',True,''),

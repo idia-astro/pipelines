@@ -132,7 +132,7 @@ def parse_args():
     parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
                         help="Use this mpi wrapper when calling scripts [default: '{0}'].".format(MPI_WRAPPER))
     parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
-    parser.add_argument("-P","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: Main].")
+    parser.add_argument("-P","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -502,7 +502,7 @@ def default_config(arg_dict):
 
     #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
-    for key in ['container','mpi_wrapper']:
+    for key in ['container','mpi_wrapper','partition']:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
 
     #Overwrite parameters in config under section [slurm]
@@ -512,7 +512,7 @@ def default_config(arg_dict):
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
 
     #Don't call srun if option --local used
-    mpi_wrapper = '' if arg_dict['local'] else 'srun --nodes=1 --ntasks=1 --time=5 --mem=4GB'
+    mpi_wrapper = '' if arg_dict['local'] else 'srun --nodes=1 --ntasks=1 --time=5 --mem=4GB --partition={0}'.format(arg_dict['partition'])
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
     params =  '-B -M {MS} -C {config} -n {nodes} -t {ntasks_per_node}'.format(**arg_dict)
