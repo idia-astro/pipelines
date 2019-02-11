@@ -23,7 +23,7 @@ def parse_config(filename):
     should represent task parameters and values respectively.
     """
 
-    config = ConfigParser.SafeConfigParser()
+    config = ConfigParser.SafeConfigParser(allow_no_value=True)
     config.read(filename)
 
     # Build a nested dictionary with tasknames at the top level
@@ -40,37 +40,31 @@ def parse_config(filename):
                 taskvals[section][option] = ast.literal_eval(config.get(section, option))
             except (ValueError,SyntaxError):
                 err = "Cannot format field '{0}' in config file '{1}'".format(option,filename)
-                err += ", which is currently set to '{0}'.".format(config.get(section, option))
+                err += ", which is currently set to {0}. Ensure strings are in 'quotes'.".format(config.get(section, option))
                 raise ValueError(err)
 
     return taskvals, config
 
 
-def overwrite_config(filename, conf_dict={}, conf_sec=''):
+def overwrite_config(filename, conf_dict={}, conf_sec='', sec_comment=''):
 
     config_dict,config = parse_config(filename)
 
     if conf_sec not in config.sections():
         processMeerKAT.logger.debug('Writing [{0}] section in config file "{1}" with:\n{2}.'.format(conf_sec,filename,conf_dict))
-
         config.add_section(conf_sec)
-
-        for key in conf_dict.keys():
-            config.set(conf_sec, key, str(conf_dict[key]))
-
-        config_file = open(filename, 'w')
-        config.write(config_file)
-        config_file.close()
-
     else:
         processMeerKAT.logger.debug('Overwritting [{0}] section in config file "{1}" with:\n{2}.'.format(conf_sec,filename,conf_dict))
 
-        for key in conf_dict.keys():
-            config.set(conf_sec, key, str(conf_dict[key]))
+    if sec_comment != '':
+        config.set(conf_sec, sec_comment)
 
-        config_file = open(filename, 'w')
-        config.write(config_file)
-        config_file.close()
+    for key in conf_dict.keys():
+        config.set(conf_sec, key, str(conf_dict[key]))
+
+    config_file = open(filename, 'w')
+    config.write(config_file)
+    config_file.close()
 
 
 def validate_args(kwdict, section, key, dtype, default=None):

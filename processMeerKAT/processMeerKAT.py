@@ -10,10 +10,10 @@ from shutil import copyfile
 import logging
 logger = logging.getLogger(__name__)
 
-#Set global limits for ilifu cluster configuration
+#Set global limits for current ilifu cluster configuration
 TOTAL_NODES_LIMIT = 35
 NTASKS_PER_NODE_LIMIT = 128
-MEM_PER_NODE_GB_LIMIT = 240 #250000 MB
+MEM_PER_NODE_GB_LIMIT = 236 #241827 MB
 
 #Set global values for paths and file names
 THIS_PROG = sys.argv[0]
@@ -24,7 +24,9 @@ CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
-#Set global values for SLURM arguments copied to config file, and some of their default values
+#Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
+FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
+CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
@@ -32,13 +34,13 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
             ('calc_refant.py',False,''),
             ('flag_round_1.py',True,''),
-            ('run_setjy.py',True,''),
-            ('cal_xx_yy_solve.py',False,''),
-            ('cal_xx_yy_apply.py',True,''),
+            ('setjy.py',True,''),
+            ('xx_yy_solve.py',False,''),
+            ('xx_yy_apply.py',True,''),
             ('flag_round_2.py',True,''),
-            ('run_setjy.py',True,''),
-            ('cal_xy_yx_solve.py',False,''),
-            ('cal_xy_yx_apply.py',True,''),
+            ('setjy.py',True,''),
+            ('xy_yx_solve.py',False,''),
+            ('xy_yx_apply.py',True,''),
             ('split.py',True,''),
             ('plot_solutions.py',False,''),
             ('quick_tclean.py',True,'')]
@@ -46,8 +48,8 @@ SCRIPTS = [ ('validate_input.py',False,''),
 
 def check_path(path):
 
-    """Check in specific location for a script or container, including for one of this pipeline's calibration scripts
-    (in SCRIPT_DIR/CALIB_SCRIPTS_DIR/). If path isn't found, raise IOError, otherwise return the path.
+    """Check in specific location for a script or container, including in bash path, and in this pipeline's calibration
+    scripts directory (SCRIPT_DIR/CALIB_SCRIPTS_DIR/). If path isn't found, raise IOError, otherwise return the path.
 
     Arguments:
     ----------
@@ -119,21 +121,20 @@ def parse_args():
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
-    parser.add_argument("-n","--nodes",metavar="num", required=False, type=int, default=15,
-                        help="Use this number of nodes [default: 10; max: {0}].".format(TOTAL_NODES_LIMIT))
-    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
-                        help="Use this number of tasks (per node) [default: 8; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-p","--plane", metavar="num", required=False, type=int, default=4,
-                            help="Distribute tasks of this block size before moving onto next node [default: 4; max: ntasks-per-node].")
+    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=8,
+                        help="Use this number of nodes [default: 8; max: {0}].".format(TOTAL_NODES_LIMIT))
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=4,
+                        help="Use this number of tasks (per node) [default: 4; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+    parser.add_argument("-P","--plane", metavar="num", required=False, type=int, default=2,
+                            help="Distribute tasks of this block size before moving onto next node [default: 2; max: ntasks-per-node].")
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
-                        help="Use this many GB of memory (per node) [default: {0}; max: {0}.".format(MEM_PER_NODE_GB_LIMIT))
+                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}.".format(MEM_PER_NODE_GB_LIMIT))
+    parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
-                        help="Run pipeline with these scripts, in this order, using this container (3rd tuple value - empty string to default to [--container]). Is it threadsafe (2nd tuple value)?")
-    parser.add_argument("--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
-                        help="Use this mpi wrapper when calling scripts [default: '{0}'].".format(MPI_WRAPPER))
-    parser.add_argument("--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
-    parser.add_argument("-P","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
-    parser.add_argument("-c","--CASA", metavar="bogus", required=False, type=str, help="Bogus argument to swallow up CASA call.")
+                        help="Run pipeline with these scripts, in this order, using this container (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
+    parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
+                        help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(MPI_WRAPPER))
+    parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
@@ -141,26 +142,20 @@ def parse_args():
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
     run_args = parser.add_mutually_exclusive_group(required=True)
-    run_args.add_argument("-B","--build", action="store_true", required=False, default=False, help="Build default config file using input MS.")
+    run_args.add_argument("-B","--build", action="store_true", required=False, default=False, help="Build config file using input MS.")
     run_args.add_argument("-R","--run", action="store_true", required=False, default=False, help="Run pipeline with input config file.")
-    run_args.add_argument("-V","--version", action="store_true", required=False, default=False, help="Display the version.")
+    run_args.add_argument("-V","--version", action="store_true", required=False, default=False, help="Display the version of this pipeline and quit.")
 
     args, unknown = parser.parse_known_args()
 
     if len(unknown) > 0:
         parser.error('Unknown input argument(s) present - {0}'.format(unknown))
 
-    if args.build:
-        if args.MS is None:
-            parser.error("You must input an MS [-M --MS] to build the config file.")
-        if not os.path.isdir(args.MS):
-            parser.error("Input MS '{0}' not found.".format(args.MS))
-
     if args.run:
         if args.config is None:
             parser.error("You must input a config file [--config] to run the pipeline.")
         if not os.path.exists(args.config):
-            parser.error("Input config file '{0}' not found. Please set --config.".format(args.config))
+            parser.error("Input config file '{0}' not found. Please set [-C --config].".format(args.config))
 
     #if user inputs a list a scripts, remove the default list
     if len(args.scripts) > len(SCRIPTS):
@@ -185,7 +180,7 @@ def raise_error(config,msg,parser=None):
         If this is input, parser error will be raised."""
 
     if parser is None:
-        raise ValueError("Bad input found in '{0}'\n{1}".format(config,msg))
+        raise ValueError("Bad input found in '{0}' -- {1}".format(config,msg))
     else:
         parser.error(msg)
 
@@ -202,16 +197,29 @@ def validate_args(args,config,parser=None):
     parser : class ``argparse.ArgumentParser``, optional
         If this is input, parser error will be raised."""
 
+    if parser is None or args['build']:
+        if args['MS'] is None:
+            msg = "You must input an MS [-M --MS] to build the config file."
+            raise_error(config, msg, parser)
+
+        if not os.path.isdir(args['MS']):
+            msg = "Input MS '{0}' not found.".format(args['MS'])
+            raise_error(config, msg, parser)
+
     if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
-        msg = "The number of tasks [-t --ntasks-per-node] per node must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks-per-node'])
+        msg = "The number of tasks per node [-t --ntasks-per-node] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks_per_node'])
         raise_error(config, msg, parser)
 
     if args['nodes'] > TOTAL_NODES_LIMIT:
-        msg = "The number of nodes [-n --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
+        msg = "The number of nodes [-N --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
         raise_error(config, msg, parser)
 
     if args['mem'] > MEM_PER_NODE_GB_LIMIT:
-        msg = "The memory per node [-m --mem] must not exceed {0}. You input {1}.".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
+        msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
+        raise_error(config, msg, parser)
+
+    if args['plane'] > args['ntasks_per_node']:
+        msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
         raise_error(config, msg, parser)
 
 def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True):
@@ -525,7 +533,6 @@ def default_config(arg_dict):
 
     logger.info('Config "{0}" generated.'.format(filename))
 
-
 def get_slurm_dict(arg_dict,slurm_config_keys):
 
     """Build a slurm dictionary to be inserted into config file, using specified keys.
@@ -557,24 +564,16 @@ def format_args(config):
     Returns:
     --------
     kwargs : dict
-        Keyword arguments extracted from config file, to be passed into write_jobs() function."""
+        Keyword arguments extracted from [slurm] section of config file, to be passed into write_jobs() function."""
 
-    #Copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
-    config_dict = config_parser.parse_config(config)[0]
-    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
-    copyfile(config, TMP_CONFIG)
+    #Ensure all keys exist in these sections
+    kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
+    data_kwargs = get_config_kwargs(config,'data',['vis'])
+    get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
+    get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
-    #Ensure all sections exist in config file, otherwise raise ValueError
-    for sec in ['slurm','data','fields']:
-        if sec not in config_dict.keys():
-            raise ValueError("Config file '{0}' has no section [{1}]. Please insert section or build new config with [-B --build].".format(config,sec))
-
-    kwargs = config_dict['slurm']
-
-    #Check that expected keys are present, and validate those keys
-    missing_keys = list(set(SLURM_CONFIG_KEYS) - set(kwargs))
-    if len(missing_keys) > 0:
-        raise KeyError("Keys {0} missing from section [slurm] in '{1}'.".format(missing_keys,config))
+    # Validate kwargs along with MS
+    kwargs['MS'] = data_kwargs['vis']
     validate_args(kwargs,config)
 
     #Reformat scripts tuple/list, to extract scripts, threadsafe, and containers as parallel lists
@@ -584,11 +583,54 @@ def format_args(config):
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
-    #Replace empty containers with default container and remove unwanted kwarg
+    #Replace empty containers with default container and remove unwanted kwargs
     for i in range(len(kwargs['containers'])):
         if kwargs['containers'][i] == '':
             kwargs['containers'][i] = kwargs['container']
     kwargs.pop('container')
+    kwargs.pop('MS')
+
+    #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
+    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
+    copyfile(config, TMP_CONFIG)
+
+    return kwargs
+
+def get_config_kwargs(config,section,expected_keys):
+
+    """Return kwargs from config section. Check section exists, and that all expected keys are present, otherwise raise KeyError.
+
+    Arguments:
+    ----------
+    config : str
+        Path to config file.
+    section : str
+        Config section from which to extract kwargs.
+    expected_keys : list
+        List of expected keys.
+
+    Returns:
+    --------
+    kwargs : dict
+        Keyword arguments from this config section."""
+
+    config_dict = config_parser.parse_config(config)[0]
+
+    #Ensure section exists, otherwise raise KeyError
+    if section not in config_dict.keys():
+        raise KeyError("Config file '{0}' has no section [{1}]. Please insert section or build new config with [-B --build].".format(config,section))
+
+    kwargs = config_dict[section]
+
+    #Check for any unknown keys and display warning
+    unknown_keys = list(set(kwargs) - set(expected_keys))
+    if len(unknown_keys) > 0:
+        logger.warn("Unknown keys {0} present in section [{1}] in '{2}'.".format(unknown_keys,section,config))
+
+    #Check that expected keys are present, otherwise raise KeyError
+    missing_keys = list(set(expected_keys) - set(kwargs))
+    if len(missing_keys) > 0:
+        raise KeyError("Keys {0} missing from section [{1}] in '{2}'.".format(missing_keys,section,config))
 
     return kwargs
 

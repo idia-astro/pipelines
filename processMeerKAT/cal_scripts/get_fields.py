@@ -115,7 +115,7 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
             #Put any extra fields with intent CALIBRATE_BANDPASS in target field
             extras = list(set(fields) - set(extra_fields) - set([maxfield]))
             if len(extras) > 0:
-               logger.warn('Putting extra fields with intent "{0}" in "target" - {1}'.format(intent,extras))
+               logger.warn('Putting extra fields with intent "{0}" in "targetfields" - {1}'.format(intent,extras))
                extra_fields += extras
 
     return fieldIDs
