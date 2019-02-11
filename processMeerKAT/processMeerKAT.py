@@ -525,7 +525,7 @@ def default_config(arg_dict):
     mpi_wrapper = '' if arg_dict['local'] else 'srun --nodes=1 --ntasks=1 --time=5 --mem=4GB --partition={0}'.format(arg_dict['partition'])
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
-    params =  '-B -M {MS} -C {config} -n {nodes} -t {ntasks_per_node}'.format(**arg_dict)
+    params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)
     command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False)
     logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
     logger.debug('Using the following command:\n\t{0}'.format(command))
