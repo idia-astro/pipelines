@@ -378,7 +378,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
 
     #Submit each script with dependency on all previous scripts, and extract job IDs
     for script in scripts:
-        command = 'sbatch -d afterok:$IDs'
+        command = 'sbatch -d afterok:$IDs,aftercorr:$IDs --kill-on-invalid-dep=yes'
         master.write('\n#{0}\n'.format(script))
         if verbose:
             master.write('echo Submitting {0} SLURM queue with following command\necho {1} {0}\n'.format(script,command))
