@@ -378,7 +378,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
 
     #Submit each script with dependency on all previous scripts, and extract job IDs
     for script in scripts:
-        command = 'sbatch -d afterok:$IDs,aftercorr:$IDs --kill-on-invalid-dep=yes'
+        command = 'sbatch -d afterok:$IDs --kill-on-invalid-dep=yes'
         master.write('\n#{0}\n'.format(script))
         if verbose:
             master.write('echo Submitting {0} SLURM queue with following command\necho {1} {0}\n'.format(script,command))
@@ -404,7 +404,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
     write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
-    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep 'SEVERE\|rror' | grep -v 'mpi\|MPI'; done" """ % (LOG_DIR,LOG_DIR)
+    do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep -i 'severe\|error' | grep -vi 'mpi'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; cat %s/*\$ID.casa | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID.casa | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir)
