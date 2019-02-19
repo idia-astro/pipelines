@@ -2,6 +2,7 @@
 minbaselines = 4                  # Minimum number of baselines to use while calibrating
 specavg = 1                       # Number of channels to average after calibration (during split)
 timeavg = '8s'                    # Time interval to average after calibration (during split)
+keepmms = True                    # Output MMS  (True) or MS (false) during split
 spw = '0:860~1700MHz'             # Spectral window / frequencies to extract for MMS
 calcrefant = True                 # Calculate reference antenna in program (overwrites 'refant')
 refant = 'm005'                   # Reference antenna name / number
@@ -37,4 +38,3 @@ scripts = [ ('validate_input.py',False,''),
             ('split.py',True,''),
             ('plot_solutions.py',False,''),
             ('quick_tclean.py',True,'')]
-

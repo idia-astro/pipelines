@@ -5,7 +5,7 @@ import config_parser
 from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
-def split_vis(visname, spw, fields, specavg, timeavg):
+def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
     outputbase = visname.replace('.mms', '')
 
     msmd.open(visname)
@@ -18,7 +18,7 @@ def split_vis(visname, spw, fields, specavg, timeavg):
             if not os.path.exists(outname):
                 split(vis=visname, outputvis=outname,
                         datacolumn='corrected', field=fname, spw=spw,
-                        keepflags=False, keepmms=True, width=specavg,
+                        keepflags=False, keepmms=keepmms, width=specavg,
                         timebin=timeavg)
 
 
@@ -39,5 +39,6 @@ if __name__ == '__main__':
 
     specavg = va(taskvals, 'crosscal', 'specavg', int, default=1)
     timeavg = va(taskvals, 'crosscal', 'timeavg', str, default='8s')
+    keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
-    split_vis(visname, spw, fields, specavg, timeavg)
+    split_vis(visname, spw, fields, specavg, timeavg, keepmms)
