@@ -41,6 +41,7 @@ def main():
 
     mvis = do_partition(visname, spw)
     mvis = "'{0}'".format(mvis)
+    vis = "'{0}'".format(visname)
 
     config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'vis':mvis})
     config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'orig_vis':vis})
