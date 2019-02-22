@@ -100,7 +100,6 @@ def main():
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-    visname = os.path.split(visname.replace('.ms', '.mms'))[1]
 
     fields = bookkeeping.get_field_ids(taskvals['fields'])
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool, default=False)

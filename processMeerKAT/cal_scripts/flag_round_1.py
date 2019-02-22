@@ -75,7 +75,6 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-    visname = os.path.split(visname.replace('.ms', '.mms'))[1]
 
     badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
     badants = taskvals['crosscal'].pop('badants')

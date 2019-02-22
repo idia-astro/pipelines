@@ -10,8 +10,12 @@ from config_parser import validate_args as va
 from cal_scripts import get_fields
 
 def do_partition(visname, spw):
-    # Run partition
-    mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
+    # Get the .ms bit of the filename, case independent
+    basename, ext = os.path.splitext(visname)
+
+    mvis = basename + '.mms'
+
+    #mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
     msmd.open(visname)
     nscan = msmd.nscans()
     msmd.close()
@@ -19,6 +23,8 @@ def do_partition(visname, spw):
 
     partition(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA',
             numsubms=nscan, separationaxis='scan')
+
+    return mvis
 
 def main():
 
@@ -33,7 +39,10 @@ def main():
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
-    do_partition(visname, spw)
+    mvis = do_partition(visname, spw)
+
+    config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'vis':mvis})
+    config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'orig_vis':vis})
 
 if __name__ == '__main__':
     main()
