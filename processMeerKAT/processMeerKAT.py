@@ -26,7 +26,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
-CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges']
+CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges', 'keepmms']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
