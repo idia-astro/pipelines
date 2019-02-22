@@ -40,6 +40,7 @@ def main():
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
     mvis = do_partition(visname, spw)
+    mvis = "'{0}'".format(mvis)
 
     config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'vis':mvis})
     config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'orig_vis':vis})
