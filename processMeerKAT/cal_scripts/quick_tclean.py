@@ -6,7 +6,7 @@ from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 import glob
 
-def run_tclean(visname, fields):
+def run_tclean(visname, fields, keepmms):
     """
     Run a quick and dirty tclean that will produce an image of the phase cal as well as the target.
     No W projection will be applied, and the image size and cell size are will be restricted to
@@ -16,6 +16,11 @@ def run_tclean(visname, fields):
     #Store bandwidth in MHz
     msmd.open(visname)
     BW = msmd.bandwidths(-1)/1e6
+
+    if keepmms == True:
+        parallel = True
+    else:
+        parallel = False
 
     #Use 1 taylor term for BW < 100 MHz
     if BW < 100:
@@ -59,7 +64,7 @@ def run_tclean(visname, fields):
                     weighting='briggs', robust=0, cell='2arcsec',
                     specmode='mfs', deconvolver=deconvolver, nterms=terms, scales=[],
                     savemodel='none', gridder='standard',
-                    restoration=True, pblimit=0, parallel=True)
+                    restoration=True, pblimit=0, parallel=parallel)
 
             exportfits(imagename=tt+'.image'+suffix, fitsimage=tt+'.fits')
 
@@ -78,7 +83,7 @@ def run_tclean(visname, fields):
                         imsize=[512,512], threshold=0,niter=1000, weighting='briggs',
                         robust=0, cell='2arcsec', specmode='mfs', deconvolver=deconvolver,
                         nterms=terms, scales=[], savemodel='none', gridder='standard',
-                        restoration=True, pblimit=0, parallel=True)
+                        restoration=True, pblimit=0, parallel=parallel)
 
                 exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
 
@@ -94,7 +99,8 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
+    keepmms = va(taskvals, 'cross_cal', 'keepmms', bool)
 
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    run_tclean(visname, fields)
+    run_tclean(visname, fields, keepmms)
