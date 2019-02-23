@@ -12,8 +12,9 @@ from cal_scripts import get_fields
 def do_partition(visname, spw):
     # Get the .ms bit of the filename, case independent
     basename, ext = os.path.splitext(visname)
+    filebase = os.path.split(basename)[1]
 
-    mvis = basename + '.mms'
+    mvis = filebase + '.mms'
 
     #mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
     msmd.open(visname)
