@@ -89,7 +89,7 @@ def main():
     taskvals, config = config_parser.parse_config(config)
 
     visname = va(taskvals, 'data', 'vis', str)
-    keepmms = va(taskvals, 'cross_cal', 'keepmms', bool)
+    keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
