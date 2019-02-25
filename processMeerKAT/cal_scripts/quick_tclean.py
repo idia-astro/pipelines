@@ -43,11 +43,11 @@ def run_tclean(visname, fields, keepmms):
     if len(fields.targetfield.split(',')) > 1:
         for tt in fields.targetfield.split(','):
             fname = msmd.namesforfields(int(tt))[0]
-            tmpname = os.path.split(visname)[0] + '_%s.im' % (fname)
+            tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
             targimname.append(os.path.join(impath, tmpname))
     else:
         fname = msmd.namesforfields(int(fields.targetfield))[0]
-        tmpname = os.path.split(visname)[0] + '_%s.im' % (fname)
+        tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
         targimname.append(os.path.join(impath, tmpname))
 
     #Image target and export to fits
@@ -58,7 +58,7 @@ def run_tclean(visname, fields, keepmms):
             field = fields.targetfield
 
         fname = msmd.namesforfields(int(field))[0]
-        inname = '%s.%s.%s' % (os.path.split(visname)[0], fname, extn)
+        inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
 
         if len(glob.glob(tt + '*')) == 0:
             tclean(vis=inname, imagename=tt, datacolumn='corrected',
@@ -76,7 +76,7 @@ def run_tclean(visname, fields, keepmms):
         for subf in field.split(','):
             fname = msmd.namesforfields(int(subf))[0]
 
-            secimname = os.path.split(visname)[0]
+            secimname = os.path.splitext(visname)[0]
             inname = '%s.%s.%s' % (secimname, fname, extn)
             secimname = os.path.join(impath, secimname + '_%s.im' % (fname))
 

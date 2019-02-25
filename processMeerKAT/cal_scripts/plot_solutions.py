@@ -120,7 +120,7 @@ def main():
     for field in fields:
         for subf in field.split(','):
             fname = msmd.namesforfields(int(subf))[0]
-            inname = '%s.%s.%s' % (os.path.split(visname)[0], fname, extn)
+            inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
             plotms(vis=inname, xaxis='freq', yaxis='Amp', plotfile='{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname),showgui=False)
 
     msmd.close()

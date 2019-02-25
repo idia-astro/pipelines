@@ -6,7 +6,7 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
 def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
-    outputbase = os.path.split(visname)[0]
+    outputbase = os.path.splitext(visname)[0]
 
     msmd.open(visname)
     extn = 'mms' if keepmms else 'ms'

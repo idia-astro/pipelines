@@ -5,7 +5,7 @@ from collections import namedtuple
 import os
 
 def get_calfiles(visname, caldir):
-        base = os.path.split(visname)[0]
+        base = os.path.splitext(visname)[0]
         kcorrfile = os.path.join(caldir,base + '.kcal')
         bpassfile = os.path.join(caldir,base + '.bcal')
         gainfile =  os.path.join(caldir,base + '.gcal')
