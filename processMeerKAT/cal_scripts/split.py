@@ -6,15 +6,16 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
 def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
-    outputbase = visname.replace('.mms', '')
+    outputbase = os.path.split(visname)[0]
 
     msmd.open(visname)
+    extn = 'mms' if keepmms else 'ms'
 
     for field in fields:
         for subf in field.split(','):
             fname = msmd.namesforfields(int(subf))[0]
 
-            outname = '%s.%s.mms' % (outputbase, fname)
+            outname = '%s.%s.%s' % (outputbase, fname, extn)
             if not os.path.exists(outname):
                 split(vis=visname, outputvis=outname,
                         datacolumn='corrected', field=fname, spw=spw,

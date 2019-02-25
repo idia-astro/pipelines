@@ -43,7 +43,8 @@ def get_fields(MS):
     #Set default for any missing intent as field for intent CALIBRATE_FLUX
     default = msmd.fieldsforintent('CALIBRATE_FLUX')
     if default.size == 0:
-        raise KeyError('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(msmd.intents(),MS))
+        logger.error('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(msmd.intents(),MS))
+        return fieldIDs
 
     #Use 'CALIBRATE_PHASE' or if missing, 'CALIBRATE_AMPLI'
     phasecal_intent = 'CALIBRATE_PHASE'
@@ -193,12 +194,12 @@ def main():
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
     check_refant(args.MS, refant, warn=True)
 
-    fields = get_fields(args.MS)
-    config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
-    logger.info('Field IDs written to "{0}". Edit this file to change any field IDs (comma-seperated string for multiple IDs).'.format(args.config))
-
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node)
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
+
+    fields = get_fields(args.MS)
+    config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
+    logger.info('[fields] section written to "{0}". Edit this section to change field IDs (comma-seperated string for multiple IDs).'.format(args.config))
 
     msmd.close()
     msmd.done()

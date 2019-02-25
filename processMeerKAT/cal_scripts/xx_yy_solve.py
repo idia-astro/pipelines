@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-def do_parallel_cal(visname, fields, calfiles, referenceant,
+def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard, do_clearcal=False):
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
@@ -41,7 +41,8 @@ def do_parallel_cal(visname, fields, calfiles, referenceant,
     if len(fields.gainfields) > 1:
         fluxscale(vis=visname, caltable=calfiles.gainfile,
                 reference=[fields.fluxfield], transfer='',
-                fluxtable=calfiles.fluxfile, append=False)
+                fluxtable=calfiles.fluxfile, append=False, display=True,
+                listfile = os.path.join(caldir,'fluxscale_xx_yy.txt'))
 
 
 
@@ -61,5 +62,5 @@ if __name__ == '__main__':
     standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
 
-    do_parallel_cal(visname, fields, calfiles, refant,
+    do_parallel_cal(visname, fields, calfiles, refant, caldir,
             minbaselines, standard, do_clearcal=True)

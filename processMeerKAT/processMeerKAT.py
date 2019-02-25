@@ -26,7 +26,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
-CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges', 'keepmms']
+CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
@@ -223,7 +223,7 @@ def validate_args(args,config,parser=None):
         msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
         raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True,plot=False):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -243,6 +243,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         Is the script that is called within this job a CASA script?
     logfile : bool, optional
         Write the CASA output to a log file? Only used if casa_script==True.
+    plot : bool, optional
+        This job is a plotting task that needs to call xvfb-run.
 
     Returns:
     --------
@@ -255,16 +257,19 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['job'] = '${SLURM_JOB_ID}'
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
+    params['plot_call'] = ''
 
     #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
     if not os.path.exists(script):
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
 
-    #If specified by user, call script via CASA and write output to log file
+    #If specified by user, call script via CASA, call with xvfb-run, and write output to log file
+    if plot:
+        params['plot_call'] = 'xvfb-run -d'
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
     if casa_script:
-        params['casa_call'] = "xvfb-run -d casa --nologger --nogui {casa_log} -c".format(**params)
+        params['casa_call'] = "{plot_call} casa --nologger --nogui {casa_log} -c".format(**params)
 
     command = "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
     return command
@@ -311,8 +316,12 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script)
-    params['cpus'] = 4 if 'tclean' in script else 1
+
+    #Use multiple CPUs for tclean scripts, and xvfb for plotting scripts
+    params['cpus'] = 8 if 'tclean' in script else 1
+    plot = True if 'plot' in script else False
+
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot)
 
     contents = """#!/bin/bash
     #SBATCH --nodes={nodes}
@@ -575,7 +584,7 @@ def format_args(config):
     kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
     data_kwargs = get_config_kwargs(config,'data',['vis'])
     get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
-    get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
+    crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
     # Validate kwargs along with MS
     kwargs['MS'] = data_kwargs['vis']
@@ -587,6 +596,10 @@ def format_args(config):
     kwargs['scripts'] = [check_path(i[0]) for i in scripts]
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
+
+    #Set threadsafe=False is keepmms=False
+    if 'quick_tclean.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
+        kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
 
     #Replace empty containers with default container and remove unwanted kwargs
     for i in range(len(kwargs['containers'])):
