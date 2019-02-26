@@ -147,7 +147,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 reference = fields.fluxfield, transfer = '',
                 fluxtable = calfiles.fluxfile,
                 listfile = os.path.join(caldir,'fluxscale_xy_yx.txt'),
-                append = False, display=True)
+                append = False, display=False)
 
 
 if __name__ == '__main__':

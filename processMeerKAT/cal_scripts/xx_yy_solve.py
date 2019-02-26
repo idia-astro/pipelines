@@ -41,7 +41,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
     if len(fields.gainfields) > 1:
         fluxscale(vis=visname, caltable=calfiles.gainfile,
                 reference=[fields.fluxfield], transfer='',
-                fluxtable=calfiles.fluxfile, append=False, display=True,
+                fluxtable=calfiles.fluxfile, append=False, display=False,
                 listfile = os.path.join(caldir,'fluxscale_xx_yy.txt'))
 
 

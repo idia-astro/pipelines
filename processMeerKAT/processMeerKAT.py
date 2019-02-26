@@ -130,7 +130,7 @@ def parse_args():
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
                         help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}.".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
-    parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="SLURM partition to use [default: 'Main'].")
+    parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="Time limit to use for all jobs, in the form d-hh:mm:ss [default: '12:00:00'].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
                         help="Run pipeline with these scripts, in this order, using this container (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
     parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
@@ -288,7 +288,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     args : str
         Arguments passed into script called within this sbatch file. Use '' for no arguments.
     time : str, optional
-        Time limit on this job (option not currently used).
+        Time limit on this job.
     nodes : int, optional
         Number of nodes to use for this job.
     tasks : int, optional
@@ -322,7 +322,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     #Use multiple CPUs for tclean scripts, and xvfb for plotting scripts
     params['cpus'] = 8 if 'tclean' in script else 1
-    plot = True if 'plot' in script or 'solve' in script else False
+    plot = True if 'plot' in script else False
 
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot)
 
@@ -417,7 +417,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
-    do = """echo sacct -j $IDs -o "JobID%-15,JobName%-{0},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList,TotalCPU,State,ExitCode" """.format(15+len(name))
+    do = """echo sacct -j $IDs -o "JobID%-15,JobName%-{0},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,State,ExitCode" """.format(15+len(name))
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep -i 'severe\|error' | grep -vi 'mpi'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
