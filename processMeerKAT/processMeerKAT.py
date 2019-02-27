@@ -42,8 +42,8 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('xy_yx_solve.py',False,''),
             ('xy_yx_apply.py',True,''),
             ('split.py',True,''),
-            ('plot_solutions.py',False,''),
-            ('quick_tclean.py',True,'')]
+            ('quick_tclean.py',True,''),
+            ('plot_solutions.py',False,'')]
 
 
 def check_path(path):
@@ -606,6 +606,10 @@ def format_args(config):
     #Set threadsafe=False is keepmms=False
     if 'quick_tclean.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
+
+    #Pop script to calculate reference antenna if calcrefant=False
+    if not crosscal_kwargs['calcrefant']:
+        kwargs['scripts'].pop(kwargs['scripts'].index('calc_refant.py'))
 
     #Replace empty containers with default container and remove unwanted kwargs
     for i in range(len(kwargs['containers'])):

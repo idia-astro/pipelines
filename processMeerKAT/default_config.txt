@@ -37,5 +37,5 @@ scripts = [ ('validate_input.py',False,''),
             ('xy_yx_solve.py',False,''),
             ('xy_yx_apply.py',True,''),
             ('split.py',True,''),
-            ('plot_solutions.py',False,''),
-            ('quick_tclean.py',True,'')]
+            ('quick_tclean.py',True,''),
+            ('plot_solutions.py',False,'')]
