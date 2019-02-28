@@ -6,7 +6,7 @@ from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 import glob
 
-def run_tclean(visname, fields):
+def run_tclean(visname, fields, keepmms):
     """
     Run a quick and dirty tclean that will produce an image of the phase cal as well as the target.
     No W projection will be applied, and the image size and cell size are will be restricted to
@@ -16,6 +16,13 @@ def run_tclean(visname, fields):
     #Store bandwidth in MHz
     msmd.open(visname)
     BW = msmd.bandwidths(-1)/1e6
+
+    if keepmms == True:
+        parallel = True
+        extn = 'mms'
+    else:
+        parallel = False
+        extn = 'ms'
 
     #Use 1 taylor term for BW < 100 MHz
     if BW < 100:
@@ -36,11 +43,11 @@ def run_tclean(visname, fields):
     if len(fields.targetfield.split(',')) > 1:
         for tt in fields.targetfield.split(','):
             fname = msmd.namesforfields(int(tt))[0]
-            tmpname = visname.replace('.mms', '') + '_%s.im' % (fname)
+            tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
             targimname.append(os.path.join(impath, tmpname))
     else:
         fname = msmd.namesforfields(int(fields.targetfield))[0]
-        tmpname = visname.replace('.mms', '') + '_%s.im' % (fname)
+        tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
         targimname.append(os.path.join(impath, tmpname))
 
     #Image target and export to fits
@@ -51,7 +58,7 @@ def run_tclean(visname, fields):
             field = fields.targetfield
 
         fname = msmd.namesforfields(int(field))[0]
-        inname = '%s.%s.mms' % (visname.replace('.mms',''), fname)
+        inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
 
         if len(glob.glob(tt + '*')) == 0:
             tclean(vis=inname, imagename=tt, datacolumn='corrected',
@@ -59,7 +66,7 @@ def run_tclean(visname, fields):
                     weighting='briggs', robust=0, cell='2arcsec',
                     specmode='mfs', deconvolver=deconvolver, nterms=terms, scales=[],
                     savemodel='none', gridder='standard',
-                    restoration=True, pblimit=0, parallel=True)
+                    restoration=True, pblimit=0, parallel=parallel)
 
             exportfits(imagename=tt+'.image'+suffix, fitsimage=tt+'.fits')
 
@@ -69,8 +76,8 @@ def run_tclean(visname, fields):
         for subf in field.split(','):
             fname = msmd.namesforfields(int(subf))[0]
 
-            secimname = visname.replace('.mms', '')
-            inname = '%s.%s.mms' % (secimname, fname)
+            secimname = os.path.splitext(visname)[0]
+            inname = '%s.%s.%s' % (secimname, fname, extn)
             secimname = os.path.join(impath, secimname + '_%s.im' % (fname))
 
             if len(glob.glob(secimname + '*')) == 0:
@@ -78,7 +85,7 @@ def run_tclean(visname, fields):
                         imsize=[512,512], threshold=0,niter=1000, weighting='briggs',
                         robust=0, cell='2arcsec', specmode='mfs', deconvolver=deconvolver,
                         nterms=terms, scales=[], savemodel='none', gridder='standard',
-                        restoration=True, pblimit=0, parallel=True)
+                        restoration=True, pblimit=0, parallel=parallel)
 
                 exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
 
@@ -94,8 +101,8 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-    visname = os.path.split(visname.replace('.ms', '.mms'))[1]
+    keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    run_tclean(visname, fields)
+    run_tclean(visname, fields, keepmms)

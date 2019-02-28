@@ -26,8 +26,8 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
-CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges']
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time']
+CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name']
 CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
@@ -42,8 +42,8 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('xy_yx_solve.py',False,''),
             ('xy_yx_apply.py',True,''),
             ('split.py',True,''),
-            ('plot_solutions.py',False,''),
-            ('quick_tclean.py',True,'')]
+            ('quick_tclean.py',True,''),
+            ('plot_solutions.py',False,'')]
 
 
 def check_path(path):
@@ -130,12 +130,13 @@ def parse_args():
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
                         help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
-    parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="SLURM partition to use [default: 'Main'].")
+    parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="Time limit to use for all jobs, in the form d-hh:mm:ss [default: '12:00:00'].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
                         help="Run pipeline with these scripts, in this order, using this container (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
     parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
                         help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(MPI_WRAPPER))
     parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
+    parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
@@ -223,7 +224,7 @@ def validate_args(args,config,parser=None):
         msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
         raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True,plot=False):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -243,6 +244,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         Is the script that is called within this job a CASA script?
     logfile : bool, optional
         Write the CASA output to a log file? Only used if casa_script==True.
+    plot : bool, optional
+        This job is a plotting task that needs to call xvfb-run.
 
     Returns:
     --------
@@ -255,22 +258,25 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['job'] = '${SLURM_JOB_ID}'
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
+    params['plot_call'] = ''
 
     #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
     if not os.path.exists(script):
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
 
-    #If specified by user, call script via CASA and write output to log file
+    #If specified by user, call script via CASA, call with xvfb-run, and write output to log file
+    if plot:
+        params['plot_call'] = 'xvfb-run -d'
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
     if casa_script:
-        params['casa_call'] = "xvfb-run -d casa --nologger --nogui {casa_log} -c".format(**params)
+        params['casa_call'] = "{plot_call} casa --nologger --nogui {casa_log} -c".format(**params)
 
     command = "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
     return command
 
 
-def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",plane=2,
+def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=2,
                 mpi_wrapper=MPI_WRAPPER,container=CONTAINER,partition="Main",time="12:00:00",casa_script=True):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
@@ -282,7 +288,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     args : str
         Arguments passed into script called within this sbatch file. Use '' for no arguments.
     time : str, optional
-        Time limit on this job (option not currently used).
+        Time limit on this job.
     nodes : int, optional
         Number of nodes to use for this job.
     tasks : int, optional
@@ -291,6 +297,8 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
         The memory in GB (per node) to use for this job.
     name : str, optional
         Name for this job, used in naming the various output files.
+    runname : str, optional
+        Unique name to give this pipeline run, appended to the start of all job names.
     plane : int, optional
         Distrubute tasks for this job using this block size before moving onto next node.
     mpi_wrapper : str, optional
@@ -311,15 +319,19 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params = locals()
     params['LOG_DIR'] = LOG_DIR
     params['job'] = '${SLURM_JOB_ID}'
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script)
-    params['cpus'] = 4 if 'tclean' in script else 1
+
+    #Use multiple CPUs for tclean scripts, and xvfb for plotting scripts
+    params['cpus'] = 8 if 'tclean' in script else 1
+    plot = True if 'plot' in script else False
+
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot)
 
     contents = """#!/bin/bash
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
     #SBATCH --cpus-per-task={cpus}
     #SBATCH --mem={mem}GB
-    #SBATCH --job-name={name}
+    #SBATCH --job-name={runname}{name}
     #SBATCH --distribution=plane={plane}
     #SBATCH --output={LOG_DIR}/{name}-%j.out
     #SBATCH --error={LOG_DIR}/{name}-%j.err
@@ -341,7 +353,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbose=False):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='',verbose=False):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -357,6 +369,8 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
         Submit jobs to SLURM queue immediately?
     dir : str, optional
         Name of directory to output ancillary job scripts.
+    name : str, optional
+        Unique name to give this pipeline run, appended to the start of all job names.
     verbose : bool, optional
         Verbose output (inserted into master script)?"""
 
@@ -403,7 +417,8 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',verbos
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
-    write_bash_job_script(master, summaryScript, extn, 'echo sacct -j $IDs', 'view the progress', dir=dir)
+    do = """echo sacct -j $IDs -o "JobID%-15,JobName%-{0},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,State,ExitCode" """.format(15+len(name))
+    write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep -i 'severe\|error' | grep -vi 'mpi'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; cat %s/*\$ID.casa | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID.casa | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
@@ -448,7 +463,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4,
-                mem=MEM_PER_NODE_GB_LIMIT, plane=2, partition='Main', time='12:00:00', submit=False, verbose=False):
+                mem=MEM_PER_NODE_GB_LIMIT, plane=2, partition='Main', time='12:00:00', submit=False, name='', verbose=False):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -470,8 +485,6 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         The number of tasks per node to use for this job.
     mem : int, optional
         The memory in GB (per node) to use for this job.
-    name : str, optional
-        Name for this job, used in naming the various output files.
     plane : int, optional
         Distrubute tasks for this job using this block size before moving onto next node.
     partition : str, optional
@@ -480,24 +493,26 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         Time limit to use for all jobs, in the form d-hh:mm:ss.
     submit : bool, optional
         Submit jobs to SLURM queue immediately?
+    name : str, optional
+        Unique name to give this pipeline run, appended to the start of all job names.
     verbose : bool, optional
         Verbose output?"""
 
     #Write sbatch file for each input python script
     for i,script in enumerate(scripts):
-        name = os.path.splitext(os.path.split(script)[1])[0]
+        jobname = os.path.splitext(os.path.split(script)[1])[0]
 
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,
-                        plane=plane,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=name)
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,
+                        mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=jobname,runname=name)
         else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,
-                        mpi_wrapper='srun',container=containers[i],partition=partition,time=time,name=name)
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,mpi_wrapper='srun',
+                        container=containers[i],partition=partition,time=time,name=jobname,runname=name)
 
     #Build master pipeline submission script, replacing all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
-    write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,verbose=verbose)
+    write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,name=name,verbose=verbose)
 
 
 def default_config(arg_dict):
@@ -517,7 +532,7 @@ def default_config(arg_dict):
 
     #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
-    for key in ['container','mpi_wrapper','partition','time']:
+    for key in ['container','mpi_wrapper','partition','time','name']:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
 
     #Overwrite parameters in config under section [slurm]
@@ -575,7 +590,7 @@ def format_args(config):
     kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
     data_kwargs = get_config_kwargs(config,'data',['vis'])
     get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
-    get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
+    crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
     # Validate kwargs along with MS
     kwargs['MS'] = data_kwargs['vis']
@@ -587,6 +602,14 @@ def format_args(config):
     kwargs['scripts'] = [check_path(i[0]) for i in scripts]
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
+
+    #Set threadsafe=False is keepmms=False
+    if 'quick_tclean.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
+        kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
+
+    #Pop script to calculate reference antenna if calcrefant=False
+    if not crosscal_kwargs['calcrefant']:
+        kwargs['scripts'].pop(kwargs['scripts'].index('calc_refant.py'))
 
     #Replace empty containers with default container and remove unwanted kwargs
     for i in range(len(kwargs['containers'])):

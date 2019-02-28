@@ -23,11 +23,11 @@ def sort_by_antenna(fname):
         Antenna numbers."""
 
     #Remove everything but antenna numbers from filename
-    for sub in ['/','chan','cal','amp','phase','time','all','bpass','ant','_','~','.',EXTN,PLOT_DIR]:
+    for sub in ['/','freq','cal','amp','phase','time','all','bpass','ant','_','~','.',EXTN,PLOT_DIR]:
         fname = fname.replace(sub,'')
     return int(fname)
 
-def plot_antennas(caltype,fields,calfiles,xaxis='chan',yaxis='amp'):
+def plot_antennas(caltype,fields,calfiles,xaxis='freq',yaxis='amp'):
 
     """Write multi-page PDF with each page containing plots of solutions
     for individual antennas of input calibrator in 3x2 panels, using plotcal.
@@ -89,7 +89,7 @@ def main():
     taskvals, config = config_parser.parse_config(config)
 
     visname = va(taskvals, 'data', 'vis', str)
-    visname = os.path.split(visname.replace('.ms', '.mms'))[1]
+    keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
@@ -100,20 +100,30 @@ def main():
         os.mkdir(PLOT_DIR)
 
     #Plot solutions for bandpass calibrator
-    plotms(vis=calfiles.bpassfile, xaxis='Real', yaxis='Imag', coloraxis='antenna1', plotfile='{0}/bpass_real_imag.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.bpassfile, xaxis='chan', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/bpass_chan_amp.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.bpassfile, xaxis='chan', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_chan_phase.png'.format(PLOT_DIR),showgui=False)
+    plotms(vis=calfiles.bpassfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/bpass_real_imag.png'.format(PLOT_DIR),showgui=False)
+    plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/bpass_freq_amp.png'.format(PLOT_DIR),showgui=False)
+    plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_freq_phase.png'.format(PLOT_DIR),showgui=False)
 
     #Plot solutions for phase calibrator
-    plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='antenna1', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
+    plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
     plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/phasecal_time_amp.png'.format(PLOT_DIR),showgui=False)
     plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/phasecal_time_phase.png'.format(PLOT_DIR),showgui=False)
 
     #Plot solutions for individual antennas of bandpass and phase calibrator in 3x2 panels
-    plot_antennas('bpass',fields,calfiles,xaxis='chan',yaxis='amp')
-    plot_antennas('bpass',fields,calfiles,xaxis='chan',yaxis='phase')
+    plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='amp')
+    plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='phase')
     plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='amp')
     plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='phase')
+
+
+    extn = 'mms' if keepmms else 'ms'
+    for field in fields:
+        for subf in field.split(','):
+            fname = msmd.namesforfields(int(subf))[0]
+            inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
+            if not os.path.exists('{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname)):
+                plotms(vis=inname, xaxis='freq', yaxis='Amp', coloraxis='corr', plotfile='{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname),showgui=False)
+                plotms(vis=inname, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/{1}_real_imag.png'.format(PLOT_DIR,fname),showgui=False)
 
     msmd.close()
     msmd.done()

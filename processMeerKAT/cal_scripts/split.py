@@ -5,20 +5,21 @@ import config_parser
 from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
-def split_vis(visname, spw, fields, specavg, timeavg):
-    outputbase = visname.replace('.mms', '')
+def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
+    outputbase = os.path.splitext(visname)[0]
 
     msmd.open(visname)
+    extn = 'mms' if keepmms else 'ms'
 
     for field in fields:
         for subf in field.split(','):
             fname = msmd.namesforfields(int(subf))[0]
 
-            outname = '%s.%s.mms' % (outputbase, fname)
+            outname = '%s.%s.%s' % (outputbase, fname, extn)
             if not os.path.exists(outname):
                 split(vis=visname, outputvis=outname,
                         datacolumn='corrected', field=fname, spw=spw,
-                        keepflags=False, keepmms=True, width=specavg,
+                        keepflags=False, keepmms=keepmms, width=specavg,
                         timebin=timeavg)
 
 
@@ -30,7 +31,6 @@ if __name__ == '__main__':
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-    visname = os.path.split(visname.replace('.ms', '.mms'))[1]
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
@@ -39,5 +39,6 @@ if __name__ == '__main__':
 
     specavg = va(taskvals, 'crosscal', 'specavg', int, default=1)
     timeavg = va(taskvals, 'crosscal', 'timeavg', str, default='8s')
+    keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
-    split_vis(visname, spw, fields, specavg, timeavg)
+    split_vis(visname, spw, fields, specavg, timeavg, keepmms)
