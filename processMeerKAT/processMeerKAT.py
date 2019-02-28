@@ -128,7 +128,7 @@ def parse_args():
     parser.add_argument("-P","--plane", metavar="num", required=False, type=int, default=2,
                             help="Distribute tasks of this block size before moving onto next node [default: 2; max: ntasks-per-node].")
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
-                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}.".format(MEM_PER_NODE_GB_LIMIT))
+                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
@@ -598,6 +598,7 @@ def format_args(config):
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
+    logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again")
 
     return kwargs
 
