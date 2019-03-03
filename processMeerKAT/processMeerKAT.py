@@ -621,7 +621,7 @@ def format_args(config):
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
-    logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again")
+    logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
     return kwargs
 
