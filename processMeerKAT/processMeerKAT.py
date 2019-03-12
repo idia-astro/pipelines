@@ -608,7 +608,7 @@ def format_args(config):
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
 
     #Pop script to calculate reference antenna if calcrefant=False
-    if not crosscal_kwargs['calcrefant']:
+    if 'calc_refant.py' in kwargs['scripts'] and not crosscal_kwargs['calcrefant']:
         kwargs['scripts'].pop(kwargs['scripts'].index('calc_refant.py'))
 
     #Replace empty containers with default container and remove unwanted kwargs

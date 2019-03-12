@@ -134,6 +134,7 @@ def check_refant(MS,refant,warn=True):
     warn : bool, optional
         Warn the user? If False, raise ValueError."""
 
+    msmd.open(MS)
     ants = msmd.antennanames()
 
     if refant not in ants:
