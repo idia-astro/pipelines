@@ -17,10 +17,14 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
             outname = '%s.%s.%s' % (outputbase, fname, extn)
             if not os.path.exists(outname):
-                split(vis=visname, outputvis=outname,
-                        datacolumn='corrected', field=fname, spw=spw,
-                        keepflags=False, keepmms=keepmms, width=specavg,
-                        timebin=timeavg)
+                mstransform(vis=visname, outputvis=outname, datacolumn='corrected',
+                        field=fname, spw=spw, keepflags=False, createmms=keepmms,
+                        chanaverage=True, chanbin=specavg, timeaverage=True,
+                        timebin=timeavg, usewtspectrum=True)
+                #split(vis=visname, outputvis=outname,
+                #        datacolumn='corrected', field=fname, spw=spw,
+                #        keepflags=False, keepmms=keepmms, width=specavg,
+                #        timebin=timeavg)
 
 
 if __name__ == '__main__':
