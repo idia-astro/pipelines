@@ -603,13 +603,16 @@ def format_args(config):
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
-    #Set threadsafe=False is keepmms=False
+    #Set threadsafe=False if keepmms=False
     if 'quick_tclean.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
 
     #Pop script to calculate reference antenna if calcrefant=False
     if 'calc_refant.py' in kwargs['scripts'] and not crosscal_kwargs['calcrefant']:
-        kwargs['scripts'].pop(kwargs['scripts'].index('calc_refant.py'))
+        index = kwargs['scripts'].index('calc_refant.py')
+        kwargs['scripts'].pop(index)
+        kwargs['threadsafe'].pop(index)
+        kwargs['containers'].pop(index)
 
     #Replace empty containers with default container and remove unwanted kwargs
     for i in range(len(kwargs['containers'])):
