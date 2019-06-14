@@ -2,6 +2,25 @@
 
 __version__ = '1.0'
 
+license = """
+    Process MeerKAT data via CASA measurement set.
+    Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy.
+    support@ilifu.ac.za
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import argparse
 import os
 import sys
@@ -147,6 +166,7 @@ def parse_args():
     run_args.add_argument("-B","--build", action="store_true", required=False, default=False, help="Build config file using input MS.")
     run_args.add_argument("-R","--run", action="store_true", required=False, default=False, help="Run pipeline with input config file.")
     run_args.add_argument("-V","--version", action="store_true", required=False, default=False, help="Display the version of this pipeline and quit.")
+    run_args.add_argument("-L","--license", action="store_true", required=False, default=False, help="Display this program's license and quit.")
 
     args, unknown = parser.parse_known_args()
 
@@ -695,6 +715,8 @@ def main():
     #Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
         logger.info('This is version {0}'.format(__version__))
+    if args.license:
+        logger.info(license)
     if args.build:
         default_config(vars(args))
     if args.run:

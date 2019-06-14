@@ -1,3 +1,6 @@
+#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
+
 import sys
 import os
 
@@ -22,7 +25,7 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
                     chanaverage=False
                 else:
                     chanaverage=True
-                    
+
                 mstransform(vis=visname, outputvis=outname, datacolumn='corrected',
                             field=fname, spw=spw, keepflags=False, createmms=keepmms,
                             chanaverage=chanaverage, chanbin=specavg, timeaverage=True,
