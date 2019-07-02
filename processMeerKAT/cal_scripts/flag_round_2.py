@@ -1,3 +1,5 @@
+#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
 
 import sys
 import os
