@@ -8,13 +8,13 @@ The IDIA MeerKAT pipeline is a radio interferometric calibration pipeline design
 
 ## Requirements
 
-This pipeline is designed to run on the Ilifu cluster, making use of SLURM and MPICASA. For other uses, please contact the authors. Currently, use of the pipeline requires access to the Ilifu cloud infrastructure. You can request access using the following [form](http://docs.ilifu.ac.za/#/access/request_time).
+This pipeline is designed to run on the Ilifu cluster, making use of SLURM and MPICASA. For other uses, please contact the authors. Currently, use of the pipeline requires access to the Ilifu cloud infrastructure. You can request access using the following [form](http://docs.ilifu.ac.za/#/getting_started/request_access).
 
 ## Quick Start
 
 ### 1. In order to use the `processMeerKAT.py` script, source the `setup.sh` file:
 
-        source /data/exp_soft/pipelines/master/setup.sh
+        source /idia/software/pipelines/master/setup.sh
 
 which will add the correct paths to your `$PATH` and `$PYTHONPATH` in order to correctly use the pipeline. We recommend you add this to your `~/.profile`, for future use.
 
