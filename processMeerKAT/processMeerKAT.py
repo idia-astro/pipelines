@@ -47,8 +47,8 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name']
-CONTAINER = '/data/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
-MPI_WRAPPER = '/data/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
+CONTAINER = '/idia/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
+MPI_WRAPPER = '/idia/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
             ('calc_refant.py',False,''),
@@ -592,7 +592,7 @@ def get_slurm_dict(arg_dict,slurm_config_keys):
     slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
     return slurm_dict
 
-def format_args(config):
+def format_args(config,submit):
 
     """Format (and validate) arguments from config file, to be passed into write_jobs() function.
 
@@ -600,6 +600,8 @@ def format_args(config):
     ----------
     config : str
         Path to config file.
+    submit : bool
+        Allow user to force submitting to queue immediately.
 
     Returns:
     --------
@@ -611,6 +613,10 @@ def format_args(config):
     data_kwargs = get_config_kwargs(config,'data',['vis'])
     get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
+
+    #Force submit=True if user has requested it during [-R --run]
+    if submit:
+        kwargs['submit'] = True
 
     # Validate kwargs along with MS
     kwargs['MS'] = data_kwargs['vis']
@@ -720,7 +726,7 @@ def main():
     if args.build:
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config)
+        kwargs = format_args(args.config,args.submit)
         write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":
