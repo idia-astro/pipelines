@@ -47,8 +47,8 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name']
-CONTAINER = '/idia/exp_soft/pipelines/casameer-5.4.1.xvfb.simg'
-MPI_WRAPPER = '/idia/exp_soft/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
+CONTAINER = '/idia/software/pipelines/casameer-5.4.1.xvfb.simg'
+MPI_WRAPPER = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
             ('calc_refant.py',False,''),
