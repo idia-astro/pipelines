@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
-        minbaselines, standard, do_clearcal=False):
+        minbaselines, standard):
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
@@ -170,4 +170,4 @@ if __name__ == '__main__':
     standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
 
     do_cross_cal(visname, fields, calfiles, refant, caldir,
-            minbaselines, standard, do_clearcal=True)
+            minbaselines, standard)
