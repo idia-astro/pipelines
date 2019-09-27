@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 #Set global limits for current ilifu cluster configuration
 TOTAL_NODES_LIMIT = 35
-NTASKS_PER_NODE_LIMIT = 128
+NTASKS_PER_NODE_LIMIT = 32
 MEM_PER_NODE_GB_LIMIT = 236 #241827 MB
 
 #Set global values for paths and file names
@@ -437,7 +437,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
-    do = """echo sacct -j $IDs -o "JobID%-15,JobName%-{0},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,State,ExitCode" """.format(15+len(name))
+    do = """echo sacct -j $IDs -o "JobID%-15,JobName%-{0},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,MaxRSS,State,ExitCode" """.format(15+len(name))
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep -i 'severe\|error' | grep -vi 'mpi'; done" """ % (LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)

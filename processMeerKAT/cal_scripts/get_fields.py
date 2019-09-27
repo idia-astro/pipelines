@@ -44,7 +44,7 @@ def get_fields(MS):
     extra_fields = []
 
     #Set default for any missing intent as field for intent CALIBRATE_FLUX
-    default = msmd.fieldsforintent('CALIBRATE_FLUX')
+    default = msmd.fieldsforintent('CALIBRATE_FLUX')[0]
     if default.size == 0:
         logger.error('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(msmd.intents(),MS))
         return fieldIDs
