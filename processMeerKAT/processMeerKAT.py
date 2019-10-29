@@ -388,6 +388,7 @@ def write_spw_master(filename,config,SPWs,submit):
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
+    SPWs = SPWs.replace('0:','')
 
     for spw in SPWs.split(','):
         master.write('cd {0}\n'.format(spw))
