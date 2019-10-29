@@ -24,15 +24,16 @@ license = """
 import argparse
 import os
 import sys
+import re
 import config_parser
 from shutil import copyfile
 import logging
 logger = logging.getLogger(__name__)
 
 #Set global limits for current ilifu cluster configuration
-TOTAL_NODES_LIMIT = 35
+TOTAL_NODES_LIMIT = 58
 NTASKS_PER_NODE_LIMIT = 32
-MEM_PER_NODE_GB_LIMIT = 236 #241827 MB
+MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
 
 #Set global values for paths and file names
 THIS_PROG = sys.argv[0]
@@ -45,7 +46,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
-CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
+CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name']
 CONTAINER = '/idia/software/pipelines/casameer-5.4.1.xvfb.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
@@ -57,9 +58,8 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('xx_yy_solve.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('flag_round_2.py',True,''),
-            ('setjy.py',True,''),
-            ('xy_yx_solve.py',False,''),
-            ('xy_yx_apply.py',True,''),
+            ('xx_yy_solve.py',False,''),
+            ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
             ('plot_solutions.py',False,'')]
@@ -139,7 +139,7 @@ def parse_args():
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA measurement set. Version: {0}'.format(__version__))
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
-    parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Path to config file.")
+    parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Realtive (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=8,
                         help="Use this number of nodes [default: 8; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=4,
@@ -341,7 +341,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params['job'] = '${SLURM_JOB_ID}'
 
     #Use multiple CPUs for tclean scripts, and xvfb for plotting scripts
-    params['cpus'] = 8 if 'tclean' in script else 1
+    params['cpus'] = 8 if 'tclean' in script else 4 if 'partition' in script else 1
     plot = True if 'plot' in script else False
 
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot)
@@ -372,6 +372,37 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     config.close()
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
+
+def write_spw_master(filename,config,SPWs,submit):
+
+    """Write master master script, which separately calls each of the master scripts in each SPW directory.
+
+    filename : str
+        Name of master pipeline submission script.
+    config : str
+        Path to config file.
+    SPWs : str
+        Comma-separated list of spw ranges.
+    submit : bool, optional
+        Submit jobs to SLURM queue immediately?"""
+
+    master = open(filename,'w')
+    master.write('#!/bin/bash\n')
+
+    for spw in SPWs.split(','):
+        master.write('cd {0}\n'.format(spw))
+        master.write('{0} -R -C ./{1}\n'.format(THIS_PROG,config))
+        master.write('cd -\n\n')
+    #Close master submission script and make executable
+    master.close()
+    os.chmod(filename, 509)
+
+    #Submit script or output that it will not run
+    if submit:
+        logger.info('Running master script "{0}"'.format(filename))
+        os.system('./{0}'.format(filename))
+    else:
+        logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
 def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='',verbose=False):
 
@@ -518,21 +549,26 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
     verbose : bool, optional
         Verbose output?"""
 
-    #Write sbatch file for each input python script
-    for i,script in enumerate(scripts):
-        jobname = os.path.splitext(os.path.split(script)[1])[0]
+    crosscal_kwargs = get_config_kwargs(TMP_CONFIG, 'crosscal', CROSSCAL_CONFIG_KEYS)
+    if crosscal_kwargs['nspw'] > 1:
+        #Build master master script, calling each of the separate SPWs at once
+        write_spw_master(MASTER_SCRIPT,config,crosscal_kwargs['spw'],submit)
+    else:
+        #Write sbatch file for each input python script
+        for i,script in enumerate(scripts):
+            jobname = os.path.splitext(os.path.split(script)[1])[0]
 
-        #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
-        if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,
-                        mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=jobname,runname=name)
-        else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,mpi_wrapper='srun',
-                        container=containers[i],partition=partition,time=time,name=jobname,runname=name)
+            #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
+            if threadsafe[i]:
+                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,
+                            mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=jobname,runname=name)
+            else:
+                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,mpi_wrapper='srun',
+                            container=containers[i],partition=partition,time=time,name=jobname,runname=name)
 
-    #Build master pipeline submission script, replacing all .py with .sbatch
-    scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
-    write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,name=name,verbose=verbose)
+        #Build master pipeline submission script, replacing all .py with .sbatch
+        scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
+        write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,name=name,verbose=verbose)
 
 
 def default_config(arg_dict):
@@ -632,6 +668,7 @@ def format_args(config,submit):
     #Set threadsafe=False if keepmms=False
     if 'quick_tclean.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
+        kwargs['threadsafe'][kwargs['scripts'].index('split.py')] = False
 
     #Pop script to calculate reference antenna if calcrefant=False
     if 'calc_refant.py' in kwargs['scripts'] and not crosscal_kwargs['calcrefant']:
@@ -647,12 +684,78 @@ def format_args(config,submit):
     kwargs.pop('container')
     kwargs.pop('MS')
 
+    #If single correctly formatted spw, split into nspw directories, and process each spw independently
+    spw = crosscal_kwargs['spw']
+    nspw = crosscal_kwargs['nspw']
+    if nspw > 1:
+        spw_split(spw, nspw, config)
+
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
     logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
     return kwargs
+
+def linspace(lower,upper,length):
+
+    """Basically np.linspace, but without needing to import numpy..."""
+
+    return [lower + x*(upper-lower)/float(length-1) for x in range(length)]
+
+def spw_split(spw,nspw,config):
+
+    """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
+
+    spw : str
+        spw parameter from config.
+    nspw : int
+        Number of spectral windows to split into.
+    config : str
+        Path to config file."""
+
+    #TODO: Validate nspw as integer
+    bounds = spw.split(':')[-1].split('~')
+
+    if ',' not in spw and ':' in spw and '~' in spw and len(bounds) == 2 and bounds[1] != '':
+        #Write nspw frequency ranges
+        high,unit=re.search(r'(\d+\.*\d*)(\w*)',bounds[1]).groups()
+        func = int if unit == '' else float
+        low = func(bounds[0])
+        high = func(high)
+        interval=func((high-low)/float(nspw))
+        lo=linspace(low,high-interval,nspw)
+        hi=linspace(low+interval,high,nspw)
+        SPWs=[]
+
+        for i in range(len(lo)):
+            SPWs.append('{0}~{1}{2}'.format(func(lo[i]),func(hi[i]),unit))
+
+        spw_list=',0:'.join(SPWs)
+        config_parser.overwrite_config(config, conf_dict={'spw' : "'0:{0}'".format(spw_list)}, conf_sec='crosscal')
+
+    elif ',' in spw:
+        SPW = spw.replace('0:','')
+        SPWs = SPW.split(',')
+        if len(SPWs) != nspw:
+            logger.error("nspw ({0}) not equal to number of separate SPWs ({1} in '{2}') from '{3}'. Setting to nspw={1}.".format(nspw,len(SPWs),spw,config))
+            nspw = len(SPWs)
+            config_parser.overwrite_config(config, conf_dict={'nspw' : len(SPWs)}, conf_sec='crosscal')
+    else:
+        logger.error("Can't split into {0} SPWs using SPW format '{1}'. Using nspw=1 in '{2}'.".format(nspw,spw,config))
+        config_parser.overwrite_config(config, conf_dict={'nspw' : '1'}, conf_sec='crosscal')
+        return
+
+    #Create each spw as directory and place config in there
+    logger.info("Making {0} directories for SPWs ({1}) and copying '{2}' to each of them.".format(nspw,SPWs,config))
+    for spw in SPWs:
+        spw_config = '{0}/{1}'.format(spw,config)
+        if not os.path.exists(spw):
+            os.mkdir(spw)
+        copyfile(config, spw_config)
+        config_parser.overwrite_config(spw_config, conf_dict={'spw' : "'0:{0}'".format(spw)}, conf_sec='crosscal')
+        config_parser.overwrite_config(spw_config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
+        config_parser.overwrite_config(spw_config, conf_dict={'submit' : True}, conf_sec='slurm')
 
 def get_config_kwargs(config,section,expected_keys):
 
@@ -688,7 +791,7 @@ def get_config_kwargs(config,section,expected_keys):
     #Check that expected keys are present, otherwise raise KeyError
     missing_keys = list(set(expected_keys) - set(kwargs))
     if len(missing_keys) > 0:
-        raise KeyError("Keys {0} missing from section [{1}] in '{2}'.".format(missing_keys,section,config))
+        raise KeyError("Keys {0} missing from section [{1}] in '{2}'. Please add these keywords to '{2}', or else run [-B --build] step again.".format(missing_keys,section,config))
 
     return kwargs
 

@@ -4,9 +4,10 @@ specavg = 1                       # Number of channels to average after calibrat
 timeavg = '8s'                    # Time interval to average after calibration (during split)
 keepmms = True                    # Output MMS (True) or MS (False) during split
 spw = '0:860~1700MHz'             # Spectral window / frequencies to extract for MMS
+nspw = 16                         # Number of spectral windows to split into
 calcrefant = False                # Calculate reference antenna in program (overwrites 'refant')
-refant = 'm005'                   # Reference antenna name / number
-standard = 'Perley-Butler 2010'   # Flux density standard for setjy
+refant = 'm059'                   # Reference antenna name / number
+standard = 'Stevens-Reynolds 2016'# Flux density standard for setjy
 badants = []                      # List of bad antenna numbers (to flag)
 badfreqranges = [ '935~947MHz',   # List of bad frequency ranges (to flag)
                   '1160~1310MHz',
@@ -33,9 +34,8 @@ scripts = [ ('validate_input.py',False,''),
             ('xx_yy_solve.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('flag_round_2.py',True,''),
-            ('setjy.py',True,''),
-            ('xy_yx_solve.py',False,''),
-            ('xy_yx_apply.py',True,''),
+            ('xx_yy_solve.py',False,''),
+            ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
             ('plot_solutions.py',False,'')]

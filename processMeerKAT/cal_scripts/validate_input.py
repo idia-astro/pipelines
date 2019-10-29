@@ -32,6 +32,7 @@ def validateinput():
     visname = va(taskvals, 'data', 'vis', str)
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
     refant = va(taskvals, 'crosscal', 'refant', str)
+    nspw = va(taskvals, 'crosscal', 'nspw', int)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     # Check if the reference antenna exists, and complain and quit if it doesn't

@@ -20,16 +20,10 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
             outname = '%s.%s.%s' % (outputbase, fname, extn)
             if not os.path.exists(outname):
-                # If specavg=1 then don't do averaging (set chanaverage=False)
-                if specavg<2:
-                    chanaverage=False
-                else:
-                    chanaverage=True
 
-                mstransform(vis=visname, outputvis=outname, datacolumn='corrected',
-                            field=fname, spw=spw, keepflags=False, createmms=keepmms,
-                            chanaverage=chanaverage, chanbin=specavg, timeaverage=True,
-                            timebin=timeavg, usewtspectrum=True)
+                split(vis=visname, outputvis=outname, datacolumn='corrected',
+                            field=fname, spw=spw, keepflags=False, keepmms=keepmms,
+                            width=specavg, timebin=timeavg)
 
 
 if __name__ == '__main__':

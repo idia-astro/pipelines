@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_setjy(visname, spw, fields, standard):
-    clearcal(vis=visname)
 
     fluxlist = ['J0408-6545', '0408-6545', '']
 

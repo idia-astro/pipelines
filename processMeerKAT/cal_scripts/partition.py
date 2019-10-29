@@ -24,8 +24,8 @@ def do_partition(visname, spw):
     msmd.close()
     msmd.done()
 
-    partition(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA',
-            numsubms=nscan, separationaxis='scan')
+    mstransform(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA',
+            numsubms=nscan, separationaxis='scan', keepflags=False, usewtspectrum=True, nthreads=4)
 
     return mvis
 
