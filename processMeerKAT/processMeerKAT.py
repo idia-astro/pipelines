@@ -280,7 +280,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
-    params['job'] = '${SLURM_JOB_NAME}-${SLURM_JOB_ID}'
+    params['job'] = '${SLURM_ARRAY_TASK_ID}' if SPWs != '' else '${SLURM_JOB_NAME}'
+    params['job'] += '-${SLURM_JOB_ID}'
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
     params['plot_call'] = ''
