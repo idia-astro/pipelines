@@ -11,7 +11,7 @@ from cal_scripts import bookkeeping
 def do_pre_flag(visname, fields, badfreqranges, badants):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
-    cliptarget    = [0., 20.]
+    cliptarget    = [0., 50.]
 
     if len(badfreqranges):
         for badfreq in badfreqranges:

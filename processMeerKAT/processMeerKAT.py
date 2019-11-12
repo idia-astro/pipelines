@@ -31,7 +31,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 #Set global limits for current ilifu cluster configuration
-TOTAL_NODES_LIMIT = 58
+TOTAL_NODES_LIMIT = 70
 NTASKS_PER_NODE_LIMIT = 32
 MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
 
@@ -47,8 +47,8 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name']
-CONTAINER = '/idia/software/pipelines/casameer-5.4.1.xvfb.simg'
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name','dependencies','exclude']
+CONTAINER = '/idia/software/containers/casa-stable-5.6.0-60.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
@@ -144,8 +144,8 @@ def parse_args():
                         help="Use this number of nodes [default: 8; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=4,
                         help="Use this number of tasks (per node) [default: 4; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-P","--plane", metavar="num", required=False, type=int, default=2,
-                            help="Distribute tasks of this block size before moving onto next node [default: 2; max: ntasks-per-node].")
+    parser.add_argument("-P","--plane", metavar="num", required=False, type=int, default=1,
+                            help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
                         help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(MEM_PER_NODE_GB_LIMIT))
     parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
@@ -156,10 +156,13 @@ def parse_args():
                         help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(MPI_WRAPPER))
     parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
+    parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies. [default: ''].")
+    parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
+    parser.add_argument("-q","--quiet", action="store_true", required=False, default=False, help="Activate quiet mode, with suppressed output [default: False].")
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
     run_args = parser.add_mutually_exclusive_group(required=True)
@@ -244,7 +247,7 @@ def validate_args(args,config,parser=None):
         msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
         raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True,plot=False):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True,plot=False,SPWs=''):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -266,6 +269,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         Write the CASA output to a log file? Only used if casa_script==True.
     plot : bool, optional
         This job is a plotting task that needs to call xvfb-run.
+    SPWs : str, optional
+        Comma-separated list of spw ranges.
 
     Returns:
     --------
@@ -275,12 +280,13 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
-    params['job'] = '${SLURM_JOB_ID}'
+    params['job'] = '${SLURM_JOB_NAME}-${SLURM_JOB_ID}'
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
     params['plot_call'] = ''
+    command = ''
 
-    #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
+    #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory (TODO: don't assume this!)
     if not os.path.exists(script):
         params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
 
@@ -288,16 +294,29 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     if plot:
         params['plot_call'] = 'xvfb-run -d'
     if logfile:
-        params['casa_log'] = '--logfile {LOG_DIR}/{name}-{job}.casa'.format(**params)
+        params['casa_log'] = '--logfile {LOG_DIR}/{job}.casa'.format(**params)
     if casa_script:
         params['casa_call'] = "{plot_call} casa --nologger --nogui {casa_log} -c".format(**params)
 
-    command = "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
+    if SPWs != '':
+        command += """#Iterate over SPWs in job array, launching one after the other
+        SPWs="%s"
+        arr=($SPWs)
+        cd ${arr[SLURM_ARRAY_TASK_ID]}
+        cp default_config.txt .config.tmp
+
+        """ % SPWs.replace(',',' ').replace('0:','')
+
+    command += "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
+
+    if SPWs != '':
+        command += '\ncd ..\n'
+
     return command
 
 
-def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=2,
-                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,partition="Main",time="12:00:00",casa_script=True):
+def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',
+                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,SPWs=''):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -321,6 +340,8 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
         Unique name to give this pipeline run, appended to the start of all job names.
     plane : int, optional
         Distrubute tasks for this job using this block size before moving onto next node.
+    exclude : str, optional
+        SLURM worker nodes to exclude.
     mpi_wrapper : str, optional
         MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
     container : str, optional
@@ -330,7 +351,9 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     time : str, optional
         Time limit to use for this job, in the form d-hh:mm:ss.
     casa_script : bool, optional
-        Is the script that is called within this job a CASA script?"""
+        Is the script that is called within this job a CASA script?
+    SPWs : str, optional
+        Comma-separated list of spw ranges."""
 
     if not os.path.exists(LOG_DIR):
         os.mkdir(LOG_DIR)
@@ -344,19 +367,24 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params['cpus'] = 8 if 'tclean' in script else 4 if 'partition' in script else 1
     plot = True if 'plot' in script else False
 
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs)
+    params['array'] = '' if SPWs == '' else '#SBATCH --array=0-{0}%1'.format(len(SPWs.split(','))-1)
+    params['ID'] = '%j' if SPWs == '' else '%A_%a'
+    params['exclude'] = '' if exclude == '' else '#SBATCH --exclude={0}'.format(exclude)
 
     contents = """#!/bin/bash
+    {exclude}
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
     #SBATCH --cpus-per-task={cpus}
     #SBATCH --mem={mem}GB
     #SBATCH --job-name={runname}{name}
     #SBATCH --distribution=plane={plane}
-    #SBATCH --output={LOG_DIR}/{name}-%j.out
-    #SBATCH --error={LOG_DIR}/{name}-%j.err
+    #SBATCH --output={LOG_DIR}/%x-{ID}.out
+    #SBATCH --error={LOG_DIR}/%x-{ID}.err
     #SBATCH --partition={partition}
     #SBATCH --time={time}
+    {array}
 
     export OMP_NUM_THREADS={cpus}
 
@@ -373,7 +401,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_spw_master(filename,config,SPWs,submit):
+def write_spw_master(filename,config,SPWs,submit,dir='jobScripts'):
 
     """Write master master script, which separately calls each of the master scripts in each SPW directory.
 
@@ -384,16 +412,45 @@ def write_spw_master(filename,config,SPWs,submit):
     SPWs : str
         Comma-separated list of spw ranges.
     submit : bool, optional
-        Submit jobs to SLURM queue immediately?"""
+        Submit jobs to SLURM queue immediately?
+    dir : str, optional
+        Name of directory to output ancillary job scripts."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
     SPWs = SPWs.replace('0:','')
 
-    for spw in SPWs.split(','):
+    master.write("\njobID=$(sbatch partition.sbatch | cut -d ' ' -f4)\n")
+    master.write('echo Running partition job array with jobID=$jobID, iterating over SPWs\n')
+
+    #Add time as extn to this pipeline run, to give unique filenames
+    killScript = 'killJobs'
+    summaryScript = 'summary'
+    fullSummaryScript = 'fullSummary'
+    errorScript = 'findErrors'
+    timingScript = 'displayTimes'
+    master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
+    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n\n")
+    master.write('mkdir -p {0}\n'.format(dir))
+    extn = '_$DATE.sh'
+
+    for i,spw in enumerate(SPWs.split(',')):
+        master.write('echo Running pipeline in directory "{0}" for spectral window 0:{0}\n'.format(spw))
         master.write('cd {0}\n'.format(spw))
-        master.write('{0} -R -C ./{1}\n'.format(THIS_PROG,config))
-        master.write('cd -\n\n')
+        master.write('{0} --config ./{1} --run --submit --quiet --dependencies=$jobID\_{2}\n'.format(THIS_PROG,config,i))
+        master.write('cd ..\n\n')
+
+    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..;  done" """ % (SPWs,killScript)
+    write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir)
+    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh | grep -v 'PENDING\|COMPLETED'; cd ..; done" """ % (SPWs,summaryScript)
+    write_bash_job_script(master, summaryScript, extn, do, 'view the progress \(for running of failed jobs\)', dir=dir)
+    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..; done" """ % (SPWs,summaryScript)
+    write_bash_job_script(master, fullSummaryScript, extn, do, 'view the progress \(for all jobs\)', dir=dir)
+    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..; done" """ % (SPWs,errorScript)
+    write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
+    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..; done" """ % (SPWs,timingScript)
+    write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir)
+
     #Close master submission script and make executable
     master.close()
     os.chmod(filename, 509)
@@ -405,7 +462,7 @@ def write_spw_master(filename,config,SPWs,submit):
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
-def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='',verbose=False):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='',verbose=False, echo=True, dependencies=''):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -424,7 +481,11 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='
     name : str, optional
         Unique name to give this pipeline run, appended to the start of all job names.
     verbose : bool, optional
-        Verbose output (inserted into master script)?"""
+        Verbose output (inserted into master script)?
+    echo : bool, optional
+        Echo the pupose of each job script for the user?
+    dependencies : str, optional
+        Comma-separated list of SLURM job dependencies."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
@@ -435,12 +496,15 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Submit first script with no dependencies and extract job ID
-    command = 'sbatch {0}'.format(scripts[0])
-    master.write('\n#{0}\n'.format(scripts[0]))
-    if verbose:
-        master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
-    master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
-    scripts.pop(0)
+    if dependencies == '':
+        command = 'sbatch {0}'.format(scripts[0])
+        master.write('\n#{0}\n'.format(scripts[0]))
+        if verbose:
+            master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
+        master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
+        scripts.pop(0)
+    else:
+        master.write('\n#Run after these dependencies\nIDs={0}\n'.format(dependencies))
 
     #Submit each script with dependency on all previous scripts, and extract job IDs
     for script in scripts:
@@ -468,13 +532,13 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='
     master.write('cp {0} {1}/{2}_$DATE.txt\n'.format(config,dir,os.path.splitext(config)[0]))
 
     #Write each job script - kill script, summary script, and error script
-    write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir)
+    write_bash_job_script(master, killScript, extn, 'echo scancel $IDs', 'kill all the jobs', dir=dir, echo=echo)
     do = """echo sacct -j $IDs -o "JobID%-15,JobName%-{0},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,MaxRSS,State,ExitCode" """.format(15+len(name))
-    write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir)
+    write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.out; cat %s/*\$ID.{out,err,casa} | grep -i 'severe\|error' | grep -vi 'mpi'; done" """ % (LOG_DIR,LOG_DIR)
-    write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
+    write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
     do = """echo "for ID in {$IDs,}; do ls %s/*\$ID.casa; cat %s/*\$ID.casa | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID.casa | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (LOG_DIR,LOG_DIR,LOG_DIR)
-    write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir)
+    write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir, echo=echo)
 
     #Close master submission script and make executable
     master.close()
@@ -482,12 +546,13 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',name='
 
     #Submit script or output that it will not run
     if submit:
-        logger.info('Running master script "{0}"'.format(filename))
+        if echo:
+            logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
-def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
+def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=True):
 
     """Write bash job script (e.g. jobs summary, kill all jobs, etc).
 
@@ -504,7 +569,9 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     purpose : str
         Purpose of this script to append as comment.
     dir : str, optional
-        Directory to write this script into."""
+        Directory to write this script into.
+    echo : bool, optional
+        Echo what this job script does for the user?"""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
     master.write('\n#Create {0}.sh file, make executable and simlink to current version\n'.format(filename))
@@ -512,10 +579,11 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts'):
     master.write('{0} >> {1}\n'.format(do,fname))
     master.write('chmod u+x {0}\n'.format(fname))
     master.write('ln -f -s {0} {1}.sh\n'.format(fname,filename))
-    master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
+    if echo:
+        master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
-def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4,
-                mem=MEM_PER_NODE_GB_LIMIT, plane=2, partition='Main', time='12:00:00', submit=False, name='', verbose=False):
+def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,
+                plane=1, partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude=''):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -548,11 +616,19 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
     name : str, optional
         Unique name to give this pipeline run, appended to the start of all job names.
     verbose : bool, optional
-        Verbose output?"""
+        Verbose output?
+    quiet : bool, optional
+        Activate quiet mode, with suppressed output?
+    dependencies : str, optional
+        Comma-separated list of SLURM job dependencies.
+    exclude : str, optional
+        SLURM worker nodes to exclude."""
 
     crosscal_kwargs = get_config_kwargs(TMP_CONFIG, 'crosscal', CROSSCAL_CONFIG_KEYS)
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once
+        write_sbatch('partition.py','--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,
+                    mpi_wrapper=mpi_wrapper,container=containers[0],partition=partition,time=time,name='partition',runname=name,SPWs=crosscal_kwargs['spw'])
         write_spw_master(MASTER_SCRIPT,config,crosscal_kwargs['spw'],submit)
     else:
         #Write sbatch file for each input python script
@@ -561,15 +637,16 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
 
             #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
             if threadsafe[i]:
-                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,
+                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,
                             mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=jobname,runname=name)
             else:
                 write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,mpi_wrapper='srun',
-                            container=containers[i],partition=partition,time=time,name=jobname,runname=name)
+                            container=containers[i],partition=partition,time=time,name=jobname,runname=name,exclude=exclude)
 
         #Build master pipeline submission script, replacing all .py with .sbatch
         scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
-        write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,name=name,verbose=verbose)
+        echo = False if quiet else True
+        write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,name=name,verbose=verbose,echo=echo,dependencies=dependencies)
 
 
 def default_config(arg_dict):
@@ -589,7 +666,7 @@ def default_config(arg_dict):
 
     #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
-    for key in ['container','mpi_wrapper','partition','time','name']:
+    for key in ['container','mpi_wrapper','partition','time','name','dependencies','exclude']:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
 
     #Overwrite parameters in config under section [slurm]
@@ -629,7 +706,7 @@ def get_slurm_dict(arg_dict,slurm_config_keys):
     slurm_dict = {key:arg_dict[key] for key in slurm_config_keys}
     return slurm_dict
 
-def format_args(config,submit):
+def format_args(config,submit,quiet,dependencies):
 
     """Format (and validate) arguments from config file, to be passed into write_jobs() function.
 
@@ -639,6 +716,10 @@ def format_args(config,submit):
         Path to config file.
     submit : bool
         Allow user to force submitting to queue immediately.
+    quiet : bool
+        Activate quiet mode, with suppressed output?
+    dependencies : str
+        Comma-separated list of SLURM job dependencies.
 
     Returns:
     --------
@@ -684,17 +765,29 @@ def format_args(config,submit):
             kwargs['containers'][i] = kwargs['container']
     kwargs.pop('container')
     kwargs.pop('MS')
+    kwargs['quiet'] = quiet
+
+    #Force overwrite of dependencies and pop partition.py if != ''
+    if dependencies != '':
+        kwargs['dependencies'] = dependencies
+        if 'partition.py' in kwargs['scripts']:
+            index = kwargs['scripts'].index('partition.py')
+            kwargs['scripts'].pop(index)
+            kwargs['threadsafe'].pop(index)
+            kwargs['containers'].pop(index)
 
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     spw = crosscal_kwargs['spw']
-    nspw = crosscal_kwargs['nspw']
+    nspw = int(crosscal_kwargs['nspw'])
+    mem = int(kwargs['mem']) // nspw
     if nspw > 1:
-        spw_split(spw, nspw, config)
+        spw_split(spw, nspw, config, mem)
 
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
-    logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
+    if not quiet:
+        logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
     return kwargs
 
@@ -704,7 +797,7 @@ def linspace(lower,upper,length):
 
     return [lower + x*(upper-lower)/float(length-1) for x in range(length)]
 
-def spw_split(spw,nspw,config):
+def spw_split(spw,nspw,config,mem):
 
     """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
 
@@ -713,7 +806,9 @@ def spw_split(spw,nspw,config):
     nspw : int
         Number of spectral windows to split into.
     config : str
-        Path to config file."""
+        Path to config file.
+    mem : int
+        Memory in GB to use per instance."""
 
     #TODO: Validate nspw as integer
     bounds = spw.split(':')[-1].split('~')
@@ -756,7 +851,7 @@ def spw_split(spw,nspw,config):
         copyfile(config, spw_config)
         config_parser.overwrite_config(spw_config, conf_dict={'spw' : "'0:{0}'".format(spw)}, conf_sec='crosscal')
         config_parser.overwrite_config(spw_config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
-        config_parser.overwrite_config(spw_config, conf_dict={'submit' : True}, conf_sec='slurm')
+        config_parser.overwrite_config(spw_config, conf_dict={'mem' : mem}, conf_sec='slurm')
 
 def get_config_kwargs(config,section,expected_keys):
 
@@ -830,7 +925,7 @@ def main():
     if args.build:
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config,args.submit)
+        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies)
         write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":

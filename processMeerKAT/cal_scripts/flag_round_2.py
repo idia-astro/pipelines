@@ -11,7 +11,7 @@ from cal_scripts import bookkeeping
 def do_pre_flag_2(visname, fields):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
-    cliptarget    = [0., 20.]
+    cliptarget    = [0., 50.]
 
     flagdata(vis=visname, mode="clip", field=fields.fluxfield,
             clipminmax=clipfluxcal, datacolumn="corrected", clipoutside=True,

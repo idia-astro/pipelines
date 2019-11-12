@@ -17,14 +17,16 @@ badfreqranges = [ '935~947MHz',   # List of bad frequency ranges (to flag)
 [slurm]                           # See processMeerKAT.py -h for documentation
 nodes = 8
 ntasks_per_node = 4
-plane = 2
+plane = 1
 mem = 236                         # Use this many GB of memory (per node)
 partition = 'Main'                # SLURM partition to use
+exclude = ''                      # SLURM worker to exclude
 time = '12:00:00'
 submit = False
-container = '/idia/software/pipelines/casameer-5.4.1.xvfb.simg'
+container = '/idia/software/containers/casa-stable-5.6.0-60.simg'
 mpi_wrapper = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 name = ''
+dependencies = ''
 verbose = False
 scripts = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
