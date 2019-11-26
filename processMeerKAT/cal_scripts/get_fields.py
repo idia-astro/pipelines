@@ -124,7 +124,7 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
 
     return fieldIDs
 
-def check_refant(MS,refant,warn=True):
+def check_refant(MS,refant,config,warn=True):
 
     """Check if reference antenna exists, otherwise throw an error or display a warning.
 
@@ -147,7 +147,7 @@ def check_refant(MS,refant,warn=True):
         else:
             raise ValueError(err)
     else:
-        logger.info("Choosing reference antenna '{0}', which is usually a well-behaved (stable) antenna. Update 'refant' in [crosscal] section of '{1}' to change this.".format(refant,args.config))
+        logger.info("Choosing reference antenna '{0}', which is usually a well-behaved (stable) antenna. Update 'refant' in [crosscal] section of '{1}' to change this.".format(refant,config))
 
 def check_scans(MS,nodes,tasks):
 
@@ -198,7 +198,7 @@ def main():
     msmd.open(args.MS)
 
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
-    check_refant(args.MS, refant, warn=True)
+    check_refant(args.MS, refant, args.config, warn=True)
 
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node)
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
