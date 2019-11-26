@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     visname = va(taskvals, 'data', 'vis', str)
 
-    badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
+    badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['935~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
     badants = taskvals['crosscal'].pop('badants')
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)

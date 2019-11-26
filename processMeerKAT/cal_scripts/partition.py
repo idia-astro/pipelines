@@ -21,7 +21,6 @@ def do_partition(visname, spw):
     #mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
     msmd.open(visname)
     nscan = msmd.nscans()
-    msmd.close()
     msmd.done()
 
     mstransform(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA',

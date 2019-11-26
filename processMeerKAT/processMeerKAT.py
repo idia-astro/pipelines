@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 
-__version__ = '1.0'
+__version__ = '1.1'
 
 license = """
     Process MeerKAT data via CASA measurement set.
@@ -40,6 +40,7 @@ THIS_PROG = sys.argv[0]
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
 CALIB_SCRIPTS_DIR = 'cal_scripts'
+AUX_SCRIPTS_DIR = 'aux_scripts'
 CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
@@ -48,7 +49,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name','dependencies','exclude']
-CONTAINER = '/idia/software/containers/casa-stable-5.6.0-60.simg'
+CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
@@ -65,26 +66,41 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('plot_solutions.py',False,'')]
 
 
-def check_path(path):
+def check_path(path,update=False):
 
     """Check in specific location for a script or container, including in bash path, and in this pipeline's calibration
-    scripts directory (SCRIPT_DIR/CALIB_SCRIPTS_DIR/). If path isn't found, raise IOError, otherwise return the path.
+    scripts directory (SCRIPT_DIR/{CALIB_SCRIPTS_DIR,AUX_SCRIPTS_DIR}/). If path isn't found, raise IOError, otherwise return the path.
 
     Arguments:
     ----------
     path : str
         Check for script or container at this path.
+    update : bool, optional
+        Update the path according to where the file is found.
 
     Returns:
     --------
     path : str
-        Path to script or container (if path found)."""
+        Path to script or container (if path found and update=True)."""
 
-    #check if path is in bash path first
-    if '/' not in path and path != '':
-        path = check_bash_path(path)
-    if path != '' and not os.path.exists(path) and not os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
-        raise IOError('File "{0}" not found.'.format(path))
+    #Attempt to find path in pipeline directories and bash path first
+    if not os.path.exists(path) and path != '':
+        if os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)
+        elif os.path.exists('../{0}'.format(path)):
+            newpath = '../{0}'.format(path)
+        elif os.path.exists(check_bash_path(path)):
+            newpath = check_bash_path(path)
+        else:
+            #If it still doesn't exist, throw error
+            raise IOError('File "{0}" not found.'.format(path))
+    else:
+        newpath = path
+
+    if update:
+        return newpath
     else:
         return path
 
@@ -247,7 +263,7 @@ def validate_args(args,config,parser=None):
         msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
         raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,logfile=True,plot=False,SPWs=''):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,casacore=False,logfile=True,plot=False,SPWs=''):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -265,6 +281,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         Path to singularity container used for this job.
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?
+    casacore : bool, optional
+        Is the script that is called within this job a casacore script?
     logfile : bool, optional
         Write the CASA output to a log file? Only used if casa_script==True.
     plot : bool, optional
@@ -289,15 +307,19 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
     #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory (TODO: don't assume this!)
     if not os.path.exists(script):
-        params['script'] = '{0}/{1}/{2}'.format(SCRIPT_DIR, CALIB_SCRIPTS_DIR, script)
+        params['script'] = check_path(script, update=True)
 
     #If specified by user, call script via CASA, call with xvfb-run, and write output to log file
     if plot:
-        params['plot_call'] = 'xvfb-run -d'
+        params['plot_call'] = 'xvfb-run -a'
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{job}.casa'.format(**params)
     if casa_script:
         params['casa_call'] = "{plot_call} casa --nologger --nogui {casa_log} -c".format(**params)
+    if casacore:
+        params['singularity_call'] = 'run' #points to python that comes with CASA, including casac
+    else:
+        params['singularity_call'] = 'exec'
 
     if SPWs != '':
         command += """#Iterate over SPWs in job array, launching one after the other
@@ -308,8 +330,11 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
         """ % SPWs.replace(',',' ').replace('0:','')
 
-    command += "{mpi_wrapper} singularity exec {container} {casa_call} {script} {args}".format(**params)
+    command += "{mpi_wrapper} singularity {singularity_call} {container} {casa_call} {script} {args}".format(**params)
 
+    #Get rid of annoying msmd output from casacore call
+    if casacore:
+        command += " 2>&1 | grep -v 'msmetadata_cmpt.cc::open\|MSMetaData::_computeScanAndSubScanProperties'"
     if SPWs != '':
         command += '\ncd ..\n'
 
@@ -677,11 +702,16 @@ def default_config(arg_dict):
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
 
     #Don't call srun if option --local used
-    mpi_wrapper = '' if arg_dict['local'] else 'srun --nodes=1 --ntasks=1 --time=10 --mem=4GB --partition={0}'.format(arg_dict['partition'])
+    if arg_dict['local']:
+        mpi_wrapper = ''
+    else:
+        mpi_wrapper = 'srun --qos qos-interactive --nodes=1 --ntasks=1 --time=10 --mem=4GB --partition={0}'.format(arg_dict['partition'])
+        if arg_dict['exclude'] != '':
+            mpi_wrapper += ' --exclude={0}'.format(arg_dict['exclude'])
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
     params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)
-    command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False)
+    command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
     logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
     logger.debug('Using the following command:\n\t{0}'.format(command))
     os.system(command)
@@ -737,9 +767,22 @@ def format_args(config,submit,quiet,dependencies):
     if submit:
         kwargs['submit'] = True
 
+    #Ensure nspw is integer
+    if type(crosscal_kwargs['nspw']) is not int:
+        logger.warn("Argument 'nspw'={0} in '{1}' is not an integer. Will set to integer.".format(crosscal_kwargs['nspw']),config,int(crosscal_kwargs['nspw']))
+        crosscal_kwargs['nspw'] = int(crosscal_kwargs['nspw'])
+
     # Validate kwargs along with MS
     kwargs['MS'] = data_kwargs['vis']
     validate_args(kwargs,config)
+
+    #If single correctly formatted spw, split into nspw directories, and process each spw independently
+    spw = crosscal_kwargs['spw']
+    nspw = crosscal_kwargs['nspw']
+    mem = int(kwargs['mem']) // nspw
+    if nspw > 1:
+        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'])
+        config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
 
     #Reformat scripts tuple/list, to extract scripts, threadsafe, and containers as parallel lists
     #Check that path to each script and container exists or is ''
@@ -748,9 +791,8 @@ def format_args(config,submit,quiet,dependencies):
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
-    #Set threadsafe=False if keepmms=False
-    if 'quick_tclean.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
-        kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = False
+    #Set threadsafe=False for split if keepmms=False
+    if 'split.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
         kwargs['threadsafe'][kwargs['scripts'].index('split.py')] = False
 
     #Pop script to calculate reference antenna if calcrefant=False
@@ -777,13 +819,6 @@ def format_args(config,submit,quiet,dependencies):
             kwargs['threadsafe'].pop(index)
             kwargs['containers'].pop(index)
 
-    #If single correctly formatted spw, split into nspw directories, and process each spw independently
-    spw = crosscal_kwargs['spw']
-    nspw = int(crosscal_kwargs['nspw'])
-    mem = int(kwargs['mem']) // nspw
-    if nspw > 1:
-        spw_split(spw, nspw, config, mem)
-
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
@@ -798,10 +833,55 @@ def linspace(lower,upper,length):
 
     return [lower + x*(upper-lower)/float(length-1) for x in range(length)]
 
-def spw_split(spw,nspw,config,mem):
+def get_spw_bounds(spw):
+
+    """Get upper and lower bounds of spw.
+
+    Arguments:
+    ----------
+    spw : str
+        CASA spectral window in MHz.
+
+    Returns:
+    --------
+    low : float
+        Lower bound of spw.
+    high : float
+        Higher bound of spw.
+    unit : str
+        Unit of spw.
+    func : function
+        Function to apply to spectral window (i.e. int for SPW channel range, otherwise float)."""
+
+    bounds = spw.split(':')[-1].split('~')
+    if ',' not in spw and ':' in spw and '~' in spw and len(bounds) == 2 and bounds[1] != '':
+        high,unit=re.search(r'(\d+\.*\d*)(\w*)',bounds[1]).groups()
+        func = int if unit == '' else float
+        low = func(bounds[0])
+        high = func(high)
+
+        if unit != 'MHz':
+            logger.warning('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
+        # Can only do when using CASA
+        # if unit == '':
+        #     msmd.open(MS)
+        #     low_MHz = msmd.chanfreqs(0)[low] / 1e9
+        #     high_MHz = msmd.chanfreqs(0)[high] / 1e9
+        #     msmd.done()
+        # else:
+        #     low_MHz=qa.convertfreq('{0}{1}'.format(low,unit),'MHz')['value']
+        #     high_MHz=qa.convertfreq('{0}{1}'.format(high,unit),'MHz')['value']
+    else:
+        return None
+
+    return low,high,unit,func
+
+def spw_split(spw,nspw,config,mem,badfreqranges,MS):
 
     """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
 
+    Arguments:
+    ----------
     spw : str
         spw parameter from config.
     nspw : int
@@ -809,50 +889,76 @@ def spw_split(spw,nspw,config,mem):
     config : str
         Path to config file.
     mem : int
-        Memory in GB to use per instance."""
+        Memory in GB to use per instance.
+    badfreqranges : list
+        List of bad frequency ranges in MHz.
+    MS : str
+        Path to CASA Measurement Set.
+
+    Returns:
+    --------
+    nspw : int
+        New nspw, potentially a lower value than input (if any SPWs completely encompassed by badfreqranges)."""
 
     #TODO: Validate nspw as integer
-    bounds = spw.split(':')[-1].split('~')
-
-    if ',' not in spw and ':' in spw and '~' in spw and len(bounds) == 2 and bounds[1] != '':
+    if get_spw_bounds(spw) != None:
         #Write nspw frequency ranges
-        high,unit=re.search(r'(\d+\.*\d*)(\w*)',bounds[1]).groups()
-        func = int if unit == '' else float
-        low = func(bounds[0])
-        high = func(high)
+        low,high,unit,func = get_spw_bounds(spw)
         interval=func((high-low)/float(nspw))
         lo=linspace(low,high-interval,nspw)
         hi=linspace(low+interval,high,nspw)
         SPWs=[]
 
+        #Remove SPWs entirely encompassed by bad frequency ranges (only for MHz unit)
         for i in range(len(lo)):
-            SPWs.append('{0}~{1}{2}'.format(func(lo[i]),func(hi[i]),unit))
-
-        spw_list=',0:'.join(SPWs)
-        config_parser.overwrite_config(config, conf_dict={'spw' : "'0:{0}'".format(spw_list)}, conf_sec='crosscal')
+            SPWs.append('0:{0}~{1}{2}'.format(func(lo[i]),func(hi[i]),unit))
 
     elif ',' in spw:
-        SPW = spw.replace('0:','')
-        SPWs = SPW.split(',')
+        SPWs = spw.split(',')
+        unit = get_spw_bounds(SPWs[0])[2]
         if len(SPWs) != nspw:
             logger.error("nspw ({0}) not equal to number of separate SPWs ({1} in '{2}') from '{3}'. Setting to nspw={1}.".format(nspw,len(SPWs),spw,config))
             nspw = len(SPWs)
-            config_parser.overwrite_config(config, conf_dict={'nspw' : len(SPWs)}, conf_sec='crosscal')
     else:
         logger.error("Can't split into {0} SPWs using SPW format '{1}'. Using nspw=1 in '{2}'.".format(nspw,spw,config))
-        config_parser.overwrite_config(config, conf_dict={'nspw' : '1'}, conf_sec='crosscal')
-        return
+        return 1
+
+    #Remove any SPWs completely encompassed by bad frequency ranges
+    i=0
+    while i < nspw:
+        badfreq = False
+        low,high = get_spw_bounds(SPWs[i])[0:2]
+        if unit == 'MHz':
+            for freq in badfreqranges:
+                bad_low,bad_high = get_spw_bounds('0:{0}'.format(freq))[0:2]
+                if low > bad_low and high < bad_high:
+                    logger.info("Won't process spw '0:{0}~{1}{2}', since it's completely encompassed by bad frequency range '{3}'.".format(low,high,unit,freq))
+                    badfreq = True
+                    break
+        if badfreq:
+            SPWs.pop(i)
+            i -= 1
+            nspw -= 1
+        i += 1
+
+    #Overwrite config with new SPWs
+    config_parser.overwrite_config(config, conf_dict={'spw' : "'{0}'".format(','.join(SPWs))}, conf_sec='crosscal')
 
     #Create each spw as directory and place config in there
     logger.info("Making {0} directories for SPWs ({1}) and copying '{2}' to each of them.".format(nspw,SPWs,config))
     for spw in SPWs:
-        spw_config = '{0}/{1}'.format(spw,config)
-        if not os.path.exists(spw):
-            os.mkdir(spw)
+        spw_config = '{0}/{1}'.format(spw.replace('0:',''),config)
+        if not os.path.exists(spw.replace('0:','')):
+            os.mkdir(spw.replace('0:',''))
         copyfile(config, spw_config)
-        config_parser.overwrite_config(spw_config, conf_dict={'spw' : "'0:{0}'".format(spw)}, conf_sec='crosscal')
+        config_parser.overwrite_config(spw_config, conf_dict={'spw' : "'{0}'".format(spw)}, conf_sec='crosscal')
         config_parser.overwrite_config(spw_config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
         config_parser.overwrite_config(spw_config, conf_dict={'mem' : mem}, conf_sec='slurm')
+        #Look 1 directory up when using relative path
+        if MS[0] != '/':
+            config_parser.overwrite_config(config, conf_dict={'vis' : "'../{0}'".format(MS)}, conf_sec='data')
+
+    return nspw
 
 def get_config_kwargs(config,section,expected_keys):
 

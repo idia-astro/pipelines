@@ -21,7 +21,6 @@ def get_ref_ant(visname, fluxfield):
     fluxscans = msmd.scansforfield(int(fluxfield))
     logger.info("Flux field scan no: %d" % fluxscans[0])
     antennas = msmd.antennasforscan(fluxscans[0])
-    msmd.close()
     msmd.done()
 
     header = '{0: <3} {1: <4} {2: <4}'.format('ant','median','rms')

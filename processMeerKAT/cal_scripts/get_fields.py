@@ -146,6 +146,8 @@ def check_refant(MS,refant,warn=True):
             logger.warn(err)
         else:
             raise ValueError(err)
+    else:
+        logger.info("Choosing reference antenna '{0}', which is usually a well-behaved (stable) antenna. Update 'refant' in [crosscal] section of '{1}' to change this.".format(refant,args.config))
 
 def check_scans(MS,nodes,tasks):
 
@@ -203,9 +205,7 @@ def main():
 
     fields = get_fields(args.MS)
     config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
-    logger.info('[fields] section written to "{0}". Edit this section to change field IDs (comma-seperated string for multiple IDs).'.format(args.config))
-
-    msmd.close()
+    logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs).'.format(args.config))
     msmd.done()
 
 if __name__ == "__main__":

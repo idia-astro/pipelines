@@ -18,13 +18,11 @@ def run_tclean(visname, fields, keepmms):
 
     #Store bandwidth in MHz
     msmd.open(visname)
-    BW = msmd.bandwidths(-1)/1e6
+    BW = msmd.bandwidths(-1).sum()/1e6
 
     if keepmms == True:
-        parallel = True
         extn = 'mms'
     else:
-        parallel = False
         extn = 'ms'
 
     #Use 1 taylor term for BW < 100 MHz
@@ -43,13 +41,8 @@ def run_tclean(visname, fields, keepmms):
 
     #Store target names
     targimname = []
-    if len(fields.targetfield.split(',')) > 1:
-        for tt in fields.targetfield.split(','):
-            fname = msmd.namesforfields(int(tt))[0]
-            tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
-            targimname.append(os.path.join(impath, tmpname))
-    else:
-        fname = msmd.namesforfields(int(fields.targetfield))[0]
+    for tt in fields.targetfield.split(','):
+        fname = msmd.namesforfields(int(tt))[0]
         tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
         targimname.append(os.path.join(impath, tmpname))
 
@@ -69,7 +62,7 @@ def run_tclean(visname, fields, keepmms):
                     weighting='briggs', robust=0, cell='2arcsec',
                     specmode='mfs', deconvolver=deconvolver, nterms=terms, scales=[],
                     savemodel='none', gridder='standard',
-                    restoration=True, pblimit=0, parallel=parallel)
+                    restoration=True, pblimit=0, parallel=True)
 
             exportfits(imagename=tt+'.image'+suffix, fitsimage=tt+'.fits')
 
@@ -88,11 +81,10 @@ def run_tclean(visname, fields, keepmms):
                         imsize=[512,512], threshold=0,niter=1000, weighting='briggs',
                         robust=0, cell='2arcsec', specmode='mfs', deconvolver=deconvolver,
                         nterms=terms, scales=[], savemodel='none', gridder='standard',
-                        restoration=True, pblimit=0, parallel=parallel)
+                        restoration=True, pblimit=0, parallel=True)
 
                 exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
 
-    msmd.close()
     msmd.done()
 
 

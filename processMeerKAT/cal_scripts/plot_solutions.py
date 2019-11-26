@@ -128,7 +128,6 @@ def main():
                 plotms(vis=inname, xaxis='freq', yaxis='Amp', coloraxis='corr', plotfile='{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname),showgui=False)
                 plotms(vis=inname, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/{1}_real_imag.png'.format(PLOT_DIR,fname),showgui=False)
 
-    msmd.close()
     msmd.done()
 
 
