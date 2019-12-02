@@ -39,7 +39,7 @@ def validateinput():
     if not calcrefant:
         refant = va(taskvals, 'crosscal', 'refant', str)
         msmd.open(visname)
-        get_fields.check_refant(MS=visname, refant=refant, warn=False)
+        get_fields.check_refant(MS=visname, refant=refant, config=config, warn=False)
         msmd.done()
 
     if not os.path.exists(visname):
