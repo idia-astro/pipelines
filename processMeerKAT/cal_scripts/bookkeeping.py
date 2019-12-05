@@ -7,6 +7,10 @@ import config_parser
 from collections import namedtuple
 import os
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
+
 def get_calfiles(visname, caldir):
         base = os.path.splitext(visname)[0]
         kcorrfile = os.path.join(caldir,base + '.kcal')
