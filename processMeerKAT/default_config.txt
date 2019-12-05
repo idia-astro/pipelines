@@ -27,6 +27,7 @@ container = '/idia/software/containers/casa-stable-5.6.2-2.simg'
 mpi_wrapper = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 name = ''
 dependencies = ''
+account = 'b03-idia-ag'
 verbose = False
 scripts = [ ('validate_input.py',False,''),
             ('partition.py',True,''),

@@ -24,6 +24,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             field = fields.kcorrfield, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'K',
             solint = '10min', combine = 'scan', parang = False, append = False)
+    bookkeeping.check_file(calfiles.kcorrfile)
 
     logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
@@ -32,6 +33,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             solint = 'inf', combine = 'scan', bandtype = 'B', fillgaps = 8,
             gaintable = calfiles.kcorrfile, gainfield = fields.kcorrfield,
             parang = False, append = False)
+    bookkeeping.check_file(calfiles.bpassfile)
 
     logger.info(" starting cross hand delay -> %s" % calfiles.xdelfile)
     gaincal(vis=visname, caltable = calfiles.xdelfile, field = fields.xdelfield,
@@ -40,6 +42,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             combine = 'scan',
             gaintable = [calfiles.kcorrfile, calfiles.bpassfile],
             gainfield = [fields.kcorrfield, fields.bpassfield])
+    bookkeeping.check_file(calfiles.xdelfile)
 
     base = visname.replace('.ms', '')
     gain1file   = os.path.join(caldir, base+'.g1cal')
@@ -69,6 +72,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 calfiles.xdelfile],
             gainfield = [fields.kcorrfield, fields.bpassfield,
                 fields.xdelfield], append=False, parang=True)
+    bookkeeping.check_file(gain1file)
 
     gaincal(vis=visname, caltable=gain1file, field=fields.secondaryfield,
             smodel=[1,0,0,0], refant=referenceant, solint='10min',
@@ -78,6 +82,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gainfield = [fields.kcorrfield, fields.bpassfield,
                 fields.xdelfield],
             append=True, parang=True)
+    bookkeeping.check_file(gain1file)
 
     # implied polarization from instrumental response
     logger.info("\n Solve for Q, U from initial gain solution")
@@ -94,6 +99,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gainfield = [fields.kcorrfield, fields.bpassfield,
                 fields.secondaryfield, fields.xdelfield],
             append = False)
+    bookkeeping.check_file(xy0ambpfile)
 
     logger.info("\n Check for x-y phase ambiguity.")
     xyamb(xytab=xy0ambpfile, qu=GainQU[int(fields.dpolfield)], xyout = xy0pfile)
@@ -113,6 +119,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 calfiles.xdelfile],
             gainfield = [fields.kcorrfield,fields.bpassfield,fields.xdelfield],
             parang = True, append = False)
+    bookkeeping.check_file(calfiles.gainfile)
 
     logger.info("\n solution for secondary with parang = true")
     gaincal(vis=visname, caltable = calfiles.gainfile,
@@ -125,6 +132,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gainfield = [fields.kcorrfield, fields.bpassfield,
                 fields.xdelfield],
             parang = True, append = True)
+    bookkeeping.check_file(calfiles.gainfile)
 
     logger.info("\n now re-solve for Q,U from the new gainfile\n -> %s" \
                                                         % calfiles.gainfile)
@@ -140,6 +148,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
            gainfield = [fields.kcorrfield, fields.bpassfield,
                fields.secondaryfield, fields.xdelfield, fields.dpolfield],
            append = False)
+    bookkeeping.check_file(dtempfile)
 
     Dgen(dtab=dtempfile, dout=calfiles.dpolfile)
 
@@ -151,6 +160,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 fluxtable = calfiles.fluxfile,
                 listfile = os.path.join(caldir,'fluxscale_xy_yx.txt'),
                 append = False, display=False)
+        bookkeeping.check_file(calfiles.fluxfile)
 
 
 if __name__ == '__main__':

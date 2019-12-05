@@ -134,6 +134,8 @@ def check_refant(MS,refant,config,warn=True):
         Input measurement set (relative or absolute path).
     refant: str
         Input reference antenna.
+    config : str
+        Path to config file.
     warn : bool, optional
         Warn the user? If False, raise ValueError."""
 

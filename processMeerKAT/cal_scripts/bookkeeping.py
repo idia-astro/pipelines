@@ -62,3 +62,11 @@ def get_field_ids(fields):
 
     return FieldIDs(targetfield, fluxfield, bpassfield, secondaryfield,
             kcorrfield, xdelfield, dpolfield, xpolfield, gainfields)
+
+def check_file(filepath):
+
+    if not os.path.exists(filepath):
+        logger.error('Calibration table "{0}" was not written. Please check the CASA output and whether a solution was found.'.format(filepath))
+        raise FileNotFoundError
+    else:
+        logger.info('Calibration table "{0}" successfully written.')

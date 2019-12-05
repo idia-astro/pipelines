@@ -31,7 +31,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 #Set global limits for current ilifu cluster configuration
-TOTAL_NODES_LIMIT = 70
+TOTAL_NODES_LIMIT = 74
+CPUS_PER_NODE_LIMIT = 32
 NTASKS_PER_NODE_LIMIT = 32
 MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
 
@@ -48,7 +49,8 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose','container','mpi_wrapper','partition','time','name','dependencies','exclude']
+SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account']
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
 SCRIPTS = [ ('validate_input.py',False,''),
@@ -174,6 +176,7 @@ def parse_args():
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies. [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
+    parser.add_argument("-a","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr list Account format=account%%30') [default: 'b03-idia-ag'].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
@@ -298,7 +301,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
-    params['job'] = '${SLURM_ARRAY_TASK_ID}' if SPWs != '' else '${SLURM_JOB_ID}'
+    params['job'] = '${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}' if SPWs != '' else '${SLURM_JOB_ID}'
     params['job'] = '${SLURM_JOB_NAME}-' + params['job']
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
@@ -342,7 +345,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',
-                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,SPWs=''):
+                mpi_wrapper=MPI_WRAPPER,container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,SPWs='',account='b03-idia-ag'):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -379,7 +382,9 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?
     SPWs : str, optional
-        Comma-separated list of spw ranges."""
+        Comma-separated list of spw ranges.
+    account : str, optional
+        SLURM accounting group for sbatch jobs."""
 
     if not os.path.exists(LOG_DIR):
         os.mkdir(LOG_DIR)
@@ -387,10 +392,15 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
-    params['job'] = '${SLURM_JOB_ID}'
 
-    #Use multiple CPUs for tclean scripts, and xvfb for plotting scripts
-    params['cpus'] = 8 if 'tclean' in script else 4 if 'partition' in script else 1
+    #Use multiple CPUs for tclean and paratition scripts
+    params['cpus'] = 1
+    if 'partition' in script and tasks*4 > CPUS_PER_NODE_LIMIT:
+        params['cpus'] = 4 #hard-code for 4 polarisations
+    if 'tclean' in script:
+        params['cpus'] = int(32/tasks)
+
+    #Use xvfb for plotting scripts
     plot = True if 'plot' in script else False
 
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs)
@@ -400,6 +410,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     contents = """#!/bin/bash
     {exclude}
+    #SBATCH --account={account}
     #SBATCH --nodes={nodes}
     #SBATCH --ntasks-per-node={tasks}
     #SBATCH --cpus-per-task={cpus}
@@ -412,7 +423,8 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     #SBATCH --time={time}
     {array}
 
-    export OMP_NUM_THREADS={cpus}
+    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    export OMPI_MCA_btl_tcp_if_exclude='192.168.100.0/24'
 
     {command}"""
 
@@ -466,11 +478,12 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts'):
         master.write('{0} --config ./{1} --run --submit --quiet --dependencies=$jobID\_{2}\n'.format(THIS_PROG,config,i))
         master.write('cd ..\n\n')
 
+    header = '------------------------------------------------------------------------------------------------------------------------------------------------------------------'
     do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..;  done" """ % (SPWs,killScript)
     write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir)
-    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh | grep -v 'PENDING\|COMPLETED'; cd ..; done" """ % (SPWs,summaryScript)
+    do = """echo "counter=1; for f in {%s,}; do echo '%s';  echo -n SPW \#\$counter:; echo -n ' '; cd \$f; pwd; ./%s.sh | grep -v 'PENDING\|COMPLETED'; cd ..; counter=\$((counter+1)); done" """ % (SPWs,header,summaryScript)
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress \(for running of failed jobs\)', dir=dir)
-    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..; done" """ % (SPWs,summaryScript)
+    do = """echo "counter=1; for f in {%s,}; do echo '%s';  echo -n SPW \#\$counter:; echo -n ' '; cd \$f; pwd; ./%s.sh; cd ..; counter=\$((counter+1)); done" """ % (SPWs,header,summaryScript)
     write_bash_job_script(master, fullSummaryScript, extn, do, 'view the progress \(for all jobs\)', dir=dir)
     do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..; done" """ % (SPWs,errorScript)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir)
@@ -609,7 +622,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
         master.write('echo Run {0}.sh to {1}.\n'.format(filename,purpose))
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,
-                plane=1, partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude=''):
+                plane=1, partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag'):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -648,13 +661,15 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
     dependencies : str, optional
         Comma-separated list of SLURM job dependencies.
     exclude : str, optional
-        SLURM worker nodes to exclude."""
+        SLURM worker nodes to exclude.
+    account : str, optional
+        SLURM accounting group for sbatch jobs."""
 
     crosscal_kwargs = get_config_kwargs(TMP_CONFIG, 'crosscal', CROSSCAL_CONFIG_KEYS)
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once
         write_sbatch('partition.py','--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,
-                    mpi_wrapper=mpi_wrapper,container=containers[0],partition=partition,time=time,name='partition',runname=name,SPWs=crosscal_kwargs['spw'])
+                    mpi_wrapper=mpi_wrapper,container=containers[0],partition=partition,time=time,name='partition',runname=name,SPWs=crosscal_kwargs['spw'],account=account)
         write_spw_master(MASTER_SCRIPT,config,crosscal_kwargs['spw'],submit)
     else:
         #Write sbatch file for each input python script
@@ -664,10 +679,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
             #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
             if threadsafe[i]:
                 write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,
-                            mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=jobname,runname=name)
+                            mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,time=time,name=jobname,runname=name,account=account)
             else:
                 write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,mpi_wrapper='srun',
-                            container=containers[i],partition=partition,time=time,name=jobname,runname=name,exclude=exclude)
+                            container=containers[i],partition=partition,time=time,name=jobname,runname=name,exclude=exclude,account=account)
 
         #Build master pipeline submission script, replacing all .py with .sbatch
         scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
@@ -692,7 +707,7 @@ def default_config(arg_dict):
 
     #Add SLURM arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
-    for key in ['container','mpi_wrapper','partition','time','name','dependencies','exclude']:
+    for key in SLURM_CONFIG_STR_KEYS:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
 
     #Overwrite parameters in config under section [slurm]
@@ -956,7 +971,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS):
         config_parser.overwrite_config(spw_config, conf_dict={'mem' : mem}, conf_sec='slurm')
         #Look 1 directory up when using relative path
         if MS[0] != '/':
-            config_parser.overwrite_config(config, conf_dict={'vis' : "'../{0}'".format(MS)}, conf_sec='data')
+            config_parser.overwrite_config(spw_config, conf_dict={'vis' : "'../{0}'".format(MS)}, conf_sec='data')
 
     return nspw
 
