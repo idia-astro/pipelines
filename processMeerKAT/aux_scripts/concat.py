@@ -58,7 +58,7 @@ def do_concat(visname, fields):
             concat(vis=MSs, concatvis=out)
 
         if not os.path.exists(out):
-            logger.error("Output image '{0}' not written.".format(out))
+            logger.error("Output MS '{0}' not written.".format(out))
 
     msmd.done()
 

@@ -407,7 +407,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     #Use multiple CPUs for tclean and paratition scripts
     params['cpus'] = 1
-    if 'partition' in script and tasks*4 > CPUS_PER_NODE_LIMIT:
+    if 'partition' in script and tasks*4 < CPUS_PER_NODE_LIMIT:
         params['cpus'] = 4 #hard-code for 4 polarisations
     if 'tclean' in script:
         params['cpus'] = int(32/tasks)
