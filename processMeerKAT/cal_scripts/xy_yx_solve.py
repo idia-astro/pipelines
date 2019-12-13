@@ -1,6 +1,3 @@
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
-#See processMeerKAT.py for license details.
-
 from __future__ import print_function
 
 import sys
@@ -17,7 +14,13 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
-        minbaselines, standard):
+        minbaselines, standard, do_clearcal=False):
+
+    for ff in calfiles:
+        if os.path.exists(ff):
+            shutil.rmtree(ff)
+
+    xyfield = bookkeeping.get_xy_field(visname)
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
@@ -49,6 +52,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     dtempfile   = os.path.join(caldir, base+'.dtempcal')
     xy0ambpfile = os.path.join(caldir, base+'.xyambcal')
     xy0pfile    = os.path.join(caldir, base+'.xycal')
+    xpfile      = os.path.join(caldir, base+'.xfcal')
 
     # Delete output from any previous calibration run
     if os.path.exists(gain1file):
@@ -63,7 +67,6 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     if os.path.exists(xy0pfile):
         shutil.rmtree(xy0pfile)
 
-    # TODO: Look into deleting this first call
     logger.info(" starting gaincal -> %s" % gain1file)
     gaincal(vis=visname, caltable=gain1file, field=fields.fluxfield,
             refant=referenceant, solint='10min', minblperant=minbaselines,
@@ -89,6 +92,19 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     GainQU = qufromgain(gain1file)
     logger.info(GainQU[int(fields.dpolfield)])
 
+
+    # if xyfield is not the secondary, run a round of gain calibration on xyfield
+    if xyfield != fields.secondaryfield:
+        gaincal(vis=visname, caltable=gain1file, field=xyfield,
+                refant=referenceant, solint='10min',
+                minblperant=minbaselines, solnorm=False, gaintype='G',
+                gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
+                    calfiles.xdelfile],
+                gainfield = [fields.kcorrfield, fields.bpassfield,
+                    fields.xdelfield],
+                append=True, parang=True)
+
+
     logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
     gaincal(vis=visname, caltable = xy0ambpfile, field = fields.dpolfield,
             refant = referenceant, solint = 'inf', combine = 'scan',
@@ -97,12 +113,22 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gaintable = [calfiles.kcorrfile,calfiles.bpassfile,
                 gain1file, calfiles.xdelfile],
             gainfield = [fields.kcorrfield, fields.bpassfield,
-                fields.secondaryfield, fields.xdelfield],
+                xyfield, fields.xdelfield],
             append = False)
     bookkeeping.check_file(xy0ambpfile)
 
+    #logger.info("starting \'Xf+QU\' polcal -> %s"  % calfiles.dpolfile)
+    #polcal(vis=visname, caltable = xy0pfile, field = xyfield,
+    #        refant = '', solint = 'inf', combine = 'scan',
+    #        poltype = 'Xf', smodel = smodel, preavg= 200.0,
+    #        gaintable = [calfiles.kcorrfile,calfiles.bpassfile,
+    #            gain1file, calfiles.xdelfile],
+    #        gainfield = [fields.kcorrfield, fields.bpassfield,
+    #            xyfield, fields.xdelfield],
+    #       append = False)
+
     logger.info("\n Check for x-y phase ambiguity.")
-    xyamb(xytab=xy0ambpfile, qu=GainQU[int(fields.dpolfield)], xyout = xy0pfile)
+    S = xyamb(xytab=xy0ambpfile, qu=GainQU[int(fields.dpolfield)], xyout = xy0pfile)
 
     S = [1.0, GainQU[int(fields.dpolfield)][0],
             GainQU[int(fields.dpolfield)][1], 0.0]
@@ -121,6 +147,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             parang = True, append = False)
     bookkeeping.check_file(calfiles.gainfile)
 
+
     logger.info("\n solution for secondary with parang = true")
     gaincal(vis=visname, caltable = calfiles.gainfile,
             field = fields.secondaryfield, refant = referenceant,
@@ -134,15 +161,28 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             parang = True, append = True)
     bookkeeping.check_file(calfiles.gainfile)
 
-    logger.info("\n now re-solve for Q,U from the new gainfile\n -> %s" \
-                                                        % calfiles.gainfile)
+
+    # if xyfield is not the secondary, run a round of gain calibration on xyfield
+    if xyfield != fields.secondaryfield:
+        gaincal(vis=visname, caltable=calfiles.gainfile, field=xyfield,
+                refant=referenceant, solint='10min',
+                minblperant=minbaselines, solnorm=False, gaintype='G',
+                gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
+                    calfiles.xdelfile],
+                gainfield = [fields.kcorrfield, fields.bpassfield,
+                    fields.xdelfield],
+            append=True, parang=True)
+        bookkeeping.check_file(calfiles.gainfile)
+
+    logger.info("\n now re-solve for Q,U from the new gainfile\n -> %s" % calfiles.gainfile)
+
     Gain2QU = qufromgain(calfiles.gainfile)
     logger.info(Gain2QU[int(fields.dpolfield)])
 
-    logger.info("starting \'Dflls\' polcal -> %s"  % calfiles.dpolfile)
+    logger.info("starting \'D+QU\' polcal -> %s"  % calfiles.dpolfile)
     polcal(vis=visname, caltable = dtempfile, field = fields.dpolfield,
             refant = '', solint = 'inf', combine = 'scan',
-            poltype = 'Dflls', smodel = S, preavg= 200.0,
+            poltype = 'D+QU', smodel = S, preavg= 200.0,
             gaintable = [calfiles.kcorrfile,calfiles.bpassfile,
                 calfiles.gainfile, calfiles.xdelfile, xy0pfile],
            gainfield = [fields.kcorrfield, fields.bpassfield,
@@ -151,6 +191,79 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     bookkeeping.check_file(dtempfile)
 
     Dgen(dtab=dtempfile, dout=calfiles.dpolfile)
+
+    ## Redo X-Y and gaincal solutions, applying leakage
+    if os.path.exists(xy0ambpfile):
+        shutil.rmtree(xy0ambpfile)
+
+    if os.path.exists(xy0pfile):
+        shutil.rmtree(xy0pfile)
+
+
+    gaincal(vis=visname, caltable = calfiles.gainfile, field = fields.fluxfield,
+            refant = referenceant, solint = '10min', solnorm = False,
+            gaintype = 'G', minblperant = minbaselines, combine = '',
+            minsnr = 3, calmode = 'ap',
+            gaintable = [calfiles.kcorrfile, calfiles.bpassfile,
+                calfiles.xdelfile, calfiles.dpolfile],
+            gainfield = [fields.kcorrfield,fields.bpassfield,fields.xdelfield,
+                fields.dpolfield],
+            parang = True, append = False)
+    bookkeeping.check_file(calfiles.gainfile)
+
+
+    logger.info("\n solution for secondary with parang = true")
+    gaincal(vis=visname, caltable = calfiles.gainfile,
+            field = fields.secondaryfield, refant = referenceant,
+            solint = '10min', solnorm = False,
+            gaintype = 'G', minblperant = minbaselines,
+            combine = '', smodel = S, minsnr = 3,
+            gaintable = [calfiles.kcorrfile, calfiles.bpassfile,
+                calfiles.xdelfile, calfiles.dpolfile],
+            gainfield = [fields.kcorrfield, fields.bpassfield,
+                fields.xdelfield, fields.dpolfield],
+            parang = True, append = True)
+    bookkeeping.check_file(calfiles.gainfile)
+
+    # if xyfield is not the secondary, run a round of gain calibration on xyfield
+    if xyfield != fields.secondaryfield:
+        gaincal(vis=visname, caltable=calfiles.gainfile, field=xyfield,
+                refant=referenceant, solint='10min',
+                minblperant=minbaselines, solnorm=False, gaintype='G',
+                gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
+                    calfiles.xdelfile],
+                gainfield = [fields.kcorrfield, fields.bpassfield,
+                    fields.xdelfield],
+            append=True, parang=True)
+        bookkeeping.check_file(calfiles.gainfile)
+
+    logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
+    gaincal(vis=visname, caltable = xy0ambpfile, field = fields.dpolfield,
+            refant = referenceant, solint = 'inf', combine = 'scan',
+            gaintype = 'XYf+QU', minblperant = minbaselines,
+            smodel = [1.,0.,1.,0.], preavg = 200.0,
+            gaintable = [calfiles.kcorrfile,calfiles.bpassfile,
+                calfiles.gainfile, calfiles.xdelfile, calfiles.dpolfile],
+            gainfield = [fields.kcorrfield, fields.bpassfield,
+                fields.secondaryfield, fields.xdelfield, fields.dpolfield],
+            append = False)
+    bookkeeping.check_file(xy0ambpfile)
+
+    logger.info("\n Check for x-y phase ambiguity.")
+    S = xyamb(xytab=xy0ambpfile, qu=GainQU[int(fields.dpolfield)], xyout = xy0pfile)
+
+    logger.info("starting \'Xf\' polcal -> %s"  % calfiles.dpolfile)
+    polcal(vis=visname, caltable = xpfile, field = xyfield,
+            refant = '', solint = 'inf', combine = 'scan',
+            poltype = 'Xf', preavg= 200.0,
+            gaintable = [calfiles.kcorrfile,calfiles.bpassfile,
+                calfiles.gainfile, calfiles.xdelfile, calfiles.dpolfile,
+                xy0pfile],
+            gainfield = [fields.kcorrfield, fields.bpassfield,
+                fields.secondaryfield, fields.xdelfield, fields.dpolfield,
+                fields.dpolfield],
+           append = False)
+    bookkeeping.check_file(xpfile)
 
     # Only run fluxscale if bootstrapping
     if len(fields.gainfields) > 1:
@@ -180,4 +293,4 @@ if __name__ == '__main__':
     standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
 
     do_cross_cal(visname, fields, calfiles, refant, caldir,
-            minbaselines, standard)
+            minbaselines, standard, do_clearcal=True)
