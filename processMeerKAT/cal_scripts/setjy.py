@@ -1,5 +1,5 @@
-# Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
-# See processMeerKAT.py for license details.
+#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
 
 from __future__ import print_function
 
@@ -9,14 +9,10 @@ import config_parser
 from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 import numpy as np
-
 import logging
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO
-)
-
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def get_y_value_from_linear_fit(xInput, xDataList, yDataList):
     """
@@ -52,19 +48,9 @@ def do_setjy(visname, spw, fields, standard):
         logger.info("Spix: %s", spix)
         logger.info("Ref freq %s", reffreq)
 
-        setjy(
-            vis=visname,
-            field=setjyname,
-            scalebychan=True,
-            standard="manual",
-            fluxdensity=smodel,
-            spix=spix,
-            reffreq=reffreq,
-        )
+        setjy(vis=visname,field=setjyname,scalebychan=True,standard="manual",fluxdensity=smodel,spix=spix,reffreq=reffreq)
     else:
-        setjy(
-            vis=visname, field=setjyname, spw=spw, scalebychan=True, standard=standard
-        )
+        setjy(vis=visname, field=setjyname, spw=spw, scalebychan=True, standard=standard)
 
     fieldnames = msmd.fieldnames()
 
@@ -83,14 +69,11 @@ def do_setjy(visname, spw, fields, standard):
         logger.info("Predicted polindex at frequecny %s: %s", spwMeanFreq, polindex)
         # position angle of polarized intensity
         polPositionAngleList = [33, 33, 33, 33]
-        polangle = get_y_value_from_linear_fit(
-            spwMeanFreq, freqList, polPositionAngleList
-        )
+        polangle = get_y_value_from_linear_fit(spwMeanFreq, freqList, polPositionAngleList)
         logger.info("Predicted pol angle at frequecny %s: %s", spwMeanFreq, polangle)
 
         logger.info("Ref freq %s", reffreq)
-        setjy(
-            vis=visname,
+        setjy(vis=visname,
             field=setjyname,
             scalebychan=True,
             standard="manual",
@@ -99,8 +82,7 @@ def do_setjy(visname, spw, fields, standard):
             reffreq="1.45GHz",
             polindex=[polindex],
             polangle=[polangle],
-            rotmeas=7.0,
-        )
+            rotmeas=7.0)
 
     # calibrator names
     calibrator_3C138 = set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames))
@@ -124,8 +106,7 @@ def do_setjy(visname, spw, fields, standard):
 
         reffreq = "1.45GHz"
         logger.info("Ref freq %s", reffreq)
-        setjy(
-            vis=visname,
+        setjy(vis=visname,
             field=setjyname,
             scalebychan=True,
             standard="manual",
@@ -134,10 +115,8 @@ def do_setjy(visname, spw, fields, standard):
             reffreq=reffreq,
             polindex=[polindex],
             polangle=[polangle],
-            rotmeas=7.0,
-        )
+            rotmeas=7.0)
 
-    msmd.close()
     msmd.done()
 
 
@@ -157,6 +136,6 @@ if __name__ == "__main__":
     fields = bookkeeping.get_field_ids(taskvals["fields"])
 
     spw = va(taskvals, "crosscal", "spw", str, default="")
-    standard = va(taskvals, "crosscal", "standard", str, default="Perley-Butler 2010")
+    standard = va(taskvals, "crosscal", "standard", str, default="Stevens-Reynolds 2016")
 
     do_setjy(visname, spw, fields, standard)

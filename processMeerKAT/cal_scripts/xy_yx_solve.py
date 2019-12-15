@@ -1,3 +1,6 @@
+#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
+
 from __future__ import print_function
 
 import sys
@@ -14,11 +17,11 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
-        minbaselines, standard, do_clearcal=False):
+        minbaselines, standard):
 
-    for ff in calfiles:
-        if os.path.exists(ff):
-            shutil.rmtree(ff)
+    if os.path.isdir(caldir):
+        shutil.move(caldir,caldir+'1')
+        os.makedirs(caldir)
 
     xyfield = bookkeeping.get_xy_field(visname)
 
@@ -293,4 +296,4 @@ if __name__ == '__main__':
     standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
 
     do_cross_cal(visname, fields, calfiles, refant, caldir,
-            minbaselines, standard, do_clearcal=True)
+            minbaselines, standard)

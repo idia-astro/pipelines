@@ -17,8 +17,6 @@ def do_partition(visname, spw):
     filebase = os.path.split(basename)[1]
 
     mvis = '{0}.{1}.mms'.format(filebase,spw.replace('0:',''))
-
-    #mvis = os.path.split(visname.replace('.ms', '.mms'))[1]
     msmd.open(visname)
     nscan = msmd.nscans()
     msmd.done()

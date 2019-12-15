@@ -28,6 +28,7 @@ mpi_wrapper = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicas
 name = ''
 dependencies = ''
 account = 'b03-idia-ag'
+reservation = ''
 verbose = False
 scripts = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
@@ -41,4 +42,14 @@ scripts = [ ('validate_input.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,'')]
+            ('plot_solutions.py',False,''),
+            ('concat.py',False,'')]
+
+[data]
+vis = ''
+
+[fields]
+bpassfield = ''
+fluxfield = ''
+phasecalfield = ''
+targetfields = ''

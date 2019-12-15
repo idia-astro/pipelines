@@ -16,24 +16,34 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def sortbySPW(visname):
     return float(visname.split('~')[0])
 
+def check_output(fname,pattern,out,job='concat',filetype='image'):
+
+    files = glob.glob(pattern)
+    if os.path.exists(out):
+        logger.info('Output file "{0}" already exists. Skipping {1}.'.format(out,job))
+        return None
+    elif len(files) == 0:
+        logger.warn("Didn't find any {0}s with '{1}'".format(filetype,pattern))
+        return None
+    elif len(files) == 1:
+        logger.warn("Only found 1 {0} with '{1}'. Will copy to this directory.".format(filetype,pattern))
+        copytree(files[0], out)
+        return None
+    return files
+
 def do_concat(visname, fields):
 
-    basename = os.path.split(visname)[-1].replace('.ms','')
+    basename, ext = os.path.splitext(visname)
+    filebase = os.path.split(basename)[1]
     msmd.open(visname)
     for target in fields.targetfield.split(','):
         fname = msmd.namesforfields(int(target))[0]
 
         #Concat images (into continuum cube)
-        images = glob.glob('*/images/*{0}*image'.format(fname))
-        out = '{0}.{1}.cube'.format(basename,fname)
-        if os.path.exists(out):
-            logger.info('Output file "{0}" already exists. Skipping imageconcat.'.format(out))
-        elif len(images) == 0:
-            logger.warn("Didn't find any images with '*/images/*{0}*image'".format(fname))
-        elif len(images) == 1:
-            logger.warn("Only found 1 images with '*/images/*{0}*image'. Will copy to this directory.".format(fname))
-            copytree(images[0], out)
-        else:
+        pattern = '*/images/*{0}*image'.format(fname)
+        out = '{0}.{1}.cube'.format(filebase,fname)
+        images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
+        if images is not None:
             images.sort(key=sortbySPW)
             ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
 
@@ -44,21 +54,26 @@ def do_concat(visname, fields):
             logger.error("Output image '{0}' not written.".format(out))
 
         #Concat MSs
-        MSs = glob.glob('*/*{0}*.ms'.format(fname))
-        out = '{0}.{1}.ms'.format(basename,fname)
-        if os.path.exists(out):
-            logger.info('Output file "{0}" already exists. Skipping concat.'.format(out))
-        elif len(MSs) == 0:
-            logger.warn("Didn't find any MSs with '*/*{0}*.ms'".format(fname))
-        elif len(MSs) == 1:
-            logger.warn("Only found 1 MS with '*/*{0}*.ms'. Will copy to this directory.".format(fname))
-            copytree(MSs[0], out)
-        else:
+        pattern = '*/*{0}*.ms'.format(fname)
+        out = '{0}.{1}.ms'.format(filebase,fname)
+        MSs = check_output(fname,pattern,out,job='concat',filetype='MS')
+        if MSs is not None:
             MSs.sort(key=sortbySPW)
             concat(vis=MSs, concatvis=out)
 
         if not os.path.exists(out):
             logger.error("Output MS '{0}' not written.".format(out))
+
+        #Concat MMSs
+        pattern = '*/*{0}*.mms'.format(fname)
+        out = '{0}.{1}.mms'.format(filebase,fname)
+        MMSs = check_output(fname,pattern,out,job='virtualconcat',filetype='MMS')
+        if MMSs is not None:
+            MMSs.sort(key=sortbySPW)
+            virtualconcat(vis=MMSs, concatvis=out)
+
+        if not os.path.exists(out):
+            logger.error("Output MMS '{0}' not written.".format(out))
 
     msmd.done()
 

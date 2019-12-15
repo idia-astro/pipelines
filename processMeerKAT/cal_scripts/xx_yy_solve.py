@@ -17,6 +17,10 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard):
 
+    if os.path.isdir(caldir):
+        shutil.move(caldir,caldir+'1')
+        os.makedirs(caldir)
+        
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile, field
             = fields.kcorrfield, refant = referenceant,
@@ -64,8 +68,8 @@ if __name__ == '__main__':
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     minbaselines = va(taskvals, 'crosscal', 'minbaselines', int, default=4)
-    standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
-    refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
+    standard = va(taskvals, 'crosscal', 'standard', str, default='Stevens-Reynolds 2016')
+    refant = va(taskvals, 'crosscal', 'refant', str, default='m059')
 
     do_parallel_cal(visname, fields, calfiles, refant, caldir,
             minbaselines, standard)
