@@ -522,6 +522,7 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,p
     else:
         master.write('echo Submitted the following jobIDs over all SPWs: $IDs\n\n')
 
+    prefix = ''
     #Write bash job scripts for the jobs run in this top level directory
     if partition or concatenating:
         prefix = 'allSPW_'
