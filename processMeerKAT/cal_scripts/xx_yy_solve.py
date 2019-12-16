@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import sys
 import os
+import shutil
 
 import config_parser
 from cal_scripts import bookkeeping
@@ -20,7 +21,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
     if os.path.isdir(caldir):
         shutil.move(caldir,caldir+'1')
         os.makedirs(caldir)
-        
+
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile, field
             = fields.kcorrfield, refant = referenceant,
