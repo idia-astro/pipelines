@@ -185,6 +185,7 @@ def parse_args():
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
     parser.add_argument("-q","--quiet", action="store_true", required=False, default=False, help="Activate quiet mode, with suppressed output [default: False].")
+    parser.add_argument("--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
     run_args = parser.add_mutually_exclusive_group(required=True)
@@ -207,6 +208,22 @@ def parse_args():
     #if user inputs a list a scripts, remove the default list
     if len(args.scripts) > len(SCRIPTS):
         [args.scripts.pop(0) for i in range(len(SCRIPTS))]
+
+    # If --dopol is passed in, replace second call of xx_yy* with xy_yx*
+    print(args.dopol)
+    if args.dopol:
+        count = 0
+        for ind, ss in enumerate(SCRIPTS):
+            print(ind, ss, count)
+            if ss[0] == 'xx_yy_solve.py' or ss[0] == 'xx_yy_apply.py':
+                count += 1
+
+            if count > 2:
+                if ss[0] == 'xx_yy_solve.py':
+                    SCRIPTS[ind] = ('xy_yx_solve.py', False, '')
+                if ss[0] == 'xx_yy_apply.py':
+                    SCRIPTS[ind] = ('xy_yx_apply.py', True, '')
+
 
     #validate arguments before returning them
     validate_args(vars(args),args.config,parser=parser)
