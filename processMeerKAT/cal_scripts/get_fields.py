@@ -194,6 +194,36 @@ def check_scans(MS,nodes,tasks):
     return threads
 
 
+def get_xy_field(visname):
+    """
+    From the input MS determine which field should
+    be used for XY-phase calibration (if required).
+
+    In the following order :
+    3C286
+    3C138
+    secondaryfield (nominally dpolfield)
+    """
+
+    msmd.open(visname)
+    fields = msmd.fieldnames()
+    msmd.close()
+
+    # Use 3C286 or 3C138 if present in the data
+    calibrator_3C286 = set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fields))
+    calibrator_3C138 = set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fields))
+
+    if calibrator_3C286:
+        xyfield = list(calibrator_3C286)[0]
+    elif calibrator_3C138:
+        xyfield = list(calibrator_3C138)[0]
+    else:
+        xyfield = fields.dpolfield
+
+    return xyfield
+
+
+
 def main():
 
     args = processMeerKAT.parse_args()

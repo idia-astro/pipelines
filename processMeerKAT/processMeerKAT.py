@@ -210,11 +210,9 @@ def parse_args():
         [args.scripts.pop(0) for i in range(len(SCRIPTS))]
 
     # If --dopol is passed in, replace second call of xx_yy* with xy_yx*
-    print(args.dopol)
     if args.dopol:
         count = 0
         for ind, ss in enumerate(SCRIPTS):
-            print(ind, ss, count)
             if ss[0] == 'xx_yy_solve.py' or ss[0] == 'xx_yy_apply.py':
                 count += 1
 
