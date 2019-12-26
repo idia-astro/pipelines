@@ -54,9 +54,15 @@ def do_setjy(visname, spw, fields, standard):
 
     fieldnames = msmd.fieldnames()
 
-    # calibrator names
-    calibrator_3C286 = set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames))
-    if calibrator_3C286:
+
+    # Check if 3C286 exists in the data
+    is3C286 = True
+    try:
+        calibrator_3C286 = list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))
+    except IndexError:
+        is3C286 = False
+
+    if is3C286:
         logger.info("Detected calibrator name(s):  %s", ", ".join(calibrator_3C286))
         logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
         logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
@@ -72,6 +78,7 @@ def do_setjy(visname, spw, fields, standard):
         polangle = get_y_value_from_linear_fit(spwMeanFreq, freqList, polPositionAngleList)
         logger.info("Predicted pol angle at frequecny %s: %s", spwMeanFreq, polangle)
 
+        reffreq = "1.45GHz"
         logger.info("Ref freq %s", reffreq)
         setjy(vis=visname,
             field=setjyname,
@@ -79,14 +86,20 @@ def do_setjy(visname, spw, fields, standard):
             standard="manual",
             fluxdensity=[14.6, 0.0, 0.0, 0.0],
             spix=-0.52, # between 1465MHz and 1565MHz
-            reffreq="1.45GHz",
+            reffreq=reffreq,
             polindex=[polindex],
             polangle=[polangle],
             rotmeas=7.0)
 
-    # calibrator names
-    calibrator_3C138 = set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames))
-    if calibrator_3C138:
+
+    # Check if 3C138 exists in the data
+    is3C138 = True
+    try:
+        calibrator_3C138 = set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames))
+    except IndexError:
+        is3C138 = False
+
+    if is3C138:
         logger.info("Detected calibrator name(s):  %s", ", ".join(calibrator_3C138))
         logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
         logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")

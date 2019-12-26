@@ -8,7 +8,7 @@ import os
 import shutil
 
 import config_parser
-from cal_scripts import bookkeeping
+from cal_scripts import bookkeeping, get_fields
 from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 
@@ -27,11 +27,10 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     dtempfile   = os.path.join(caldir, base+'.dtempcal')
     xy0ambpfile = os.path.join(caldir, base+'.xyambcal')
     xy0pfile    = os.path.join(caldir, base+'.xycal')
-    xpfile      = os.path.join(caldir, base+'.xfcal')
     calfiles = calfiles._replace(xpolfile=xy0pfile)
     fields = fields._replace(xpolfield=fields.dpolfield)
 
-    xyfield = bookkeeping.get_xy_field(visname)
+    xyfield = get_fields.get_xy_field(visname)
 
     if len(fields.gainfields) > 1:
         fluxfile = calfiles.fluxfile
@@ -60,19 +59,19 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     applycal(vis=visname, field = fields.fluxfield,
             selectdata = False, calwt = False, gaintable = [calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile, calfiles.dpolfile,
-                calfiles.xdelfile, calfiles.xpolfile, xpfile],
+                calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield,fields.bpassfield, fields.fluxfield,
-            fields.dpolfield,fields.xdelfield, fields.xpolfield, xyfield],
+            fields.dpolfield,fields.xdelfield, fields.xpolfield],
         parang = True)
 
 
-    print " applying calibrations: polarization calibrator"
+    logger.info(" applying calibrations: polarization calibrator")
     applycal(vis=visname, field = xyfield,
             selectdata = False, calwt = True, gaintable = [calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile, calfiles.dpolfile,
-                calfiles.xdelfile, calfiles.xpolfile, xpfile],
+                calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield,fields.bpassfield,xyfield,
-            fields.dpolfield,fields.xdelfield,fields.xpolfield, xyfield],
+            fields.dpolfield,fields.xdelfield,fields.xpolfield],
         parang= True)
 
 
@@ -80,20 +79,20 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     applycal(vis=visname, field = fields.secondaryfield,
             selectdata = False, calwt = False,
         gaintable = [calfiles.kcorrfile, calfiles.bpassfile, fluxfile,
-            calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile, xpfile],
+            calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield, fields.bpassfield,
             fields.secondaryfield, fields.dpolfield, fields.xdelfield,
-            fields.xpolfield, xyfield],
+            fields.xpolfield],
         parang= True)
 
     logger.info(" applying calibrations: target fields")
     applycal(vis=visname, field = fields.targetfield,
             selectdata = False, calwt = False, gaintable = [calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile, calfiles.dpolfile,
-                calfiles.xdelfile, calfiles.xpolfile, xpfile],
+                calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield, fields.bpassfield,
             fields.secondaryfield, fields.dpolfield, fields.xdelfield,
-            fields.xpolfield, xyfield],
+            fields.xpolfield],
         parang= True)
 
 
