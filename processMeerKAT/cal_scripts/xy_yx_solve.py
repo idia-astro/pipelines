@@ -23,7 +23,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
         shutil.move(caldir,caldir+'1')
         os.makedirs(caldir)
 
-    xyfield = get_fields.get_xy_field(visname)
+    xyfield = get_fields.get_xy_field(visname, fields)
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile,
