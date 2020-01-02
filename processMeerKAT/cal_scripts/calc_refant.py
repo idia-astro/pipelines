@@ -23,9 +23,8 @@ def get_ref_ant(visname, fluxfield):
     antennas = msmd.antennasforscan(fluxscans[0])
     msmd.done()
 
-    header = '{0: <3} {1: <4} {2: <4}'.format('ant','median','rms')
+    header = '{0: <3} {1: <4}'.format('ant', 'flags')
     logger.info("Antenna statistics on total flux calibrator")
-    logger.info("(flux in Jy averaged over scans & channels, and over all of each antenna's baselines)")
     logger.info(header)
 
     tb.open(visname)
@@ -33,60 +32,28 @@ def get_ref_ant(visname, fluxfield):
     fptr = open('ant_stats.txt', 'w')
     fptr.write(header)
 
-    antamp=[]; antrms = []
+    antflags = []
     for ant in antennas:
-        antdat = tb.query('ANTENNA1==%d AND FIELD_ID==%d' % (ant, int(fluxfield))).getcol('DATA')
-        antdat = np.abs(antdat)
+        antdat = tb.query('ANTENNA1==%d AND FIELD_ID==%d' % (ant, int(fluxfield))).getcol('FLAG')
 
-        amp = np.median(antdat)
-        rms = np.std(antdat)
+        flags = np.count_nonzero(antdat)/float(antdat.size)
 
-        fptr.write('\n{0: <3} {1:.2f}   {2:.2f}'.format(ant, amp, rms))
-        antamp.append(amp)
-        antrms.append(rms)
+        fptr.write('\n{0: <3} {1:.4f}'.format(ant, flags))
+        antflags.append(flags)
 
     tb.close()
     tb.done()
     fptr.close()
 
-    antamp = np.array(antamp)
-    antrms = np.array(antrms)
-
-    medamp = np.median(antamp)
-    medrms = np.median(antrms)
-
-    #iqramp = iqr(antamp)
-    #iqrrms = iqr(antrms)
-    lowamp = np.percentile(antamp, 5)
-    highamp = np.percentile(antamp, 95)
-
-    lowrms = np.percentile(antrms, 5)
-    highrms = np.percentile(antrms, 95)
-
-    logger.info('{0: <3} {1:.2f}  {2:.2f}'.format('All',medamp,medrms))
-
-    goodrms=[]; goodamp=[]; goodant=[]
     badants = []
-    for ii in range(len(antamp)):
-        cond1 = antamp[ii] > lowamp
-        cond1 = cond1 & (antamp[ii] < highamp)
+    for idx, ant in enumerate(antflags):
+        if ant > 0.8:
+            badants.append(antennas[idx])
+            
+    refidx = np.argmin(antflags)
 
-        cond2 = antrms[ii] > lowrms
-        cond2 = cond1 & (antrms[ii] < highrms)
-
-        if cond1 and cond2:
-            goodant.append(antennas[ii])
-            goodamp.append(antamp[ii])
-            goodrms.append(antrms[ii])
-        else:
-            badants.append(antennas[ii])
-
-    goodrms = np.array(goodrms)
-    jj = np.argmin(goodrms)
-
-    logger.info('{0: <3} {1:.2f}  {2:.2f} (best antenna)'.format(goodant[jj], goodamp[jj], goodrms[jj]))
-    logger.info('{0: <3} {1:.2f}  {2:.2f} (1st good antenna)'.format(goodant[0], goodamp[0], goodrms[0]))
-    referenceant = str(goodant[jj])
+    logger.info('{0: <3} {1:.2f} (best antenna)'.format(antennas[refidx], antflags[refidx]))
+    referenceant = str(antennas[refidx])
     logger.info("setting reference antenna to: %s" % referenceant)
 
     logger.info("Bad antennas: {0}".format(badants))
@@ -104,7 +71,8 @@ def main():
     visname = va(taskvals, 'data', 'vis', str)
 
     fields = bookkeeping.get_field_ids(taskvals['fields'])
-    calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool, default=False)
+    calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
+
 
     # Calculate reference antenna
     if calcrefant:
