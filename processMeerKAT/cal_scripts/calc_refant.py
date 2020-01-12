@@ -31,10 +31,17 @@ def get_ref_ant(visname, fluxfield):
 
     fptr = open('ant_stats.txt', 'w')
     fptr.write(header)
+    fptr.write("\n")
 
     antflags = []
     for ant in antennas:
         antdat = tb.query('ANTENNA1==%d AND FIELD_ID==%d' % (ant, int(fluxfield))).getcol('FLAG')
+
+        if antdat.size == 0:
+            flags = 1
+            fptr.write('{0: <3} {1:.4f}\n'.format(ant, np.nan))
+            antflags.append(flags)
+            continue
 
         flags = np.count_nonzero(antdat)/float(antdat.size)
 
