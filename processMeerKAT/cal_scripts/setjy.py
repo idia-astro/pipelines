@@ -71,8 +71,8 @@ def do_setjy(visname, spw, fields, standard):
         logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
         logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
         # central freq of spw
-        spwMeanFreq = msmd.meanfreq(0)
-        freqList = np.array([1.05, 1.45, 1.64, 1.95]) * 1e9
+        spwMeanFreq = msmd.meanfreq(0, unit='GHz')
+        freqList = np.array([1.05, 1.45, 1.64, 1.95])
         # fractional linear polarisation
         fracPolList = [0.086, 0.095, 0.099, 0.101]
         polindex = linfit(spwMeanFreq, freqList, fracPolList)
@@ -88,12 +88,12 @@ def do_setjy(visname, spw, fields, standard):
             field=id3C286,
             scalebychan=True,
             standard="manual",
-            fluxdensity=[14.6, 0.0, 0.0, 0.0],
-            spix=-0.52, # between 1465MHz and 1565MHz
+            fluxdensity=[-14.6, 0.0, 0.0, 0.0],
+            #spix=-0.52, # between 1465MHz and 1565MHz
             reffreq=reffreq,
             polindex=[polindex],
             polangle=[polangle],
-            rotmeas=7.0)
+            rotmeas=0)
 
 
     # Check if 3C138 exists in the data
@@ -112,8 +112,8 @@ def do_setjy(visname, spw, fields, standard):
         logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
         logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
         # central freq of spw
-        spwMeanFreq = msmd.meanfreq(0)
-        freqList = np.array([1.05, 1.45, 1.64, 1.95]) * 1e9
+        spwMeanFreq = msmd.meanfreq(0, unit='GHz')
+        freqList = np.array([1.05, 1.45, 1.64, 1.95])
         # fractional linear polarisation
         fracPolList = [0.056, 0.075, 0.084, 0.09]
         polindex = linfit(spwMeanFreq, freqList, fracPolList)
@@ -129,12 +129,12 @@ def do_setjy(visname, spw, fields, standard):
             field=id3C138,
             scalebychan=True,
             standard="manual",
-            fluxdensity=[8.26, 0.0, 0.0, 0.0],
-            spix=-0.57,  # between 1465MHz and 1565MHz
+            fluxdensity=[-8.26, 0.0, 0.0, 0.0],
+            #spix=-0.57,  # between 1465MHz and 1565MHz
             reffreq=reffreq,
             polindex=[polindex],
             polangle=[polangle],
-            rotmeas=7.0)
+            rotmeas=0)
 
     msmd.done()
 
