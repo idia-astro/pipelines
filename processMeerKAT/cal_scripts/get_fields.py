@@ -140,7 +140,10 @@ def check_refant(MS,refant,config,warn=True):
         Warn the user? If False, raise ValueError."""
 
     msmd.open(MS)
-    ants = msmd.antennanames()
+    if type(refant) is str:
+        ants = msmd.antennanames()
+    else:
+        ants = msmd.antennaids()
 
     if refant not in ants:
         err = "Reference antenna '{0}' isn't present in input dataset '{1}'. Antennas present are: {2}. Try 'm052' or 'm005' if present.".format(refant,MS,ants)
@@ -149,7 +152,9 @@ def check_refant(MS,refant,config,warn=True):
         else:
             raise ValueError(err)
     else:
-        logger.info("Choosing reference antenna '{0}', which is usually a well-behaved (stable) antenna. Update 'refant' in [crosscal] section of '{1}' to change this.".format(refant,config))
+        logger.info("Using reference antenna '{0}'.".format(refant))
+        if refant == 'm059':
+            logger.info("This is usually a well-behaved (stable) antenna. Update 'refant' in [crosscal] section of '{0}' to change this.".format(config))
 
 def check_scans(MS,nodes,tasks):
 

@@ -89,14 +89,14 @@ def check_path(path,update=False):
 
     #Attempt to find path in pipeline directories and bash path first
     if not os.path.exists(path) and path != '':
-        if os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
-            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)
-        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)):
-            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)
-        elif os.path.exists('../{0}'.format(path)):
+        if os.path.exists('../{0}'.format(path)):
             newpath = '../{0}'.format(path)
         elif os.path.exists(check_bash_path(path)):
             newpath = check_bash_path(path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)
         else:
             #If it still doesn't exist, throw error
             raise IOError('File "{0}" not found.'.format(path))
@@ -359,7 +359,6 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         SPWs="%s"
         arr=($SPWs)
         cd ${arr[SLURM_ARRAY_TASK_ID]}
-        cp default_config.txt .config.tmp
 
         """ % SPWs.replace(',',' ').replace('0:','')
 
