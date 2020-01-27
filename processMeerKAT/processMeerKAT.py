@@ -826,6 +826,8 @@ def default_config(arg_dict):
         mpi_wrapper = 'srun --qos qos-interactive --nodes=1 --ntasks=1 --time=10 --mem=4GB --partition={0}'.format(arg_dict['partition'])
         if arg_dict['exclude'] != '':
             mpi_wrapper += ' --exclude={0}'.format(arg_dict['exclude'])
+        if arg_dict['reservation'] != '':
+            mpi_wrapper += ' --reservation={0}'.format(arg_dict['reservation'])
 
     #Write and submit srun command to extract fields, and insert them into config file under section [fields]
     params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)

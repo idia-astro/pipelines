@@ -2,6 +2,7 @@
 #See processMeerKAT.py for license details.
 
 import os
+import sys
 import glob
 from shutil import copytree
 
@@ -33,6 +34,7 @@ def check_output(fname,pattern,out,job='concat',filetype='image'):
 
 def do_concat(visname, fields):
 
+    logger.info('Beginning {0}.'.format(sys.argv[0]))
     basename, ext = os.path.splitext(visname)
     filebase = os.path.split(basename)[1]
     msmd.open(visname)
@@ -45,6 +47,8 @@ def do_concat(visname, fields):
         images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
         if images is not None:
             images.sort(key=sortbySPW)
+            logger.info('Creating continuum cube with following command:')
+            logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
             ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
 
         if os.path.exists(out):
@@ -59,6 +63,8 @@ def do_concat(visname, fields):
         MSs = check_output(fname,pattern,out,job='concat',filetype='MS')
         if MSs is not None:
             MSs.sort(key=sortbySPW)
+            logger.info('Concatenating MSs with following command:')
+            logger.info('concat(vis={0}, concatvis={1})'.format(MSs,out))
             concat(vis=MSs, concatvis=out)
 
         if not os.path.exists(out):
@@ -70,12 +76,15 @@ def do_concat(visname, fields):
         MMSs = check_output(fname,pattern,out,job='virtualconcat',filetype='MMS')
         if MMSs is not None:
             MMSs.sort(key=sortbySPW)
+            logger.info('Concatenating MMSs with following command:')
+            logger.info('virtualconcat(vis={0}, concatvis={1})'.format(MMSs,out))
             virtualconcat(vis=MMSs, concatvis=out)
 
         if not os.path.exists(out):
             logger.error("Output MMS '{0}' not written.".format(out))
 
     msmd.done()
+    logger.info('Completed {0}.'.format(sys.argv[0]))
 
 if __name__ == '__main__':
     # Get the name of the config file
