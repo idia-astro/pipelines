@@ -20,7 +20,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard):
 
     if os.path.isdir(caldir):
-        shutil.move(caldir,caldir+'1')
+        os.rename(caldir,caldir+'_old')
         os.makedirs(caldir)
 
     xyfield = get_fields.get_xy_field(visname, fields)

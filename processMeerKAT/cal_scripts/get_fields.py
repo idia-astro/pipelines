@@ -181,8 +181,9 @@ def check_scans(MS,nodes,tasks):
     if abs(nodes * tasks - limit) > 0.1*limit:
         logger.warn('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
 
-        #Start with one node, and increase count of nodes (and then tasks per node) until limit reached
+        #Start with eight tasks on one node, and increase count of nodes (and then tasks per node) until limit reached
         nodes = 1
+        tasks = 8
         while nodes * tasks < limit:
             if nodes < processMeerKAT.TOTAL_NODES_LIMIT:
                 nodes += 1

@@ -19,7 +19,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard):
 
     if os.path.isdir(caldir):
-        shutil.move(caldir,caldir+'1')
+        os.rename(caldir,caldir+'_old')
         os.makedirs(caldir)
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)

@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 #Set global limits for current ilifu cluster configuration
 TOTAL_NODES_LIMIT = 74
 CPUS_PER_NODE_LIMIT = 32
-NTASKS_PER_NODE_LIMIT = 32
+NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
 MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
 
 #Set global values for paths and file names
@@ -185,7 +185,8 @@ def parse_args():
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
     parser.add_argument("-q","--quiet", action="store_true", required=False, default=False, help="Activate quiet mode, with suppressed output [default: False].")
-    parser.add_argument("--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
+    parser.add_argument("-D","--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
+    parser.add_argument("-x","--nofields", action="store_true", required=False, default=False, help="Do not read the input MS to extract field IDs [default: False].")
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
     run_args = parser.add_mutually_exclusive_group(required=True)
@@ -770,7 +771,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
                         container=containers[0],partition=partition,time=time,name='partition',runname=name,SPWs=crosscal_kwargs['spw'],account=account,reservation=reservation)
         write_spw_master(MASTER_SCRIPT,config,crosscal_kwargs['spw'],submit,pad_length=pad_length,partition=includes_partition,concatenating=concatenating)
         if concatenating:
-            write_sbatch('concat.py','--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,exclude=exclude,mpi_wrapper=mpi_wrapper,
+            write_sbatch('concat.py','--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,exclude=exclude,mpi_wrapper='srun',
                         container=containers[0],partition=partition,time=time,name='concat',runname=name,account=account,reservation=reservation)
             write_sbatch('quick_tclean.py','--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
                         container=containers[0],partition=partition,time=time,name='quick_tclean',runname=name,account=account,reservation=reservation)
@@ -784,7 +785,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
                 write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
                             container=containers[i],partition=partition,time=time,name=jobname,runname=name,account=account,reservation=reservation)
             else:
-                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=100,plane=1,mpi_wrapper='srun',container=containers[i],
+                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],
                             partition=partition,time=time,name=jobname,runname=name,exclude=exclude,account=account,reservation=reservation)
 
         #Build master pipeline submission script, replacing all .py with .sbatch
@@ -819,22 +820,25 @@ def default_config(arg_dict):
     #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
 
-    #Don't call srun if option --local used
-    if arg_dict['local']:
-        mpi_wrapper = ''
-    else:
-        mpi_wrapper = 'srun --qos qos-interactive --nodes=1 --ntasks=1 --time=10 --mem=4GB --partition={0}'.format(arg_dict['partition'])
-        if arg_dict['exclude'] != '':
-            mpi_wrapper += ' --exclude={0}'.format(arg_dict['exclude'])
-        if arg_dict['reservation'] != '':
-            mpi_wrapper += ' --reservation={0}'.format(arg_dict['reservation'])
+    if not arg_dict['nofields']:
+        #Don't call srun if option --local used
+        if arg_dict['local']:
+            mpi_wrapper = ''
+        else:
+            mpi_wrapper = 'srun --qos qos-interactive --nodes=1 --ntasks=1 --time=10 --mem=4GB --partition={0}'.format(arg_dict['partition'])
+            if arg_dict['exclude'] != '':
+                mpi_wrapper += ' --exclude={0}'.format(arg_dict['exclude'])
+            if arg_dict['reservation'] != '':
+                mpi_wrapper += ' --reservation={0}'.format(arg_dict['reservation'])
 
-    #Write and submit srun command to extract fields, and insert them into config file under section [fields]
-    params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)
-    command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
-    logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
-    logger.debug('Using the following command:\n\t{0}'.format(command))
-    os.system(command)
+        #Write and submit srun command to extract fields, and insert them into config file under section [fields]
+        params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)
+        command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
+        logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
+        logger.debug('Using the following command:\n\t{0}'.format(command))
+        os.system(command)
+    else:
+        logger.info('Skipping extraction of field IDs.')
 
     logger.info('Config "{0}" generated.'.format(filename))
 
@@ -923,7 +927,11 @@ def format_args(config,submit,quiet,dependencies):
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     spw = crosscal_kwargs['spw']
     nspw = crosscal_kwargs['nspw']
-    mem = int(kwargs['mem']) // nspw
+
+    #Only reduce the memory footprint if we're not using all CPUs on each node
+    if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
+        mem = int(kwargs['mem']) // nspw
+
     includes_partition = 'partition.py' in kwargs['scripts']
     if nspw > 1:
         nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)

@@ -31,7 +31,11 @@ def validateinput():
 
     visname = va(taskvals, 'data', 'vis', str)
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
-    refant = va(taskvals, 'crosscal', 'refant', str)
+    refant = taskvals['crosscal']['refant']
+    if type(refant) is str and 'm' in refant:
+        refant = va(taskvals, 'crosscal', 'refant', str)
+    else:
+        refant = va(taskvals, 'crosscal', 'refant', int)
     nspw = va(taskvals, 'crosscal', 'nspw', int)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
