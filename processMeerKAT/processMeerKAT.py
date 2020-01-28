@@ -261,11 +261,11 @@ def validate_args(args,config,parser=None):
         If this is input, parser error will be raised."""
 
     if parser is None or args['build']:
-        if args['MS'] is None:
+        if args['MS'] is None and not args['nofields']:
             msg = "You must input an MS [-M --MS] to build the config file."
             raise_error(config, msg, parser)
 
-        if not os.path.isdir(args['MS']):
+        if args['MS'] is not None and not os.path.isdir(args['MS']):
             msg = "Input MS '{0}' not found.".format(args['MS'])
             raise_error(config, msg, parser)
 
@@ -838,7 +838,9 @@ def default_config(arg_dict):
         logger.debug('Using the following command:\n\t{0}'.format(command))
         os.system(command)
     else:
+        #Assume we're not processing multiple SPWs
         logger.info('Skipping extraction of field IDs.')
+        config_parser.overwrite_config(filename, conf_dict={'nspw' : 1}, conf_sec='crosscal')
 
     logger.info('Config "{0}" generated.'.format(filename))
 
@@ -927,10 +929,11 @@ def format_args(config,submit,quiet,dependencies):
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     spw = crosscal_kwargs['spw']
     nspw = crosscal_kwargs['nspw']
+    mem = int(kwargs['mem'])
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
     if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
-        mem = int(kwargs['mem']) // nspw
+        mem = mem // nspw
 
     includes_partition = 'partition.py' in kwargs['scripts']
     if nspw > 1:
