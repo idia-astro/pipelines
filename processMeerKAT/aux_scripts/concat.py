@@ -43,7 +43,7 @@ def do_concat(visname, fields):
 
         #Concat images (into continuum cube)
         pattern = '*/images/*{0}*image'.format(fname)
-        out = '{0}.{1}.cube'.format(filebase,fname)
+        out = '{0}.{1}.contcube'.format(filebase,fname)
         images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
         if images is not None:
             images.sort(key=sortbySPW)

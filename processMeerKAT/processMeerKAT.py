@@ -265,7 +265,7 @@ def validate_args(args,config,parser=None):
             msg = "You must input an MS [-M --MS] to build the config file."
             raise_error(config, msg, parser)
 
-        if args['MS'] is not None and not os.path.isdir(args['MS']):
+        if args['MS'] not in [None,'None'] and not os.path.isdir(args['MS']):
             msg = "Input MS '{0}' not found.".format(args['MS'])
             raise_error(config, msg, parser)
 
@@ -430,7 +430,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     if 'partition' in script and tasks*4 <= CPUS_PER_NODE_LIMIT:
         params['cpus'] = 4 #hard-code for 4 polarisations
     if 'tclean' in script:
-        params['cpus'] = int(32/tasks)
+        params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
 
     #Use xvfb for plotting scripts
     plot = True if 'plot' in script else False
