@@ -35,9 +35,6 @@ def get_calfiles(visname, caldir):
 def bookkeeping(visname):
     # Book keeping
     caldir = os.path.join(os.getcwd(), 'caltables')
-    if not os.path.isdir(caldir):
-        os.makedirs(caldir)
-
     calfiles = get_calfiles(visname, caldir)
 
     return calfiles, caldir

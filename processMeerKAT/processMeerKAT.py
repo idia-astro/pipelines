@@ -432,6 +432,10 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     if 'tclean' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
 
+    #If requesting all CPUs, user may as well use all memory
+    if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
+        params['mem'] = MEM_PER_NODE_GB_LIMIT
+
     #Use xvfb for plotting scripts
     plot = True if 'plot' in script else False
 

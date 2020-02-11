@@ -18,8 +18,10 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
         minbaselines, standard):
 
-    if os.path.isdir(caldir):
-        os.rename(caldir,caldir+'_old')
+    if not os.path.isdir(caldir):
+        os.makedirs(caldir)
+    elif not os.path.isdir(caldir+'_round1'):
+        os.rename(caldir,caldir+'_round1')
         os.makedirs(caldir)
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
