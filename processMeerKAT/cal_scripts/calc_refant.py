@@ -1,4 +1,4 @@
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 """
@@ -56,7 +56,7 @@ def get_ref_ant(visname, fluxfield):
     for idx, ant in enumerate(antflags):
         if ant > 0.8:
             badants.append(antennas[idx])
-            
+
     refidx = np.argmin(antflags)
 
     logger.info('{0: <3} {1:.2f} (best antenna)'.format(antennas[refidx], antflags[refidx]))

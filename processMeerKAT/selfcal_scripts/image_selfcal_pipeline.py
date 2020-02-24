@@ -1,3 +1,6 @@
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
+
 import os
 
 # So that CASA can find pyBDSF

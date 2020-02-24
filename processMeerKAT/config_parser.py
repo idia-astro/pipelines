@@ -1,7 +1,7 @@
-#!/usr/bin/env python2.7
-
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
+
+#!/usr/bin/env python2.7
 
 import argparse
 import ConfigParser
