@@ -46,7 +46,7 @@ def selfcal_part2(vis, imagename, imsize, cell, gridder, wprojplanes,
 
     # If it's the first round of selfcal and regionfile is blank, only run
     # BDSF and quit.
-    if len(regionfile) == 0 and ll == 0:
+    if len(regionfile) == 0:
         do_gaincal = False
     else:
         do_gaincal = True

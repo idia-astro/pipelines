@@ -20,7 +20,7 @@ def selfcal_part1(vis, imagename, imsize, cell, gridder, wprojplanes,
     else:
         imagename = vis.replace('.ms', '') + '_im_%d' % (ll + restart_no):
 
-        if ll < params['nloop']:
+        if ll < (params['nloop']-1):
             caltable = vis.replace('.ms', '') + '.gcal%d' % (ll + restart_no)
 
             applycal(vis=vis, selectdata=False, gaintable=caltable, parang=True)

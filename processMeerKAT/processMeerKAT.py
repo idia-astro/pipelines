@@ -68,7 +68,9 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
             ('plot_solutions.py',False,''),
-            ('concat.py',False,'')]
+            ('concat.py',False,''),
+            ('selfcal_part1.py', True, ''),
+            ('selfcal_part2.py', False, '')]
 
 
 def check_path(path,update=False):
@@ -606,7 +608,8 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     #Hack to perform correct number of selfcal loops
     selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloop']
-    scripts.append(['selfcal_part1.py','selfcal_part2.py']*(selfcal_loops-1))
+    scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+    scripts.append('selfcal_part1.sbatch')
 
     #Submit first script with no dependencies and extract job ID
     if dependencies == '':
