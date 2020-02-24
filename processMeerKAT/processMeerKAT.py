@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 
-__version__ = '1.1'
+__version__ = '2.0'
 
 license = """
     Process MeerKAT data via CASA measurement set.
@@ -42,6 +42,7 @@ SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
 CALIB_SCRIPTS_DIR = 'cal_scripts'
 AUX_SCRIPTS_DIR = 'aux_scripts'
+SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
 CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
@@ -97,6 +98,8 @@ def check_path(path,update=False):
             newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)
         elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)):
             newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,SELFCAL_SCRIPTS_DIR,path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,SELFCAL_SCRIPTS_DIR,path)
         else:
             #If it still doesn't exist, throw error
             raise IOError('File "{0}" not found.'.format(path))
@@ -600,6 +603,10 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     if verbose:
         master.write("\necho Copying \'{0}\' to \'{1}\', and using this to run pipeline.\n".format(config,TMP_CONFIG))
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
+
+    #Hack to perform correct number of selfcal loops
+    selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloop']
+    scripts.append(['selfcal_part1.py','selfcal_part2.py']*(selfcal_loops-1))
 
     #Submit first script with no dependencies and extract job ID
     if dependencies == '':
