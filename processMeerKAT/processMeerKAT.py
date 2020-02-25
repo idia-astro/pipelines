@@ -986,7 +986,7 @@ def format_args(config,submit,quiet,dependencies):
         logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
     #Add vis to selfcal section, in case user skipping cross-cal
-    config_parser.overwrite_config(config, conf_dict={'vis' : kwargs['MS']}, conf_sec='selfcal')
+    config_parser.overwrite_config(config, conf_dict={'vis' : data_kwargs['vis']}, conf_sec='selfcal')
 
     return kwargs
 
