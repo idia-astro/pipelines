@@ -45,3 +45,8 @@ if __name__ == '__main__':
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     split_vis(visname, spw, fields, specavg, timeavg, keepmms)
+
+    #TODO: Set selfcal input to target(s)
+    #target = ''
+    #config_parser.overwrite_config(config, conf_dict={'vis' : target}, conf_sec='selfcal')
+    msmd.done()

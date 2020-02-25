@@ -607,7 +607,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Hack to perform correct number of selfcal loops
-    selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloop']
+    selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
     scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
     scripts.append('selfcal_part1.sbatch')
 
@@ -984,6 +984,9 @@ def format_args(config,submit,quiet,dependencies):
     copyfile(config, TMP_CONFIG)
     if not quiet:
         logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
+
+    #Add vis to selfcal section, in case user skipping cross-cal
+    config_parser.overwrite_config(config, conf_dict={'vis' : kwargs['MS']}, conf_sec='selfcal')
 
     return kwargs
 
