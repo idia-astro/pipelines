@@ -7,34 +7,38 @@ import os
 import config_parser
 from config_parser import validate_args as va
 
-def selfcal_part1(vis, imagename, imsize, cell, gridder, wprojplanes,
-                   deconvolver, robust, niter, multiscale, threshold,
-                   nterms, regionfile, restart_no, nloop, solint, calmode,
-                   atrous, loop):
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-    ll = params['loop']
+def selfcal_part1(vis, nloop, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
+		multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
 
-    if ll == 0:
-        imagename = vis.replace('.ms', '') + '_im_%d_0' % (ll + restart_no)
-        regionfile = ''
+    ll = loop
+    imagename = vis.replace('.ms', '') + '_im_%d' % (ll + restart_no)
+    regionfile = imagename + ".casabox"
+    caltable = vis.replace('.ms', '') + '.gcal%d' % (ll + restart_no)
+
+    if ll > 0 and not os.path.exists(caltable):
+        logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,ll))
+        sys.exit(1)
     else:
-        imagename = vis.replace('.ms', '') + '_im_%d' % (ll + restart_no):
+        if ll == 0 and not os.path.exists(regionfile):
+            regionfile = ''
+            imagename += '_nomask'
+        elif 0 < ll <= (params['nloop']):
+                applycal(vis=vis, selectdata=False, gaintable=caltable, parang=True)
 
-        if ll < (params['nloop']-1):
-            caltable = vis.replace('.ms', '') + '.gcal%d' % (ll + restart_no)
-
-            applycal(vis=vis, selectdata=False, gaintable=caltable, parang=True)
-
-            flagdata(vis=vis, mode='rflag', datacolumn='RESIDUAL', field='', timecutoff=5.0,
+                flagdata(vis=vis, mode='rflag', datacolumn='RESIDUAL', field='', timecutoff=5.0,
                     freqcutoff=5.0, timefit='line', freqfit='line', flagdimension='freqtime',
                     extendflags=False, timedevscale=3.0, freqdevscale=3.0, spectralmax=500,
                     extendpols=False, growaround=False, flagneartime=False, flagnearfreq=False,
+		    action='apply', flagbackup=True, overwrite=True, writeflags=True)
 
-
-    tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
+        tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize, cell=cell, stokes='I', gridder=gridder,
             wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
-            weighting='briggs', robust = robust, niter=niter[ll], multiscale=multiscale[ll],
+            weighting='briggs', robust = robust, niter=niter[ll], scales=multiscale[ll],
             threshold=threshold[ll], nterms=nterms[ll],
             savemodel='none', pblimit=-1, mask=regionfile, parallel = True)
 
