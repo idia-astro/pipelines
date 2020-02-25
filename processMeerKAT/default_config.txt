@@ -71,5 +71,5 @@ scripts = [ ('validate_input.py',False,''),
             ('quick_tclean.py',True,''),
             ('plot_solutions.py',False,''),
             ('concat.py',False,''),
-            ('selfcal_part1.py',False,''),
+            ('selfcal_part1.py',True,''),
             ('selfcal_part2.py',False,'')]
