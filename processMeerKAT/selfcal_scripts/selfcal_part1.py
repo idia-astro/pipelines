@@ -11,22 +11,21 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-def selfcal_part1(vis, nloop, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
+def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
 		multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
 
-    ll = loop
-    imagename = vis.replace('.ms', '') + '_im_%d' % (ll + restart_no)
+    imagename = vis.replace('.ms', '') + '_im_%d' % (loop + restart_no)
     regionfile = imagename + ".casabox"
-    caltable = vis.replace('.ms', '') + '.gcal%d' % (ll + restart_no)
+    caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
 
-    if ll > 0 and not os.path.exists(caltable):
-        logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,ll))
+    if loop > 0 and not os.path.exists(caltable):
+        logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,loop))
         sys.exit(1)
     else:
-        if ll == 0 and not os.path.exists(regionfile):
+        if loop == 0 and not os.path.exists(regionfile):
             regionfile = ''
             imagename += '_nomask'
-        elif 0 < ll <= (params['nloop']):
+        elif 0 < loop <= (nloops):
                 applycal(vis=vis, selectdata=False, gaintable=caltable, parang=True)
 
                 flagdata(vis=vis, mode='rflag', datacolumn='RESIDUAL', field='', timecutoff=5.0,
@@ -38,8 +37,8 @@ def selfcal_part1(vis, nloop, restart_no, cell, robust, imsize, wprojplanes, nit
         tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize, cell=cell, stokes='I', gridder=gridder,
             wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
-            weighting='briggs', robust = robust, niter=niter[ll], scales=multiscale[ll],
-            threshold=threshold[ll], nterms=nterms[ll],
+            weighting='briggs', robust = robust, niter=niter[loop], scales=multiscale[loop],
+            threshold=threshold[loop], nterms=nterms[loop],
             savemodel='none', pblimit=-1, mask=regionfile, parallel = True)
 
 
@@ -52,7 +51,8 @@ if __name__ == '__main__':
     params = taskvals['selfcal']
 
     for arg in ['multiscale','nterms','calmode','atrous']:
-        params[arg] = [params[arg]] * len(params['niter'])
+        if type(params[arg]) is not list:
+            params[arg] = [params[arg]] * len(params['niter'])
 
     if 'loop' not in params:
         params['loop'] = 0

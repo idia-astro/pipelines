@@ -25,7 +25,7 @@ badfreqranges = [ '935~947MHz',   # List of bad frequency ranges (to flag)
 
 [selfcal]
 vis = ''
-nloop = 5                         # Number of clean + bdsm + self-cal loops.
+nloops = 5                        # Number of clean + bdsm + self-cal loops.
 restart_no = 0                    # If nonzero, adds this number to nloop to name images
 cell = '2.0arcsec'
 robust = -0.5
