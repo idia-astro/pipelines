@@ -9,6 +9,10 @@ import os
 import config_parser
 from config_parser import validate_args as va
 
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
+
 # So that CASA can find pyBDSF
 os.putenv('PYTHONPATH', '/usr/lib/python2.7/dist-packages/')
 
