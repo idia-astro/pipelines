@@ -51,7 +51,7 @@ if __name__ == '__main__':
     params = taskvals['selfcal']
 
     for arg in ['multiscale','nterms','calmode','atrous']:
-        if type(params[arg]) is not list:
+        if type(params[arg]) is not list or (arg == 'multiscale' and type(params[arg][0]) is not list):
             params[arg] = [params[arg]] * len(params['niter'])
 
     if 'loop' not in params:

@@ -96,7 +96,7 @@ if __name__ == '__main__':
         params['loop'] = 0
 
     for arg in ['multiscale','nterms','calmode','atrous']:
-        if type(params[arg]) is not list:
+        if type(params[arg]) is not list or (arg == 'multiscale' and type(params[arg][0]) is not list):
             params[arg] = [params[arg]] * len(params['niter'])
 
     ran_gaincal = selfcal_part2(**params)
