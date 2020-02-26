@@ -51,7 +51,19 @@ if __name__ == '__main__':
     params = taskvals['selfcal']
 
     for arg in ['multiscale','nterms','calmode','atrous']:
-        if type(params[arg]) is not list or (arg == 'multiscale' and type(params[arg][0]) is not list):
+
+        # Multiscale needs to be a list of lists (if specifying multiple scales)
+        # or a simple list (if specifying a single scale). So make sure these two
+        # cases are covered.
+
+        # multiscale is not a list of lists, so turn it into one
+        if arg == 'multiscale' and type(params[arg]) is list and len(params[arg]) == 0:
+            params[arg] = [params[arg],]
+        # Not a list at all, so put it into a list
+        if arg == 'multiscale' and type(params[arg]) is not list:
+            params[arg] = [params[arg],]
+
+        if type(params[arg]) is not list:
             params[arg] = [params[arg]] * len(params['niter'])
 
     if 'loop' not in params:
