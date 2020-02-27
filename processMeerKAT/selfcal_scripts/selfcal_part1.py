@@ -14,8 +14,9 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
 		multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
 
-    imagename = vis.replace('.ms', '') + '_im_%d' % (loop + restart_no)
-    regionfile = imagename + ".casabox"
+    basename = vis.replace('.ms', '') + '_im_%d'
+    imagename = basename % (loop + restart_no)
+    regionfile = basename % (loop + restart_no + 1) + ".casabox"
     caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
 
     if loop > 0 and not os.path.exists(caltable):
