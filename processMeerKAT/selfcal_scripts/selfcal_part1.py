@@ -58,10 +58,10 @@ if __name__ == '__main__':
 
         # multiscale is not a list of lists, so turn it into one
         if arg == 'multiscale' and type(params[arg]) is list and len(params[arg]) == 0:
-            params[arg] = [params[arg],]
+            params[arg] = [params[arg],] * len(params['niter'])
         # Not a list at all, so put it into a list
         if arg == 'multiscale' and type(params[arg]) is not list:
-            params[arg] = [params[arg],]
+            params[arg] = [[params[arg],],] * len(params['niter'])
 
         if type(params[arg]) is not list:
             params[arg] = [params[arg]] * len(params['niter'])
