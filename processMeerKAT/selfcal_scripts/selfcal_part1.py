@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
-		multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
+        multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
 
     basename = vis.replace('.ms', '') + '_im_%d'
     imagename = basename % (loop + restart_no)
     regionfile = basename % (loop + restart_no) + ".casabox"
     caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no - 1)
-	all_caltables = sorted(glob.glob('*.gcal?'))
+    all_caltables = sorted(glob.glob('*.gcal?'))
 
     if loop > 0 and not os.path.exists(caltable):
         logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,loop))
@@ -34,7 +34,7 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
                     freqcutoff=5.0, timefit='line', freqfit='line', flagdimension='freqtime',
                     extendflags=False, timedevscale=3.0, freqdevscale=3.0, spectralmax=500,
                     extendpols=False, growaround=False, flagneartime=False, flagnearfreq=False,
-		    action='apply', flagbackup=True, overwrite=True, writeflags=True)
+            action='apply', flagbackup=True, overwrite=True, writeflags=True)
 
         tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize, cell=cell, stokes='I', gridder=gridder,
