@@ -16,8 +16,8 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
 
     basename = vis.replace('.ms', '') + '_im_%d'
     imagename = basename % (loop + restart_no)
-    regionfile = basename % (loop + restart_no + 1) + ".casabox"
-    caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
+    regionfile = basename % (loop + restart_no) + ".casabox"
+    caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no - 1)
 
     if loop > 0 and not os.path.exists(caltable):
         logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,loop))

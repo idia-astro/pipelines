@@ -41,15 +41,15 @@ def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
             weighting='briggs', robust = robust, niter=0, scales=multiscale[loop],
             threshold=threshold[loop], nterms=nterms[loop], calcpsf=False, calcres=False,
             startmodel = startmodel, savemodel='modelcolumn', pblimit=-1,
-            mask=regionfile, parallel = False)
+            mask='', parallel = False)
 
 def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
                 multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
 
     basename = vis.replace('.ms', '') + '_im_%d'
     imagename = basename % (loop + restart_no)
-    regionfile = basename % (loop + restart_no + 1) + ".casabox"
-    caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no + 1)
+    regionfile = basename % (loop + restart_no) + ".casabox"
+    caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
 
     if loop == 0 and not os.path.exists(regionfile):
         imagename += '_nomask'
@@ -64,8 +64,20 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
 
     if not os.path.exists(bdsmname):
         logger.error("Image {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(bdsmname,loop))
-        return True
+        sys.exit(1)
     else:
+        if do_gaincal:
+            predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
+                      deconvolver, robust, niter, multiscale, threshold, nterms,
+                      regionfile,loop)
+
+            gaincal(vis=vis, caltable=caltable, selectdata=False, solint=solint[loop],
+                calmode=calmode[loop], append=False, parang=True)
+
+            loop += 1
+
+        regionfile = basename % (loop + restart_no) + ".casabox"
+
         # If it's the first round of selfcal and regionfile is blank, only run
         # BDSF and quit.
         if atrous[loop]:
@@ -77,15 +89,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
         '--thresh-pix 10 {} --clobber --adaptive-rms-box '
         '--rms-map'.format(bdsmname, regionfile, atrous_str))
 
-        if do_gaincal:
-            predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
-                      deconvolver, robust, niter, multiscale, threshold, nterms,
-                      regionfile,loop)
-
-            gaincal(vis=vis, caltable=caltable, selectdata=False, solint=solint[loop],
-                calmode=calmode[loop], append=False, parang=True)
-
-        return do_gaincal
+        return loop
 
 
 if __name__ == '__main__':
@@ -115,7 +119,5 @@ if __name__ == '__main__':
         if type(params[arg]) is not list:
             params[arg] = [params[arg]] * len(params['niter'])
 
-    ran_gaincal = selfcal_part2(**params)
-
-    if ran_gaincal:
-        config_parser.overwrite_config(args['config'], conf_dict={'loop' : params['loop']+1},  conf_sec='selfcal')
+    loop = selfcal_part2(**params)
+    config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')
