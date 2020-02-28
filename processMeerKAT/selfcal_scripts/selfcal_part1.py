@@ -2,6 +2,7 @@
 #See processMeerKAT.py for license details.
 
 import sys
+import glob
 import os
 
 import config_parser
