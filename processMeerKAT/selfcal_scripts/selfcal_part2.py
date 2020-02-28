@@ -38,6 +38,11 @@ def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
             startmodel = startmodel, savemodel='modelcolumn', pblimit=-1,
             mask='', parallel = False)
 
+    #Rename image output to previous name
+    for fname in images:
+        name, ext = os.path.splitext(fname)
+        os.rename(name+'.round1'+ext,fname)
+
 def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
                 multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
 
