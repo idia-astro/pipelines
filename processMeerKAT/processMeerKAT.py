@@ -607,7 +607,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Hack to perform correct number of selfcal loops
-    if 'selfcal_part1.py' in scripts and 'selfcal_part2.py' in scripts:
+    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
         selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
