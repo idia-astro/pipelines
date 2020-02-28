@@ -16,9 +16,6 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 # So that CASA can find pyBDSF
 os.putenv('PYTHONPATH', '/usr/lib/python2.7/dist-packages/')
 
-def sortByTT(fname):
-    return int(fname[-1])
-
 def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
                       deconvolver, robust, niter, multiscale, threshold, nterms,
                       regionfile,loop):
@@ -31,9 +28,7 @@ def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
         name, ext = os.path.splitext(fname)
         os.rename(fname,name+'.round1'+ext)
 
-    startmodel = glob.glob(imagename + '.model*')
-    if nterms[loop] > 1:
-        startmodel.sort(key=sortByTT)
+    startmodel = sorted(glob.glob(imagename + '.model*'))
 
     tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize, cell=cell, stokes='I', gridder=gridder,
@@ -50,6 +45,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
     imagename = basename % (loop + restart_no)
     regionfile = basename % (loop + restart_no) + ".casabox"
     caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
+    prev_caltables = sorted(glob.glob('*.gcal?'))
 
     if loop == 0 and not os.path.exists(regionfile):
         imagename += '_nomask'
@@ -72,7 +68,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
                       regionfile,loop)
 
             gaincal(vis=vis, caltable=caltable, selectdata=False, solint=solint[loop],
-                calmode=calmode[loop], append=False, parang=True)
+                    gaintable=prev_caltables, calmode=calmode[loop], append=False, parang=True)
 
             loop += 1
 
