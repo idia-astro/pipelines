@@ -112,13 +112,13 @@ if __name__ == '__main__':
 
         # multiscale is not a list of lists, so turn it into one
         if arg == 'multiscale' and type(params[arg]) is list and len(params[arg]) == 0:
-            params[arg] = [params[arg],] * len(params['niter'])
+            params[arg] = [params[arg],] * (params['nloops'] + 1)
         # Not a list at all, so put it into a list
         if arg == 'multiscale' and type(params[arg]) is not list:
-            params[arg] = [[params[arg],],] * len(params['niter'])
+            params[arg] = [[params[arg],],] * (params['nloops'] + 1)
 
         if type(params[arg]) is not list:
-            params[arg] = [params[arg]] * len(params['niter'])
+            params[arg] = [params[arg]] * (params['nloops'] + 1)
 
     loop = selfcal_part2(**params)
     config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')
