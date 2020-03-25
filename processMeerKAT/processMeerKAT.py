@@ -26,6 +26,7 @@ import os
 import sys
 import re
 import config_parser
+from cal_scripts import bookkeeping
 from shutil import copyfile
 import logging
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
+SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
@@ -164,7 +166,7 @@ def parse_args():
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA measurement set. Version: {0}'.format(__version__))
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
-    parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Realtive (not absolute) path to config file.")
+    parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=8,
                         help="Use this number of nodes [default: 8; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=4,
@@ -920,6 +922,10 @@ def format_args(config,submit,quiet,dependencies):
     data_kwargs = get_config_kwargs(config,'data',['vis'])
     get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
+    
+    #Check selfcal params
+    selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
+    bookkeeping.get_selfcal_params()
 
     #Force submit=True if user has requested it during [-R --run]
     if submit:
@@ -954,9 +960,9 @@ def format_args(config,submit,quiet,dependencies):
     if nspw > 1:
         nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
-    else:
-        #Pop concat script if we're not processing SPWs
-        pop_script(kwargs, 'concat.py')
+    # else:
+    #     #Pop concat script if we're not processing SPWs
+    #     pop_script(kwargs, 'concat.py')
 
     #Set threadsafe=False for split if keepmms=False
     if 'split.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
@@ -985,9 +991,6 @@ def format_args(config,submit,quiet,dependencies):
     copyfile(config, TMP_CONFIG)
     if not quiet:
         logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
-
-    #Add vis to selfcal section, in case user skipping cross-cal
-    config_parser.overwrite_config(config, conf_dict={'vis' : "'{0}'".format(data_kwargs['vis'])}, conf_sec='selfcal')
 
     return kwargs
 

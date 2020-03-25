@@ -8,6 +8,7 @@ import os
 
 import config_parser
 from config_parser import validate_args as va
+from cal_scripts import bookkeeping
 
 import logging
 logger = logging.getLogger(__name__)
@@ -31,9 +32,9 @@ def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
     startmodel = sorted(glob.glob(imagename + '.model*'))
 
     tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
-            imsize=imsize, cell=cell, stokes='I', gridder=gridder,
-            wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=False,
-            weighting='briggs', robust = robust, niter=0, scales=multiscale[loop],
+            imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
+            wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=False,
+            weighting='briggs', robust = robust[loop], niter=0, scales=multiscale[loop],
             threshold=threshold[loop], nterms=nterms[loop], calcpsf=False, calcres=False,
             startmodel = startmodel, savemodel='modelcolumn', pblimit=-1,
             mask='', parallel = False)
@@ -94,31 +95,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
 
 
 if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
 
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
-    params = taskvals['selfcal']
-
-    if 'loop' not in params:
-        params['loop'] = 0
-
-    for arg in ['multiscale','nterms','calmode','atrous']:
-
-        # Multiscale needs to be a list of lists (if specifying multiple scales)
-        # or a simple list (if specifying a single scale). So make sure these two
-        # cases are covered.
-
-        # multiscale is not a list of lists, so turn it into one
-        if arg == 'multiscale' and type(params[arg]) is list and len(params[arg]) == 0:
-            params[arg] = [params[arg],] * (params['nloops'] + 1)
-        # Not a list at all, so put it into a list
-        if arg == 'multiscale' and type(params[arg]) is not list:
-            params[arg] = [[params[arg],],] * (params['nloops'] + 1)
-
-        if type(params[arg]) is not list:
-            params[arg] = [params[arg]] * (params['nloops'] + 1)
-
+    args,params = bookkeeping.get_selfcal_params()
     loop = selfcal_part2(**params)
     config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')

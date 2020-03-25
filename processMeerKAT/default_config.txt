@@ -7,40 +7,6 @@ fluxfield = ''
 phasecalfield = ''
 targetfields = ''
 
-[crosscal]
-minbaselines = 4                  # Minimum number of baselines to use while calibrating
-specavg = 1                       # Number of channels to average after calibration (during split)
-timeavg = '8s'                    # Time interval to average after calibration (during split)
-keepmms = True                    # Output MMS (True) or MS (False) during split
-spw = '0:860~1700MHz'             # Spectral window / frequencies to extract for MMS
-nspw = 16                         # Number of spectral windows to split into
-calcrefant = False                # Calculate reference antenna in program (overwrites 'refant')
-refant = 'm059'                   # Reference antenna name / number
-standard = 'Stevens-Reynolds 2016'# Flux density standard for setjy
-badants = []                      # List of bad antenna numbers (to flag)
-badfreqranges = [ '935~947MHz',   # List of bad frequency ranges (to flag)
-                  '1160~1310MHz',
-                  '1476~1611MHz',
-                  '1670~1700MHz']
-
-[selfcal]
-vis = ''
-nloops = 5                        # Number of clean + bdsm + self-cal loops.
-restart_no = 0                    # If nonzero, adds this number to nloop to name images
-cell = '2.0arcsec'
-robust = -0.5
-imsize = [8192, 8192]
-wprojplanes = 128
-niter = [8000, 11000, 14000, 15000, 200000]
-threshold = [100e-6, 50e-6, 20e-6, 10e-6, 4e-6] # In units of Jy
-multiscale = [15, 10, 5]
-nterms = 2                        # Number of taylor terms
-gridder = 'wproject'
-deconvolver = 'mtmfs'
-solint = ['10min','5min','2min','1min']
-calmode = 'p'
-atrous = True                     # Source find for diffuse emission (see PyBDSF docs)
-
 [slurm]                           # See processMeerKAT.py -h for documentation
 nodes = 5
 ntasks_per_node = 8
@@ -73,3 +39,36 @@ scripts = [ ('validate_input.py',False,''),
             ('concat.py',False,''),
             ('selfcal_part1.py',True,''),
             ('selfcal_part2.py',False,'')]
+
+[crosscal]
+minbaselines = 4                  # Minimum number of baselines to use while calibrating
+specavg = 1                       # Number of channels to average after calibration (during split)
+timeavg = '8s'                    # Time interval to average after calibration (during split)
+keepmms = True                    # Output MMS (True) or MS (False) during split
+spw = '0:860~1700MHz'             # Spectral window / frequencies to extract for MMS
+nspw = 16                         # Number of spectral windows to split into
+calcrefant = False                # Calculate reference antenna in program (overwrites 'refant')
+refant = 'm059'                   # Reference antenna name / number
+standard = 'Stevens-Reynolds 2016'# Flux density standard for setjy
+badants = []                      # List of bad antenna numbers (to flag)
+badfreqranges = [ '935~947MHz',   # List of bad frequency ranges (to flag)
+                  '1160~1310MHz',
+                  '1476~1611MHz',
+                  '1670~1700MHz']
+
+[selfcal]
+nloops = 4                        # Number of clean + bdsf + self-cal loops.
+restart_no = 0                    # If nonzero, adds this number to nloops to name images
+cell = '2.0arcsec'
+robust = -0.5
+imsize = [8192, 8192]
+wprojplanes = 128
+niter = [8000, 11000, 14000, 15000, 200000]
+threshold = [100e-6, 50e-6, 20e-6, 10e-6, 4e-6] # In units of Jy
+multiscale = [15, 10, 5]
+nterms = 2                        # Number of taylor terms
+gridder = 'wproject'
+deconvolver = 'mtmfs'
+solint = ['10min','5min','2min','1min']
+calmode = 'p'
+atrous = True                     # Source find for diffuse emission (see PyBDSF docs)
