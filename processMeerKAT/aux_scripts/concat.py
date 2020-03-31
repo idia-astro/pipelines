@@ -42,7 +42,7 @@ def do_concat(visname, fields):
         fname = msmd.namesforfields(int(target))[0]
 
         #Concat images (into continuum cube)
-        pattern = '*/images/*{0}*image'.format(fname)
+        pattern = '*MHz/images/*{0}*image'.format(fname)
         out = '{0}.{1}.contcube'.format(filebase,fname)
         images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
         if images is not None:
@@ -58,7 +58,7 @@ def do_concat(visname, fields):
             logger.error("Output image '{0}' not written.".format(out))
 
         #Concat MSs
-        pattern = '*/*{0}*.ms'.format(fname)
+        pattern = '*MHz/*{0}*.ms'.format(fname)
         out = '{0}.{1}.ms'.format(filebase,fname)
         MSs = check_output(fname,pattern,out,job='concat',filetype='MS')
         if MSs is not None:
@@ -71,7 +71,7 @@ def do_concat(visname, fields):
             logger.error("Output MS '{0}' not written.".format(out))
 
         #Concat MMSs
-        pattern = '*/*{0}*.mms'.format(fname)
+        pattern = '*MHz/*{0}*.mms'.format(fname)
         out = '{0}.{1}.mms'.format(filebase,fname)
         MMSs = check_output(fname,pattern,out,job='virtualconcat',filetype='MMS')
         if MMSs is not None:

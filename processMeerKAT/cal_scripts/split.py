@@ -9,10 +9,10 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
 def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
-    outputbase = os.path.splitext(visname)[0]
 
-    msmd.open(visname)
+    outputbase = os.path.splitext(visname)[0]
     extn = 'mms' if keepmms else 'ms'
+    newvis = visname
 
     for field in fields:
         for subf in field.split(','):
@@ -25,6 +25,10 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
                             field=fname, spw=spw, keepflags=False, keepmms=keepmms,
                             width=specavg, timebin=timeavg)
 
+            if subf == fields.targetfield.split(',')[0]:
+                newvis = outname
+
+    return newvis
 
 if __name__ == '__main__':
     # Get the name of the config file
@@ -44,9 +48,9 @@ if __name__ == '__main__':
     timeavg = va(taskvals, 'crosscal', 'timeavg', str, default='8s')
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
-    split_vis(visname, spw, fields, specavg, timeavg, keepmms)
+    msmd.open(visname)
+    newvis = split_vis(visname, spw, fields, specavg, timeavg, keepmms)
 
-    #TODO: Set selfcal input to target(s)
-    #target = ''
-    #config_parser.overwrite_config(config, conf_dict={'vis' : target}, conf_sec='selfcal')
+    config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
+    config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='data')
     msmd.done()

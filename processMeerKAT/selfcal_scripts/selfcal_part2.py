@@ -66,7 +66,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
 
     if not os.path.exists(bdsmname):
         logger.error("Image {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(bdsmname,loop))
-        sys.exit(1)
+        return loop+1
     else:
         if do_gaincal:
             predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,

@@ -21,7 +21,6 @@ def get_ref_ant(visname, fluxfield):
     fluxscans = msmd.scansforfield(int(fluxfield))
     logger.info("Flux field scan no: %d" % fluxscans[0])
     antennas = msmd.antennasforscan(fluxscans[0])
-    msmd.done()
 
     header = '{0: <3} {1: <4}'.format('ant', 'flags')
     logger.info("Antenna statistics on total flux calibrator")
@@ -31,7 +30,6 @@ def get_ref_ant(visname, fluxfield):
 
     fptr = open('ant_stats.txt', 'w')
     fptr.write(header)
-    fptr.write("\n")
 
     antflags = []
     for ant in antennas:
@@ -46,6 +44,7 @@ def get_ref_ant(visname, fluxfield):
         flags = np.count_nonzero(antdat)/float(antdat.size)
 
         fptr.write('\n{0: <3} {1:.4f}'.format(ant, flags))
+        logger.info('{0: <3} {1:.4f}'.format(ant, flags))
         antflags.append(flags)
 
     tb.close()
@@ -59,11 +58,12 @@ def get_ref_ant(visname, fluxfield):
 
     refidx = np.argmin(antflags)
 
-    logger.info('{0: <3} {1:.2f} (best antenna)'.format(antennas[refidx], antflags[refidx]))
-    referenceant = str(antennas[refidx])
+    logger.info('{0: <3} {1:.4f} (best antenna)'.format(antennas[refidx], antflags[refidx]))
+    referenceant = msmd.antennastations(refidx)[0] # or msmd.antennanames(np.where(msmd.antennaids() == refidx)[0][0])[0]
     logger.info("setting reference antenna to: %s" % referenceant)
 
     logger.info("Bad antennas: {0}".format(badants))
+    msmd.done()
 
     return referenceant, badants
 
@@ -76,10 +76,10 @@ def main():
     taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
-
     fields = bookkeeping.get_field_ids(taskvals['fields'])
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
-
+    spw = va(taskvals, 'crosscal', 'spw', str)
+    nspw = va(taskvals, 'crosscal', 'nspw', int)
 
     # Calculate reference antenna
     if calcrefant:
@@ -90,8 +90,17 @@ def main():
 
         refant, badants = get_ref_ant(visname, field)
         # Overwrite config file with new refant
-        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'refant':refant})
-        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'badants':badants})
+        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'refant' : "'{0}'".format(refant)})
+        config_parser.overwrite_config(args['config'], conf_sec='crosscal', conf_dict={'badants' : badants})
+
+        #Replace reference antenna in each SPW config
+        if nspw > 1:
+            for SPW in spw.split(','):
+                spw_config = '{0}/{1}'.format(SPW.replace('0:',''),args['config'])
+                # Overwrite config file with new refant
+                config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'refant' : "'{0}'".format(refant)})
+                config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'badants' : badants})
+                config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'calcrefant' : False})
 
 if __name__ == '__main__':
     main()

@@ -95,7 +95,7 @@ if __name__ == '__main__':
     # Parse config file
     taskvals, config = config_parser.parse_config(args['config'])
 
-    visname = va(taskvals, 'data', 'vis', str)
+    visname = va(taskvals, 'data', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     fields = bookkeeping.get_field_ids(taskvals['fields'])

@@ -25,8 +25,8 @@ reservation = ''
 verbose = False
 scripts = [ ('validate_input.py',False,''),
             ('partition.py',True,''),
-            ('calc_refant.py',False,''),
             ('flag_round_1.py',True,''),
+            ('calc_refant.py',False,''),
             ('setjy.py',True,''),
             ('xx_yy_solve.py',False,''),
             ('xx_yy_apply.py',True,''),
@@ -42,12 +42,13 @@ scripts = [ ('validate_input.py',False,''),
 
 [crosscal]
 minbaselines = 4                  # Minimum number of baselines to use while calibrating
+preavg = 1                        # Number of channels to average before calibration (during partition)
 specavg = 1                       # Number of channels to average after calibration (during split)
 timeavg = '8s'                    # Time interval to average after calibration (during split)
 keepmms = True                    # Output MMS (True) or MS (False) during split
 spw = '0:860~1700MHz'             # Spectral window / frequencies to extract for MMS
 nspw = 16                         # Number of spectral windows to split into
-calcrefant = False                # Calculate reference antenna in program (overwrites 'refant')
+calcrefant = True                 # Calculate reference antenna in program (overwrites 'refant')
 refant = 'm059'                   # Reference antenna name / number
 standard = 'Stevens-Reynolds 2016'# Flux density standard for setjy
 badants = []                      # List of bad antenna numbers (to flag)

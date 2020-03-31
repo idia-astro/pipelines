@@ -16,7 +16,7 @@ if len(args) > 1:
         bins = int(sys.argv[2])
 
 dat=open(fname).read()
-lines = dat.split('\n')[:-1]
+lines = dat.split('\n')[1:-1] #skip header and remove last line
 ants=np.empty(len(lines),dtype=np.int)
 flags=np.zeros(len(lines))
 
