@@ -1,8 +1,6 @@
 #Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
-from __future__ import print_function
-
 import sys
 import os
 

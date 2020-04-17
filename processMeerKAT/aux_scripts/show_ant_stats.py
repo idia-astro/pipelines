@@ -1,4 +1,7 @@
-#!/usr/bin/env python
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
+
+#!/usr/bin/env python2.7
 import sys, os
 import numpy as np
 import matplotlib.pyplot as plt

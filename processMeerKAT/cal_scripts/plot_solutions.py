@@ -91,7 +91,7 @@ def main():
     # Parse config file
     taskvals, config = config_parser.parse_config(config)
 
-    visname = va(taskvals, 'data', 'vis', str)
+    visname = va(taskvals, 'data', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
