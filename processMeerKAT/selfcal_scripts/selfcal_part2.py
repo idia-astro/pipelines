@@ -9,13 +9,17 @@ import os
 import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
+import processMeerKAT
 
 import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-# So that CASA can find pyBDSF
+# So that CASA can find pyBDSF and the script
 os.putenv('PYTHONPATH', '/usr/lib/python2.7/dist-packages/')
+script = 'bdsf_model.py'
+if not os.path.exists(script):
+    shutil.copyfile('{0}/{1}/{2}'.format(processMeerKAT.SCRIPT_DIR,processMeerKAT.SELFCAL_SCRIPTS_DIR,script),script)
 
 def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
                       deconvolver, robust, niter, multiscale, threshold, nterms,
@@ -45,7 +49,7 @@ def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
         os.rename(name+'.round1'+ext,fname)
 
 def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
-                multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
+                multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, refant, loop):
 
     basename = vis.replace('.ms', '') + '_im_%d'
     imagename = basename % (loop + restart_no)
@@ -60,12 +64,12 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
         do_gaincal = True
 
     if nterms[loop] > 1:
-        bdsmname = imagename + ".image.tt0"
+        bdsfname = imagename + ".image.tt0"
     else:
-        bdsmname = imagename + ".image"
+        bdsfname = imagename + ".image"
 
-    if not os.path.exists(bdsmname):
-        logger.error("Image {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(bdsmname,loop))
+    if not os.path.exists(bdsfname):
+        logger.error("Image {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(bdsfname,loop))
         return loop+1
     else:
         if do_gaincal:
@@ -73,7 +77,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
                       deconvolver, robust, niter, multiscale, threshold, nterms,
                       regionfile,loop)
 
-            gaincal(vis=vis, caltable=caltable, selectdata=False, solint=solint[loop],
+            gaincal(vis=vis, caltable=caltable, selectdata=False, refant = refant, solint=solint[loop],
                     gaintable=prev_caltables, calmode=calmode[loop], append=False, parang=True)
 
             loop += 1
@@ -87,9 +91,9 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
         else:
             atrous_str = ''
 
-        os.system('/usr/bin/python bdsm_model.py {} {} --thresh-isl 20 '
+        os.system('/usr/bin/python {} {} {} --thresh-isl 20 '
         '--thresh-pix 10 {} --clobber --adaptive-rms-box '
-        '--rms-map'.format(bdsmname, regionfile, atrous_str))
+        '--rms-map'.format(script,bdsfname, regionfile, atrous_str))
 
         return loop
 
