@@ -34,16 +34,20 @@ def check_output(fname,pattern,out,job='concat',filetype='image'):
 
 def do_concat(visname, fields):
 
+    #Store bandwidth in MHz
+    msmd.open(visname)
+    suffix = '' if msmd.bandwidths(-1).sum()/1e6 < 100 else '.tt0'
+
     newvis = visname
     logger.info('Beginning {0}.'.format(sys.argv[0]))
     basename, ext = os.path.splitext(visname)
     filebase = os.path.split(basename)[1]
-    msmd.open(visname)
+
     for target in fields.targetfield.split(','):
         fname = msmd.namesforfields(int(target))[0]
 
         #Concat images (into continuum cube)
-        pattern = '*MHz/images/*{0}*image'.format(fname)
+        pattern = '*MHz/images/*{0}*image{1}'.format(fname,suffix)
         out = '{0}.{1}.contcube'.format(filebase,fname)
         images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
         if images is not None:

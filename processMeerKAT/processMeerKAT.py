@@ -575,8 +575,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     scripts = postcal_scripts[:]
     if len(scripts) > 0:
         if len(precal_scripts) == 0:
-            command = 'sbatch -d afterany:$IDs {0}'.format(postcal_scripts[0])
-            master.write('\n#{0}\n'.format(postcal_scripts[0]))
+            command = 'sbatch -d afterany:$IDs {0}'.format(scripts[0])
+            master.write('\n#{0}\n'.format(scripts[0]))
             master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
             scripts.pop(0)
         for script in scripts:
@@ -1008,7 +1008,7 @@ def format_args(config,submit,quiet,dependencies,selfcal):
 
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
-        if len(kwargs['precal_scripts']) > 1 or len(kwargs['postcal_scripts']) > 1:
+        if len(kwargs['precal_scripts']) > 0 or len(kwargs['postcal_scripts']) > 0:
             logger.warn('Appending "precal_scripts" to beginning of "scripts", and "postcal_script" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
             scripts = kwargs['precal_scripts'] + kwargs['scripts'] + kwargs['postcal_scripts']
             config_parser.overwrite_config(config, conf_dict={'scripts' : scripts}, conf_sec='slurm')
