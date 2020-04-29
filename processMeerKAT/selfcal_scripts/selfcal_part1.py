@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
-        multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop):
+        multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, loop, refant):
 
-    basename = vis.replace('.ms', '') + '_im_%d'
+    visbase = os.path.split(vis)[1] # Get only vis name, not entire path
+    basename = visbase.replace('.ms', '') + '_im_%d' # Images will be produced in $CWD
     imagename = basename % (loop + restart_no)
     regionfile = basename % (loop + restart_no) + ".casabox"
     caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no - 1)
