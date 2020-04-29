@@ -14,7 +14,8 @@ import time
 import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
-from casacore import tables as tb ###REQUIRES KERN2 container###
+import casac
+tb = casac.casac.table()
 
 def get_axis(axis,data,times):
 
