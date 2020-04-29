@@ -8,23 +8,24 @@ phasecalfield = ''
 targetfields = ''
 
 [slurm]                           # See processMeerKAT.py -h for documentation
-nodes = 5
+nodes = 2
 ntasks_per_node = 8
 plane = 1
 mem = 236                         # Use this many GB of memory (per node)
 partition = 'Main'                # SLURM partition to use
-exclude = ''                      # SLURM worker to exclude
+exclude = ''                      # SLURM nodes to exclude
 time = '12:00:00'
 submit = False
 container = '/idia/software/containers/casa-stable-5.6.2-2.simg'
-mpi_wrapper = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
+mpi_wrapper = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
 name = ''
 dependencies = ''
 account = 'b03-idia-ag'
 reservation = ''
 verbose = False
+precal_scripts = [('calc_refant.py',False,''), ('partition.py',True,'')]
+postcal_scripts = [('concat.py',False,''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,'')]
 scripts = [ ('validate_input.py',False,''),
-            ('partition.py',True,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
             ('setjy.py',True,''),
@@ -35,10 +36,7 @@ scripts = [ ('validate_input.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,''),
-            ('concat.py',False,''),
-            ('selfcal_part1.py',True,''),
-            ('selfcal_part2.py',False,'')]
+            ('plot_solutions.py',False,'')]
 
 [crosscal]
 minbaselines = 4                  # Minimum number of baselines to use while calibrating
@@ -73,3 +71,6 @@ deconvolver = 'mtmfs'
 solint = ['10min','5min','2min','1min']
 calmode = 'p'
 atrous = True                     # Source find for diffuse emission (see PyBDSF docs)
+
+[run]
+continue = True

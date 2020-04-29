@@ -67,13 +67,7 @@ def get_ref_ant(visname, fluxfield):
 
     return referenceant, badants
 
-def main():
-
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
@@ -103,5 +97,5 @@ def main():
                 config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'calcrefant' : False})
 
 if __name__ == '__main__':
-    main()
 
+    bookkeeping.run_script(main)

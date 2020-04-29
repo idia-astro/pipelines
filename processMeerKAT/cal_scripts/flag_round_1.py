@@ -68,14 +68,7 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
     flagdata(vis=visname, mode='summary', datacolumn='DATA',
             name=visname+'.flag.summary')
 
-
-
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
 
@@ -86,3 +79,7 @@ if __name__ == '__main__':
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     do_pre_flag(visname, fields, badfreqranges, badants)
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

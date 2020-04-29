@@ -18,7 +18,7 @@ license = """
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import argparse
@@ -53,12 +53,12 @@ FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','preavg','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
+SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
-MPI_WRAPPER = '/idia/software/pipelines/casa-prerelease-5.3.0-115.el7/bin/mpicasa'
-allSPWscripts = ['calc_refant.py','partition.py','concat.py'] #Scripts run at top level directory when nspw > 1
+MPI_WRAPPER = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
+PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
+POSTCAL_SCRIPTS = [('concat.py',False,''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,'')] #Scripts run after calibration at top level directory when nspw > 1
 SCRIPTS = [ ('validate_input.py',False,''),
-            ('partition.py',True,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
             ('setjy.py',True,''),
@@ -69,10 +69,7 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,''),
-            ('concat.py',False,''),
-            ('selfcal_part1.py', True, ''),
-            ('selfcal_part2.py', False, '')]
+            ('plot_solutions.py',False,'')]
 
 
 def check_path(path,update=False):
@@ -178,14 +175,16 @@ def parse_args():
     parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="Time limit to use for all jobs, in the form d-hh:mm:ss [default: '12:00:00'].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
-                        help="Run pipeline with these scripts, in this order, using this container (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
+                        help="Run pipeline with these scripts, in this order, using these containers (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
+    parser.add_argument("-b","--precal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=PRECAL_SCRIPTS, help="Same as [-S --scripts], but run before calibration.")
+    parser.add_argument("-a","--postcal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=POSTCAL_SCRIPTS, help="Same as [-S --scripts], but run after calibration.")
     parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
                         help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(MPI_WRAPPER))
     parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
-    parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies. [default: ''].")
+    parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
-    parser.add_argument("-a","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $(whoami) -s format=account%%30') [default: 'b03-idia-ag'].")
+    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $(whoami) -s format=account%%30') [default: 'b03-idia-ag'].")
     parser.add_argument("-r","--reservation", metavar="name", required=False, type=str, default='', help="SLURM reservation to use. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -193,6 +192,7 @@ def parse_args():
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
     parser.add_argument("-q","--quiet", action="store_true", required=False, default=False, help="Activate quiet mode, with suppressed output [default: False].")
     parser.add_argument("-D","--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
+    parser.add_argument("-2","--do2GC", action="store_true", required=False, default=False, help="Perform (2GC) self-calibration in the pipeline [default: False].")
     parser.add_argument("-x","--nofields", action="store_true", required=False, default=False, help="Do not read the input MS to extract field IDs [default: False].")
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
@@ -216,6 +216,10 @@ def parse_args():
     #if user inputs a list a scripts, remove the default list
     if len(args.scripts) > len(SCRIPTS):
         [args.scripts.pop(0) for i in range(len(SCRIPTS))]
+    if len(args.precal_scripts) > len(PRECAL_SCRIPTS):
+        [args.precal_scripts.pop(0) for i in range(len(PRECAL_SCRIPTS))]
+    if len(args.postcal_scripts) > len(POSTCAL_SCRIPTS):
+        [args.postcal_scripts.pop(0) for i in range(len(POSTCAL_SCRIPTS))]
 
     # If --dopol is passed in, replace second call of xx_yy* with xy_yx*
     if args.dopol:
@@ -336,10 +340,12 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     command : str
         Bash command to call with srun or within sbatch file."""
 
+    arrayJob = ',' in SPWs and 'partition' in script
+
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
     params['LOG_DIR'] = LOG_DIR
-    params['job'] = '${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}' if SPWs != '' else '${SLURM_JOB_ID}'
+    params['job'] = '${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}' if arrayJob else '${SLURM_JOB_ID}'
     params['job'] = '${SLURM_JOB_NAME}-' + params['job']
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
@@ -362,7 +368,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     else:
         params['singularity_call'] = 'exec'
 
-    if SPWs != '':
+    if arrayJob:
         command += """#Iterate over SPWs in job array, launching one after the other
         SPWs="%s"
         arr=($SPWs)
@@ -375,7 +381,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     #Get rid of annoying msmd output from casacore call
     if casacore:
         command += " 2>&1 | grep -v 'msmetadata_cmpt.cc::open\|MSMetaData::_computeScanAndSubScanProperties'"
-    if SPWs != '':
+    if arrayJob:
         command += '\ncd ..\n'
 
     return command
@@ -447,12 +453,12 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     plot = True if 'plot' in script else False
 
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs)
-    if SPWs == '':
-        params['ID'] = '%j'
-        params['array'] = ''
-    else:
+    if 'partition' in script and ',' in SPWs:
         params['ID'] = '%A_%a'
         params['array'] = '\n#SBATCH --array=0-{0}%1'.format(len(SPWs.split(','))-1)
+    else:
+        params['ID'] = '%j'
+        params['array'] = ''
     params['exclude'] = '\n#SBATCH --exclude={0}'.format(exclude) if exclude != '' else ''
     params['reservation'] = '\n#SBATCH --reservation={0}'.format(reservation) if reservation != '' else ''
 
@@ -485,7 +491,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,calc_refant=True,partition=True,concatenating=True):
+def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5):
 
     """Write master master script, which separately calls each of the master scripts in each SPW directory.
 
@@ -495,6 +501,10 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,c
         Path to config file.
     SPWs : str
         Comma-separated list of spw ranges.
+    precal_scripts : list, optional
+        List of sbatch scripts to call in order, before running pipeline in SPW directories.
+    postcal_scripts : list, optional
+        List of sbatch scripts to call in order, after running pipeline in SPW directories.
     submit : bool, optional
         Submit jobs to SLURM queue immediately?
     dir : str, optional
@@ -511,19 +521,27 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,c
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
     SPWs = SPWs.replace('0:','')
+    toplevel = len(precal_scripts + postcal_scripts) > 0
 
-    if calc_refant:
-        master.write("\nallSPWIDs=$(sbatch calc_refant.sbatch | cut -d ' ' -f4)\n")
-        master.write('echo Calculating reference antenna using jobID=$allSPWIDs, and copying result to SPW directories.\n\n')
+    scripts = precal_scripts[:]
+    if len(scripts) > 0:
+        command = 'sbatch {0}'.format(scripts[0])
+        master.write('\n#{0}\n'.format(scripts[0]))
+        master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
+        scripts.pop(0)
+    for script in scripts:
+        command = 'sbatch -d afterok:$allSPWIDs --kill-on-invalid-dep=yes'
+        master.write('\n#{0}\n'.format(script))
+        master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
+    if 'calc_refant.sbatch' in precal_scripts:
+        master.write('echo Calculating reference antenna, and copying result to SPW directories.\n')
+    if 'partition.sbatch' in precal_scripts:
+        master.write('echo Running partition job array, iterating over SPWs.\n')
+
+    partition = len(precal_scripts) > 0 and 'partition' in precal_scripts[-1]
     if partition:
-        if calc_refant:
-            master.write("partitionID=$(sbatch -d afterok:$allSPWIDs partition.sbatch | cut -d ' ' -f4)\n")
-            master.write('allSPWIDs+=,$partitionID\n')
-        else:
-            master.write("partitionID=$(sbatch partition.sbatch | cut -d ' ' -f4)\n")
-            master.write('allSPWIDs=$partitionID\n')
-        master.write('echo Running partition job array using jobID=$partitionID, iterating over SPWs\n')
+        master.write('\npartitionID=$(echo $allSPWIDs | cut -d , -f{0})\n'.format(len(precal_scripts)))
 
     #Add time as extn to this pipeline run, to give unique filenames
     killScript = 'killJobs'
@@ -532,7 +550,7 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,c
     errorScript = 'findErrors'
     timingScript = 'displayTimes'
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
-    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
+    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M')\n")
     master.write('mkdir -p {0}\n'.format(dir))
     master.write('mkdir -p {0}\n\n'.format(LOG_DIR))
     extn = '_$DATE.sh'
@@ -543,7 +561,7 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,c
         master.write('output=$({0} --config ./{1} --run --submit --quiet'.format(os.path.split(THIS_PROG)[1],config))
         if partition:
             master.write(' --dependencies=$partitionID\_{0}'.format(i))
-        elif calc_refant:
+        elif toplevel:
             master.write(' --dependencies=$allSPWIDs')
         master.write(')\necho $output\n')
         if i == 0:
@@ -552,31 +570,45 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,c
             master.write("IDs+=,$(echo $output | cut -d ' ' -f7)")
         master.write('\ncd ..\n\n')
 
-    if concatenating:
-        master.write('echo Running concat \(and providing option to run quick_tclean.sbatch\) over all SPWs after following jobs complete: $IDs\n')
-        if calc_refant or partition:
-            master.write('allSPWIDs+=,')
-        else:
-            master.write('allSPWIDs=')
-        master.write("$(sbatch -d afterany:$IDs concat.sbatch | cut -d ' ' -f4)\n")
-    else:
-        master.write('echo Submitted the following jobIDs over all SPWs: $IDs\n\n')
+    if 'concat.sbatch' in postcal_scripts:
+        master.write('echo Will concatenate MSs/MMSs and create continuum cube across all SPWs for all fields in \"targetfields\" from \"{0}\".\n'.format(config))
+    scripts = postcal_scripts[:]
+    if len(scripts) > 0:
+        if len(precal_scripts) == 0:
+            command = 'sbatch -d afterany:$IDs {0}'.format(postcal_scripts[0])
+            master.write('\n#{0}\n'.format(postcal_scripts[0]))
+            master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
+            scripts.pop(0)
+        for script in scripts:
+            command = 'sbatch -d afterany:$IDs'
+            master.write('\n#{0}\n'.format(script))
+            master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
+    master.write('\necho Submitted the following jobIDs within the {0} SPW directories: $IDs\n'.format(len(SPWs.split(','))))
 
     prefix = ''
     #Write bash job scripts for the jobs run in this top level directory
-    if calc_refant or partition or concatenating:
+    if toplevel:
+        master.write('\necho Submitted the following jobIDs over all SPWs: $allSPWIDs\n')
         prefix = 'allSPW_'
         write_all_bash_jobs_scripts(master,extn,IDs='allSPWIDs',dir=dir,prefix=prefix,pad_length=pad_length)
+        master.write('\nln -f -s {1}{2}{3} {0}/{1}{4}{3}\n'.format(dir,prefix,summaryScript,extn,fullSummaryScript))
 
     header = '------------------------------------------------------------------------------------------------------------------------------------------------------------------' + '-'*pad_length
-    do = """echo "for f in {%s,}; do cd \$f; ./%s.sh; cd ..; done; ./%s%s.sh" """ % (SPWs,killScript,prefix,killScript)
-    write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir)
-    do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; cd \$f; pwd; ./%s.sh %s; cd ..; counter=\$((counter+1)); echo '%s'; done; echo -n 'All SPWs: '; pwd; ./%s%s.sh" """
-    write_bash_job_script(master, summaryScript, extn, do % (SPWs,summaryScript,"| grep -v 'PENDING\|COMPLETED'",header,prefix,summaryScript), 'view the progress \(for running or failed jobs\)', dir=dir)
-    write_bash_job_script(master, fullSummaryScript, extn, do % (SPWs,summaryScript,'',header,prefix,summaryScript), 'view the progress \(for all jobs\)', dir=dir)
-    header = '--------------------------------------------------------------------------' + '-'*pad_length
-    write_bash_job_script(master, errorScript, extn, do % (SPWs,errorScript,'',header,prefix,errorScript), 'find errors \(after pipeline has run\)', dir=dir)
-    write_bash_job_script(master, timingScript, extn, do % (SPWs,timingScript,'',header,prefix,timingScript), 'display start and end timestamps \(after pipeline has run\)', dir=dir)
+    do = """echo "for f in {%s,}; do cd \$f; ./%s/%s%s; cd ..; done;""" % (SPWs,dir,killScript,extn)
+    if not toplevel:
+        do += ' \"'
+    write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir,prefix=prefix)
+
+    do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; cd \$f; pwd; ./%s/%s%s %s; cd ..; counter=\$((counter+1)); echo '%s'; done; """
+    if toplevel:
+        do += "echo -n 'All SPWs: '; pwd; "
+    else:
+        do += ' \"'
+    write_bash_job_script(master, summaryScript, extn, do % (SPWs,dir,summaryScript,extn,"| grep -v 'PENDING\|COMPLETED'",header), 'view the progress \(for running or failed jobs\)', dir=dir,prefix=prefix)
+    write_bash_job_script(master, fullSummaryScript, extn, do % (SPWs,dir,summaryScript,extn,'',header), 'view the progress \(for all jobs\)', dir=dir,prefix=prefix)
+    header = '------------------------------------------------------------------------------------------' + '-'*pad_length
+    write_bash_job_script(master, errorScript, extn, do % (SPWs,dir,errorScript,extn,'',header), 'find errors \(after pipeline has run\)', dir=dir,prefix=prefix)
+    write_bash_job_script(master, timingScript, extn, do % (SPWs,dir,timingScript,extn,'',header), 'display start and end timestamps \(after pipeline has run\)', dir=dir,prefix=prefix)
 
     #Close master submission script and make executable
     master.close()
@@ -589,7 +621,7 @@ def write_spw_master(filename,config,SPWs,submit,dir='jobScripts',pad_length=5,c
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
-def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies=''):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='', date=''):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -612,7 +644,9 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     echo : bool, optional
         Echo the pupose of each job script for the user?
     dependencies : str, optional
-        Comma-separated list of SLURM job dependencies."""
+        Comma-separated list of SLURM job dependencies.
+    date : str, optional
+        Date stamp to put on this run."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
@@ -653,7 +687,10 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     #Add time as extn to this pipeline run, to give unique filenames
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
-    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M-%S')\n")
+    if date == '':
+        master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M')\n")
+    else:
+        master.write("\nDATE={0}".format(date))
     extn = '_$DATE.sh'
 
     #Copy contents of config file to jobScripts directory
@@ -714,7 +751,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
         do = """echo "for ID in {$%s,}; do ls %s/*\$ID*err; cat %s/*\$ID*err | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID*err | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir, echo=echo)
 
-def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=True):
+def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=True,prefix=''):
 
     """Write bash job script (e.g. jobs summary, kill all jobs, etc).
 
@@ -733,19 +770,22 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
     dir : str, optional
         Directory to write this script into.
     echo : bool, optional
-        Echo what this job script does for the user?"""
+        Echo what this job script does for the user?
+    prefix : str, optional
+        Additional prefix to place on the beginning of the script, called from the top level directory (instead of SPW directories)."""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
-    master.write('\n#Create {0}.sh file, make executable and simlink to current version\n'.format(filename))
+    do2 = './{0}/{1}{2}{3} \"'.format(dir,prefix,filename,extn) if prefix != '' else ' '
+    master.write('\n#Create {0}.sh file, make executable and symlink to current version\n'.format(filename))
     master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
-    master.write('{0} >> {1}\n'.format(do,fname))
+    master.write('{0}{1}>> {2}\n'.format(do,do2,fname))
     master.write('chmod u+x {0}\n'.format(fname))
     master.write('ln -f -s {0} {1}.sh\n'.format(fname,filename))
     if echo:
         master.write('echo Run ./{0}.sh to {1}.\n'.format(filename,purpose))
 
-def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT, plane=1,
-    partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation=''):
+def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,
+                plane=1,partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation=''):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -759,6 +799,8 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         Are these scripts threadsafe (for MPI)? List assumed to be same length as scripts.
     containers : list (of paths), optional
         List of paths to singularity containers to use for each script. List assumed to be same length as scripts.
+    num_precal_scripts : int, optional
+        Number of precal scripts.
     mpi_wrapper : str, optional
         Path to MPI wrapper to use for threadsafe tasks (otherwise srun used).
     nodes : int, optional
@@ -791,41 +833,31 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], mpi_wrapper=MPI
         SLURM reservation to use."""
 
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
-    includes_calcrefant = 'calc_refant.py' in scripts
-    includes_partition = 'partition.py' in scripts
-    concatenating = 'concat.py' in scripts
     pad_length = len(name)
 
+    #Write sbatch file for each input python script
+    for i,script in enumerate(scripts):
+        jobname = os.path.splitext(os.path.split(script)[1])[0]
+
+        #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
+        if threadsafe[i]:
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
+                        container=containers[i],partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],account=account,reservation=reservation)
+        else:
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],
+                        partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],exclude=exclude,account=account,reservation=reservation)
+
+    #Replace all .py with .sbatch
+    scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
+    precal_scripts = scripts[:num_precal_scripts]
+    postcal_scripts = scripts[num_precal_scripts:]
+    echo = False if quiet else True
+
     if crosscal_kwargs['nspw'] > 1:
-        if includes_calcrefant:
-            write_sbatch('calc_refant.py','--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,exclude=exclude,mpi_wrapper='srun',
-                        container=containers[0],partition=partition,time=time,name='calc_refant',runname=name,account=account,reservation=reservation)
-        if includes_partition:
-            write_sbatch('partition.py','--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
-                        container=containers[0],partition=partition,time=time,name='partition',runname=name,SPWs=crosscal_kwargs['spw'],account=account,reservation=reservation)
-        if concatenating:
-            write_sbatch('concat.py','--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,exclude=exclude,mpi_wrapper='srun',
-                        container=containers[0],partition=partition,time=time,name='concat',runname=name,account=account,reservation=reservation)
-            write_sbatch('quick_tclean.py','--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
-                        container=containers[0],partition=partition,time=time,name='quick_tclean',runname=name,account=account,reservation=reservation)
-        #Build master master script, calling each of the separate SPWs at once
-        write_spw_master(MASTER_SCRIPT,config,crosscal_kwargs['spw'],submit,pad_length=pad_length,calc_refant=includes_calcrefant,partition=includes_partition,concatenating=concatenating)
+        #Build master master script, calling each of the separate SPWs at once, precal scripts before this, and postcal scripts after this
+        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length)
     else:
-        #Write sbatch file for each input python script
-        for i,script in enumerate(scripts):
-            jobname = os.path.splitext(os.path.split(script)[1])[0]
-
-            #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
-            if threadsafe[i]:
-                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
-                            container=containers[i],partition=partition,time=time,name=jobname,runname=name,account=account,reservation=reservation)
-            else:
-                write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],
-                            partition=partition,time=time,name=jobname,runname=name,exclude=exclude,account=account,reservation=reservation)
-
-        #Build master pipeline submission script, replacing all .py with .sbatch
-        scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
-        echo = False if quiet else True
+        #Build master pipeline submission script
         write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies)
 
 
@@ -836,7 +868,7 @@ def default_config(arg_dict):
     Arguments:
     ----------
     arg_dict : dict
-        Dictionary of arguments passed into this script, which is inserted into the config file under section [slurm]."""
+        Dictionary of arguments passed into this script, which is inserted into the config file under various sections."""
 
     filename = arg_dict['config']
     MS = arg_dict['MS']
@@ -854,6 +886,19 @@ def default_config(arg_dict):
 
     #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
+
+    if not arg_dict['do2GC']:
+        config_parser.remove_section(filename, 'selfcal')
+        scripts = arg_dict['postcal_scripts']
+        i = 0
+        while i < len(scripts):
+            if 'selfcal' in scripts[i][0]:
+                scripts.pop(i)
+                i -= 1
+            i += 1
+
+        config_parser.overwrite_config(filename, conf_dict={'postcal_scripts' : scripts}, conf_sec='slurm')
+
 
     if not arg_dict['nofields']:
         #Don't call srun if option --local used
@@ -873,7 +918,7 @@ def default_config(arg_dict):
         logger.debug('Using the following command:\n\t{0}'.format(command))
         os.system(command)
     else:
-        #Assume we're not processing multiple SPWs
+        #Skip extraction of field IDs and assume we're not processing multiple SPWs
         logger.info('Skipping extraction of field IDs.')
         config_parser.overwrite_config(filename, conf_dict={'nspw' : 1}, conf_sec='crosscal')
 
@@ -915,7 +960,7 @@ def pop_script(kwargs,script):
         kwargs['threadsafe'].pop(index)
         kwargs['containers'].pop(index)
 
-def format_args(config,submit,quiet,dependencies):
+def format_args(config,submit,quiet,dependencies,selfcal):
 
     """Format (and validate) arguments from config file, to be passed into write_jobs() function.
 
@@ -929,6 +974,8 @@ def format_args(config,submit,quiet,dependencies):
         Activate quiet mode, with suppressed output?
     dependencies : str
         Comma-separated list of SLURM job dependencies.
+    selfcal : bool
+        Is selfcal being performed?
 
     Returns:
     --------
@@ -942,8 +989,9 @@ def format_args(config,submit,quiet,dependencies):
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
     #Check selfcal params
-    selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
-    bookkeeping.get_selfcal_params()
+    if selfcal:
+        selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
+        bookkeeping.get_selfcal_params()
 
     #Force submit=True if user has requested it during [-R --run]
     if submit:
@@ -951,8 +999,28 @@ def format_args(config,submit,quiet,dependencies):
 
     #Ensure nspw is integer
     if type(crosscal_kwargs['nspw']) is not int:
-        logger.warn("Argument 'nspw'={0} in '{1}' is not an integer. Will set to integer.".format(crosscal_kwargs['nspw']),config,int(crosscal_kwargs['nspw']))
+        logger.warn("Argument 'nspw'={0} in '{1}' is not an integer. Will set to integer ({2}).".format(crosscal_kwargs['nspw']),config,int(crosscal_kwargs['nspw']))
         crosscal_kwargs['nspw'] = int(crosscal_kwargs['nspw'])
+
+    spw = crosscal_kwargs['spw']
+    nspw = crosscal_kwargs['nspw']
+    mem = int(kwargs['mem'])
+
+    #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
+    if nspw == 1:
+        if len(kwargs['precal_scripts']) > 1 or len(kwargs['postcal_scripts']) > 1:
+            logger.warn('Appending "precal_scripts" to beginning of "scripts", and "postcal_script" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
+            scripts = kwargs['precal_scripts'] + kwargs['scripts'] + kwargs['postcal_scripts']
+            config_parser.overwrite_config(config, conf_dict={'scripts' : scripts}, conf_sec='slurm')
+            config_parser.overwrite_config(config, conf_dict={'precal_scripts' : []}, conf_sec='slurm')
+            config_parser.overwrite_config(config, conf_dict={'postcal_scripts' : []}, conf_sec='slurm')
+            kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
+        else:
+            scripts = kwargs['scripts']
+    else:
+        scripts = kwargs['precal_scripts'] + kwargs['postcal_scripts']
+
+    kwargs['num_precal_scripts'] = len(kwargs['precal_scripts'])
 
     # Validate kwargs along with MS
     kwargs['MS'] = data_kwargs['vis']
@@ -960,33 +1028,25 @@ def format_args(config,submit,quiet,dependencies):
 
     #Reformat scripts tuple/list, to extract scripts, threadsafe, and containers as parallel lists
     #Check that path to each script and container exists or is ''
-    scripts = kwargs['scripts']
     kwargs['scripts'] = [check_path(i[0]) for i in scripts]
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
-
-    #If single correctly formatted spw, split into nspw directories, and process each spw independently
-    spw = crosscal_kwargs['spw']
-    nspw = crosscal_kwargs['nspw']
-    mem = int(kwargs['mem'])
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
     if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
         mem = mem // nspw
 
     includes_partition = 'partition.py' in kwargs['scripts']
+    #If single correctly formatted spw, split into nspw directories, and process each spw independently
     if nspw > 1:
         nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
-    # else:
-    #     #Pop concat script if we're not processing SPWs
-    #     pop_script(kwargs, 'concat.py')
 
-    #Set threadsafe=False for split if keepmms=False
+    #Set threadsafe=False for split if keepmms=False. Assume it won't be in precal or postcal scripts
     if 'split.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
         kwargs['threadsafe'][kwargs['scripts'].index('split.py')] = False
 
-    #Pop script to calculate reference antenna if calcrefant=False
+    #Pop script to calculate reference antenna if calcrefant=False. Assume it won't be in postcal scripts
     if not crosscal_kwargs['calcrefant']:
         pop_script(kwargs,'calc_refant.py')
 
@@ -996,13 +1056,13 @@ def format_args(config,submit,quiet,dependencies):
             kwargs['containers'][i] = kwargs['container']
     kwargs.pop('container')
     kwargs.pop('MS')
+    kwargs.pop('precal_scripts')
+    kwargs.pop('postcal_scripts')
     kwargs['quiet'] = quiet
 
-    #Force overwrite of dependencies and pop scripts not needed in SPW directories
+    #Force overwrite of dependencies
     if dependencies != '':
         kwargs['dependencies'] = dependencies
-        for script in allSPWscripts:
-            pop_script(kwargs, script)
 
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
@@ -1142,6 +1202,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
         config_parser.overwrite_config(spw_config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
         config_parser.overwrite_config(spw_config, conf_dict={'mem' : mem}, conf_sec='slurm')
         config_parser.overwrite_config(spw_config, conf_dict={'calcrefant' : False}, conf_sec='crosscal')
+        config_parser.overwrite_config(spw_config, conf_dict={'precal_scripts' : []}, conf_sec='slurm')
+        config_parser.overwrite_config(spw_config, conf_dict={'postcal_scripts' : []}, conf_sec='slurm')
         #Look 1 directory up when using relative path
         if MS[0] != '/':
             config_parser.overwrite_config(spw_config, conf_dict={'vis' : "'../{0}'".format(MS)}, conf_sec='data')
@@ -1225,7 +1287,7 @@ def main():
     if args.build:
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies)
+        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.do2GC)
         write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":

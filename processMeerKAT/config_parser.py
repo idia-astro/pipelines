@@ -48,6 +48,13 @@ def parse_config(filename):
 
     return taskvals, config
 
+def remove_section(filename, section):
+
+    config_dict,config = parse_config(filename)
+    config.remove_section(section)
+    config_file = open(filename, 'w')
+    config.write(config_file)
+    config_file.close()
 
 def overwrite_config(filename, conf_dict={}, conf_sec='', sec_comment=''):
 

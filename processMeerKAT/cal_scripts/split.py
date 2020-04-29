@@ -30,12 +30,7 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
     return newvis
 
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
 
@@ -54,3 +49,7 @@ if __name__ == '__main__':
     config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
     config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='data')
     msmd.done()
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

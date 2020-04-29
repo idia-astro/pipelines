@@ -88,12 +88,7 @@ def run_tclean(visname, fields, keepmms):
     msmd.done()
 
 
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
@@ -101,3 +96,7 @@ if __name__ == '__main__':
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     run_tclean(visname, fields, keepmms)
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

@@ -13,19 +13,13 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-def validateinput():
+def main(args,taskvals):
     """
     Parse the input config file (command line argument) and validate that the
     parameters look okay
     """
 
     logger.info('This is version {0} of the pipeline'.format(processMeerKAT.__version__))
-
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
 
     visname = va(taskvals, 'data', 'vis', str)
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
@@ -49,4 +43,5 @@ def validateinput():
 
 
 if __name__ == '__main__':
-    validateinput()
+
+    bookkeeping.run_script(main)

@@ -34,6 +34,7 @@ def check_output(fname,pattern,out,job='concat',filetype='image'):
 
 def do_concat(visname, fields):
 
+    newvis = visname
     logger.info('Beginning {0}.'.format(sys.argv[0]))
     basename, ext = os.path.splitext(visname)
     filebase = os.path.split(basename)[1]
@@ -66,6 +67,8 @@ def do_concat(visname, fields):
             logger.info('Concatenating MSs with following command:')
             logger.info('concat(vis={0}, concatvis={1})'.format(MSs,out))
             concat(vis=MSs, concatvis=out)
+            if target == fields.targetfield.split(',')[0]:
+                newvis = out
 
         if not os.path.exists(out):
             logger.error("Output MS '{0}' not written.".format(out))
@@ -79,6 +82,8 @@ def do_concat(visname, fields):
             logger.info('Concatenating MMSs with following command:')
             logger.info('virtualconcat(vis={0}, concatvis={1})'.format(MMSs,out))
             virtualconcat(vis=MMSs, concatvis=out)
+            if target == fields.targetfield.split(',')[0]:
+                newvis = out
 
         if not os.path.exists(out):
             logger.error("Output MMS '{0}' not written.".format(out))
@@ -86,15 +91,18 @@ def do_concat(visname, fields):
     msmd.done()
     logger.info('Completed {0}.'.format(sys.argv[0]))
 
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
+    return newvis
 
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
-    do_concat(visname, fields)
+    newvis = do_concat(visname, fields)
+    config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
+    config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='data')
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

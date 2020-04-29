@@ -84,12 +84,7 @@ def plot_antennas(caltype,fields,calfiles,xaxis='freq',yaxis='amp'):
     os.system('rm {0}'.format(' '.join(plots)))
 
 
-def main():
-
-    config = config_parser.parse_args()['config']
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(config)
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
@@ -132,4 +127,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    bookkeeping.run_script(main)

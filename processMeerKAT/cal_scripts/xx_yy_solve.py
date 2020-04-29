@@ -56,12 +56,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
                 listfile = os.path.join(caldir,'fluxscale_xx_yy.txt'))
         bookkeeping.check_file(calfiles.fluxfile)
 
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
 
@@ -72,5 +67,8 @@ if __name__ == '__main__':
     standard = va(taskvals, 'crosscal', 'standard', str, default='Stevens-Reynolds 2016')
     refant = va(taskvals, 'crosscal', 'refant', str, default='m059')
 
-    do_parallel_cal(visname, fields, calfiles, refant, caldir,
-            minbaselines, standard)
+    do_parallel_cal(visname, fields, calfiles, refant, caldir,minbaselines, standard)
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

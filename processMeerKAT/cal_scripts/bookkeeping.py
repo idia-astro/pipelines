@@ -139,3 +139,31 @@ def get_selfcal_params():
         sys.exit(1)
 
     return args,params
+
+def run_script(func):
+
+    # Get the name of the config file
+    args = config_parser.parse_args()
+
+    # Parse config file
+    taskvals, config = config_parser.parse_config(args['config'])
+
+    continue_run = config_parser.validate_args(taskvals, 'run', 'continue', bool, default=True)
+    spw = config_parser.validate_args(taskvals, 'crosscal', 'spw', str)
+    nspw = config_parser.validate_args(taskvals, 'crosscal', 'nspw', int)
+
+    if continue_run:
+        try:
+            func(args,taskvals)
+        except Exception as err:
+            logger.error('Exception found in the pipeline {0}: {1}'.format(type(err),err))
+            config_parser.overwrite_config(args['config'], conf_dict={'continue' : False}, conf_sec='run')
+            if nspw > 1:
+                for SPW in spw.split(','):
+                    spw_config = '{0}/{1}'.format(SPW.replace('0:',''),args['config'])
+                    config_parser.overwrite_config(spw_config, conf_dict={'continue' : False}, conf_sec='run')
+            sys.exit(1)
+    else:
+        logger.error('Exception found in pipeline. Skipping "{0}".'.format(os.path.split(sys.argv[2])[1]))
+        #os.system('./killJobs.sh') # and cancelling remaining jobs (scanel not found since /opt overwritten)
+        sys.exit(1)
