@@ -9,6 +9,8 @@ import processMeerKAT
 import config_parser
 
 import logging
+from time import gmtime
+logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 

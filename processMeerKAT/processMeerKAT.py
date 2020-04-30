@@ -29,6 +29,8 @@ import config_parser
 from cal_scripts import bookkeeping
 from shutil import copyfile
 import logging
+from time import gmtime
+logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 
 #Set global limits for current ilifu cluster configuration
@@ -573,14 +575,23 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     if 'concat.sbatch' in postcal_scripts:
         master.write('echo Will concatenate MSs/MMSs and create continuum cube across all SPWs for all fields in \"targetfields\" from \"{0}\".\n'.format(config))
     scripts = postcal_scripts[:]
+
+    #Hack to perform correct number of selfcal loops
+    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
+        selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
+        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+        scripts.append('selfcal_part1.sbatch')
+
     if len(scripts) > 0:
+        command = 'sbatch -d afterany:$IDs {0}'.format(scripts[0])
+        master.write('\n#{0}\n'.format(scripts[0]))
+        scripts.pop(0)
         if len(precal_scripts) == 0:
-            command = 'sbatch -d afterany:$IDs {0}'.format(scripts[0])
-            master.write('\n#{0}\n'.format(scripts[0]))
             master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
-            scripts.pop(0)
+        else:
+            master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
         for script in scripts:
-            command = 'sbatch -d afterany:$IDs'
+            command = 'sbatch -d afterok:$allSPWIDs'
             master.write('\n#{0}\n'.format(script))
             master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
     master.write('\necho Submitted the following jobIDs within the {0} SPW directories: $IDs\n'.format(len(SPWs.split(','))))
@@ -1006,6 +1017,11 @@ def format_args(config,submit,quiet,dependencies,selfcal):
     nspw = crosscal_kwargs['nspw']
     mem = int(kwargs['mem'])
 
+    if nspw > 1 and len(kwargs['scripts']) == 0:
+        logger.warn('Setting nspw=1, since no "scripts" parameter in "{0}" is empty, so there\'s nothing run inside SPW directories.'.format(config))
+        config_parser.overwrite_config(config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
+        nspw = 1
+
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
         if len(kwargs['precal_scripts']) > 0 or len(kwargs['postcal_scripts']) > 0:
@@ -1069,6 +1085,10 @@ def format_args(config,submit,quiet,dependencies,selfcal):
     copyfile(config, TMP_CONFIG)
     if not quiet:
         logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
+
+    if len(kwargs['scripts']) == 0:
+        logger.error('Nothing to do. Please insert scripts into "scripts" parameter in "{0}".'.format(config))
+        sys.exit(1)
 
     return kwargs
 
@@ -1147,7 +1167,6 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
     nspw : int
         New nspw, potentially a lower value than input (if any SPWs completely encompassed by badfreqranges)."""
 
-    #TODO: Validate nspw as integer
     if get_spw_bounds(spw) != None:
         #Write nspw frequency ranges
         low,high,unit,func = get_spw_bounds(spw)

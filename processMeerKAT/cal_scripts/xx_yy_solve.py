@@ -10,6 +10,8 @@ from cal_scripts import bookkeeping
 from config_parser import validate_args as va
 
 import logging
+from time import gmtime
+logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
