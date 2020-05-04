@@ -971,7 +971,7 @@ def pop_script(kwargs,script):
         kwargs['threadsafe'].pop(index)
         kwargs['containers'].pop(index)
 
-def format_args(config,submit,quiet,dependencies,selfcal):
+def format_args(config,submit,quiet,dependencies):
 
     """Format (and validate) arguments from config file, to be passed into write_jobs() function.
 
@@ -1000,7 +1000,7 @@ def format_args(config,submit,quiet,dependencies,selfcal):
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
     #Check selfcal params
-    if selfcal:
+    if config_parser.has_section(config,'selfcal'):
         selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
         bookkeeping.get_selfcal_params()
 
@@ -1306,7 +1306,7 @@ def main():
     if args.build:
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.do2GC)
+        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies)
         write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":

@@ -48,6 +48,11 @@ def parse_config(filename):
 
     return taskvals, config
 
+def has_section(filename, section):
+
+    config_dict,config = parse_config(filename)
+    return section in config_dict
+
 def remove_section(filename, section):
 
     config_dict,config = parse_config(filename)

@@ -128,13 +128,16 @@ def get_selfcal_params():
 
         else:
             if type(params[arg]) is not list:
-                params[arg] = [params[arg]] * (params['nloops'] + 1)
+                if arg in ['solint','calmode']:
+                    params[arg] = [params[arg]] * (params['nloops'])
+                else:
+                    params[arg] = [params[arg]] * (params['nloops'] + 1)
 
-            if arg == 'solint' and len(params[arg]) != params['nloops']:
-                logger.error("Parameter 'solint' in '{0}' is the wrong length. It is {1} but must be a single value (not a list) or equal 'nloops' ({2}).".format(args['config'],len(params[arg]),params['nloops']))
+            if arg in ['solint','calmode'] and len(params[arg]) != params['nloops']:
+                logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']))
                 exit = True
-            elif arg != 'solint' and len(params[arg]) != params['nloops'] + 1:
-                logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} but must be a single value (not a list) equal to 'nloops' + 1 ({3}).".format(arg,args['config'],len(params[arg]),params['nloops']+1))
+            elif arg not in ['solint','calmode'] and len(params[arg]) != params['nloops'] + 1:
+                logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must 'nloops' + 1 ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']+1))
                 exit = True
 
     if exit:
