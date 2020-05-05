@@ -1052,7 +1052,7 @@ def format_args(config,submit,quiet,dependencies):
     if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
         mem = mem // nspw
 
-    includes_partition = 'partition.py' in kwargs['scripts']
+    includes_partition = any('partition' in script for script in kwargs['scripts'])
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     if nspw > 1:
         nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)
