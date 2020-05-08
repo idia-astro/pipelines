@@ -79,8 +79,9 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
                       deconvolver, robust, niter, multiscale, threshold, nterms,
                       regionfile,loop)
 
-            gaincal(vis=vis, caltable=caltable, selectdata=False, refant = refant, solint=solint[loop],
-                    gaintable=prev_caltables, calmode=calmode[loop], append=False, parang=True)
+            solnorm = 'a' in calmode[loop]
+            gaincal(vis=vis, caltable=caltable, selectdata=False, refant = refant, solint=solint[loop], solnorm=solnorm,
+                    normtype='median', gaintable=prev_caltables, calmode=calmode[loop], append=False, parang=True)
 
             loop += 1
 

@@ -39,7 +39,7 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
                     freqcutoff=5.0, timefit='line', freqfit='line', flagdimension='freqtime',
                     extendflags=False, timedevscale=3.0, freqdevscale=3.0, spectralmax=500,
                     extendpols=False, growaround=False, flagneartime=False, flagnearfreq=False,
-            action='apply', flagbackup=True, overwrite=True, writeflags=True)
+                    action='apply', flagbackup=True, overwrite=True, writeflags=True)
 
         tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
