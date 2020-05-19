@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 
-__version__ = '2.0'
+__version__ = '1.1'
 
 license = """
     Process MeerKAT data via CASA measurement set.
@@ -32,6 +32,7 @@ import logging
 from time import gmtime
 logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s")
 
 #Set global limits for current ilifu cluster configuration
 TOTAL_NODES_LIMIT = 79
@@ -443,7 +444,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     #Use multiple CPUs for tclean and paratition scripts
     params['cpus'] = 1
     if 'partition' in script and tasks*4 <= CPUS_PER_NODE_LIMIT:
-        params['cpus'] = 4 #hard-code for 4 polarisations (TODO: check MS actually has 4, requiring CASA)
+        params['cpus'] = 4 #hard-code for 2/4 polarisations (TODO: check MS actually has 4, requiring CASA)
     if 'tclean' in script or 'selfcal' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
 
@@ -451,10 +452,11 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
         params['mem'] = MEM_PER_NODE_GB_LIMIT
 
-    #Use xvfb for plotting scripts
-    plot = True if 'plot' in script else False
+    #Use xvfb for plotting scripts, and casacore for validate_input.py
+    plot = ('plot' in script)
+    casacore = (script == 'validate_input.py')
 
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,casacore=casacore)
     if 'partition' in script and ',' in SPWs:
         params['ID'] = '%A_%a'
         params['array'] = '\n#SBATCH --array=0-{0}%1'.format(len(SPWs.split(','))-1)
@@ -589,7 +591,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         if len(precal_scripts) == 0:
             master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
         else:
-            master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
+            master.write("allSPWIDs+=,$({0} | cut -d ' ' -f4)\n".format(command))
         for script in scripts:
             command = 'sbatch -d afterok:$allSPWIDs'
             master.write('\n#{0}\n'.format(script))
@@ -1290,7 +1292,7 @@ def setup_logger(config,verbose=False):
             verbose = config_dict['slurm']['verbose']
 
     loglevel = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=loglevel)
+    logger.setLevel(loglevel)
 
 def main():
 

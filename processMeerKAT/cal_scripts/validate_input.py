@@ -8,6 +8,8 @@ import config_parser
 from config_parser import validate_args as va
 import processMeerKAT
 from cal_scripts import get_fields, bookkeeping
+import casac
+msmd = casac.casac.msmetadata()
 
 import logging
 from time import gmtime
