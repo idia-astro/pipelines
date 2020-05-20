@@ -9,6 +9,7 @@ import os
 import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
+import processMeerKAT as pm
 
 import logging
 from time import gmtime
@@ -19,9 +20,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 # So that CASA can find pyBDSF and the script
 os.putenv('PYTHONPATH', '/usr/lib/python2.7/dist-packages/')
 script = 'bdsf_model.py'
-SCRIPT_DIR=os.path.dirname(sys.argv[2])
 if not os.path.exists(script):
-    shutil.copyfile('{0}/{1}'.format(SCRIPT_DIR,script),script)
+    shutil.copyfile('{0}/{1}/{2}'.format(pm.SCRIPT_DIR,pm.SELFCAL_SCRIPTS_DIR,script),script)
 
 def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
                       deconvolver, robust, niter, multiscale, threshold, nterms,
@@ -70,6 +70,9 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
     else:
         bdsfname = imagename + ".image"
 
+    fitsname = imagename + '.fits'
+    exportfits(imagename = bdsfname, fitsimage=fitsname)
+
     if not os.path.exists(bdsfname):
         logger.error("Image {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(bdsfname,loop))
         return loop+1
@@ -96,7 +99,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
 
         os.system('/usr/bin/python {} {} {} --thresh-isl 20 '
         '--thresh-pix 10 {} --clobber --adaptive-rms-box '
-        '--rms-map'.format(script, bdsfname, regionfile, atrous_str))
+        '--rms-map'.format(script, fitsname, regionfile, atrous_str))
 
         return loop
 

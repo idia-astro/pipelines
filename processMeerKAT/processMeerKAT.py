@@ -41,7 +41,7 @@ NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
 MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
 
 #Set global values for paths and file names
-THIS_PROG = sys.argv[0]
+THIS_PROG = __file__
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
 CALIB_SCRIPTS_DIR = 'cal_scripts'
@@ -459,7 +459,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,casacore=casacore)
     if 'partition' in script and ',' in SPWs:
         params['ID'] = '%A_%a'
-        params['array'] = '\n#SBATCH --array=0-{0}%1'.format(len(SPWs.split(','))-1)
+        params['array'] = '\n#SBATCH --array=0-{0}%2'.format(len(SPWs.split(','))-1)
     else:
         params['ID'] = '%j'
         params['array'] = ''
