@@ -675,16 +675,18 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
 
+    command = 'sbatch {0}'.format(scripts[0])
+
     #Submit first script with no dependencies and extract job ID
-    if dependencies == '':
-        command = 'sbatch {0}'.format(scripts[0])
-        master.write('\n#{0}\n'.format(scripts[0]))
-        if verbose:
-            master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
-        master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
-        scripts.pop(0)
-    else:
-        master.write('\n#Run after these dependencies\nIDs={0}\n'.format(dependencies))
+    if dependencies != '':
+        master.write('\n#Run after these dependencies\nDep={0}\n'.format(dependencies))
+        command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
+    master.write('\n#{0}\n'.format(scripts[0]))
+    if verbose:
+        master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
+    master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
+    scripts.pop(0)
+
 
     #Submit each script with dependency on all previous scripts, and extract job IDs
     for script in scripts:
@@ -1229,6 +1231,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
             basename, ext = os.path.splitext(MS.rstrip('/ '))
             filebase = os.path.split(basename)[1]
             vis = '{0}.{1}.mms'.format(filebase,spw.replace('0:',''))
+            logger.warn("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
             config_parser.overwrite_config(spw_config, conf_dict={'vis' : "'{0}'".format(vis)}, conf_sec='data')
 
     return nspw
