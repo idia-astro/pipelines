@@ -456,7 +456,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     plot = ('plot' in script)
     casacore = (script == 'validate_input.py')
 
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,casacore=casacore)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=not casacore,plot=plot,SPWs=SPWs,casacore=casacore)
     if 'partition' in script and ',' in SPWs:
         params['ID'] = '%A_%a'
         params['array'] = '\n#SBATCH --array=0-{0}%2'.format(len(SPWs.split(','))-1)
@@ -758,10 +758,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows'; done" """ % (IDs,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
-    if prefix == '':
-        do = """echo "for ID in {$%s,}; do ls %s/*\$ID.casa; cat %s/*\$ID.casa | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID.casa | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
-    else: #prefix != '' means we're running at top level over all SPWs, where CASA logs aren't written (since they're written to SPW directory logs), so we read the error logs
-        do = """echo "for ID in {$%s,}; do ls %s/*\$ID*err; cat %s/*\$ID*err | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID*err | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
+    do = """echo "for ID in {$%s,}; do ls %s/*\$ID*; cat %s/*\$ID* | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID* | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir, echo=echo)
 
 def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=True,prefix=''):
@@ -1128,7 +1125,7 @@ def get_spw_bounds(spw):
         high = func(high)
 
         if unit != 'MHz':
-            logger.warning('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
+            logger.warn('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
         # Can only do when using CASA
         # if unit == '':
         #     msmd.open(MS)

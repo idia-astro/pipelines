@@ -51,9 +51,9 @@ img.write_catalog(outfile=args.outfile, format=args.fmt, clobber=args.clobber,
 #modelname += '_bdsf_model' + ext
 modelname = args.imagename + '.bdsf_model'
 if 'FITS' in args.imagename.upper():
-    img.export_image(outfile=modelname, clobber=True, img_format='fits',
+    img.export_image(outfile=modelname, img_format='fits',
         img_type='gaus_model')
 
 if '.image' in args.imagename.lower():
-    img.export_image(outfile=modelname, clobber=True, img_format='casa',
+    img.export_image(outfile=modelname, img_format='casa',
         img_type='gaus_model')

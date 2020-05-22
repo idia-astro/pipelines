@@ -98,7 +98,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
             atrous_str = ''
 
         os.system('/usr/bin/python {} {} {} --thresh-isl 20 '
-        '--thresh-pix 10 {} --clobber --adaptive-rms-box '
+        '--thresh-pix 10 {} --adaptive-rms-box '
         '--rms-map'.format(script, fitsname, regionfile, atrous_str))
 
         return loop
