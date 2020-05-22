@@ -675,7 +675,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
 
-    command = 'sbatch {0}'.format(scripts[0])
+    command = 'sbatch'
 
     #Submit first script with no dependencies and extract job ID
     if dependencies != '':
@@ -684,7 +684,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
         master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
-    master.write("IDs=$({0} | cut -d ' ' -f4)\n".format(command))
+    master.write("IDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
     scripts.pop(0)
 
 
