@@ -480,7 +480,6 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     #SBATCH --time={time}
 
     export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-    export OMPI_MCA_btl_tcp_if_exclude='192.168.100.0/24'
 
     {command}"""
 
@@ -495,7 +494,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5):
+def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies=''):
 
     """Write master master script, which separately calls each of the master scripts in each SPW directory.
 
@@ -515,12 +514,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         Name of directory to output ancillary job scripts.
     pad_length : int, optional
         Length to pad the SLURM sacct output columns.
-    calc_refant : bool, optional
-        Run initial reference antenna calculation?
-    partition : bool, optional
-        Run initial partition job array?
-    concatenating : bool, optional
-        Run final concat step?"""
+    dependencies : str, optional
+        Comma-separated list of SLURM job dependencies."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
@@ -529,9 +524,13 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
 
     scripts = precal_scripts[:]
     if len(scripts) > 0:
-        command = 'sbatch {0}'.format(scripts[0])
+        command = 'sbatch'
+        if dependencies != '':
+            master.write('\n#Run after these dependencies\nDep={0}\n'.format(dependencies))
+            command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
+            dependencies = '' #Remove dependencies so it isn't fed into launching SPW scripts
         master.write('\n#{0}\n'.format(scripts[0]))
-        master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
+        master.write("allSPWIDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
         scripts.pop(0)
     for script in scripts:
         command = 'sbatch -d afterok:$allSPWIDs --kill-on-invalid-dep=yes'
@@ -567,6 +566,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
             master.write(' --dependencies=$partitionID\_{0}'.format(i))
         elif toplevel:
             master.write(' --dependencies=$allSPWIDs')
+        elif dependencies != '':
+            master.write(' --dependencies={0}'.format(dependencies))
         master.write(')\necho $output\n')
         if i == 0:
             master.write("IDs=$(echo $output | cut -d ' ' -f7)")
@@ -677,7 +678,6 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     command = 'sbatch'
 
-    #Submit first script with no dependencies and extract job ID
     if dependencies != '':
         master.write('\n#Run after these dependencies\nDep={0}\n'.format(dependencies))
         command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
@@ -756,7 +756,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel ${0}'.format(IDs), 'kill all the jobs', dir=dir, echo=echo)
-    do = """echo sacct -j ${0} -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,MaxRSS,State,ExitCode" """.format(IDs,15+pad_length)
+    do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,MaxRSS,State,ExitCode" """.format(IDs,15+pad_length)
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows'; done" """ % (IDs,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
@@ -867,7 +867,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
 
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once, precal scripts before this, and postcal scripts after this
-        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length)
+        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies)
     else:
         #Build master pipeline submission script
         write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies)
