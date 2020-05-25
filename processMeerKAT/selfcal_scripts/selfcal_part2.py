@@ -55,11 +55,12 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
 
     basename = vis.replace('.ms', '') + '_im_%d'
     imagename = basename % (loop + restart_no)
-    regionfile = basename % (loop + restart_no) + ".casabox"
+    #regionfile = basename % (loop + restart_no) + ".casabox"
+    pixmask = basename % (loop + restart_no) + ".pixmask"
     caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
     prev_caltables = sorted(glob.glob('*.gcal?'))
 
-    if loop == 0 and not os.path.exists(regionfile):
+    if loop == 0 and not os.path.exists(pixmask):
         imagename += '_nomask'
         do_gaincal = False
     else:
@@ -80,26 +81,13 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
         if do_gaincal:
             predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
                       deconvolver, robust, niter, multiscale, threshold, nterms,
-                      regionfile,loop)
+                      pixmask,loop)
 
             solnorm = 'a' in calmode[loop]
             gaincal(vis=vis, caltable=caltable, selectdata=False, refant = refant, solint=solint[loop], solnorm=solnorm,
                     normtype='median', gaintable=prev_caltables, calmode=calmode[loop], append=False, parang=True)
 
             loop += 1
-
-        regionfile = basename % (loop + restart_no) + ".casabox"
-
-        # If it's the first round of selfcal and regionfile is blank, only run
-        # BDSF and quit.
-        if atrous[loop]:
-            atrous_str = '--atrous-do'
-        else:
-            atrous_str = ''
-
-        os.system('/usr/bin/python {} {} {} --thresh-isl 20 '
-        '--thresh-pix 10 {} --adaptive-rms-box '
-        '--rms-map'.format(script, fitsname, regionfile, atrous_str))
 
         return loop
 

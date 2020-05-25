@@ -21,7 +21,8 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
     visbase = os.path.split(vis)[1] # Get only vis name, not entire path
     basename = visbase.replace('.ms', '') + '_im_%d' # Images will be produced in $CWD
     imagename = basename % (loop + restart_no)
-    regionfile = basename % (loop + restart_no) + ".casabox"
+    #regionfile = basename % (loop + restart_no) + ".casabox"
+    pixmask = basename % (loop + restart_no) + ".pixmask"
     caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no - 1)
     all_caltables = sorted(glob.glob('*.gcal?'))
 
@@ -29,8 +30,8 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
         logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,loop))
         sys.exit(1)
     else:
-        if loop == 0 and not os.path.exists(regionfile):
-            regionfile = ''
+        if loop == 0 and not os.path.exists(pixmask):
+            pixmask = ''
             imagename += '_nomask'
         elif 0 < loop <= (nloops):
                 applycal(vis=vis, selectdata=False, gaintable=all_caltables, parang=True)
@@ -46,7 +47,7 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
             wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=True,
             weighting='briggs', robust = robust[loop], niter=niter[loop], scales=multiscale[loop],
             threshold=threshold[loop], nterms=nterms[loop],
-            savemodel='none', pblimit=-1, mask=regionfile, parallel = True)
+            savemodel='none', pblimit=-1, mask=pixmask, parallel = True)
 
 
 if __name__ == '__main__':
