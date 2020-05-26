@@ -154,7 +154,8 @@ def check_refant(MS,refant,config,warn=True):
     else:
         logger.info("Using reference antenna '{0}'.".format(refant))
         if refant == 'm059':
-            logger.info("This is usually a well-behaved (stable) antenna. Update 'refant' in [crosscal] section of '{0}' to change this.".format(config))
+            logger.info("This is usually a well-behaved (stable) antenna.")
+            logger.debug("Edit '{0}' to change this, by updating 'refant' in [crosscal] section, or setting 'calcrefant=True' in this section, and including 'calc_refant.py' in 'scripts' in [slurm] section (included by default).".format(config))
 
 def check_scans(MS,nodes,tasks):
 

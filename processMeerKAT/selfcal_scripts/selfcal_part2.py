@@ -9,19 +9,12 @@ import os
 import config_parser
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
-import processMeerKAT as pm
 
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
-
-# So that CASA can find pyBDSF and the script
-os.putenv('PYTHONPATH', '/usr/lib/python2.7/dist-packages/')
-script = 'bdsf_model.py'
-if not os.path.exists(script):
-    shutil.copyfile('{0}/{1}/{2}'.format(pm.SCRIPT_DIR,pm.SELFCAL_SCRIPTS_DIR,script),script)
 
 def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
                       deconvolver, robust, niter, multiscale, threshold, nterms,

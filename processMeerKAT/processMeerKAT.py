@@ -39,6 +39,7 @@ TOTAL_NODES_LIMIT = 79
 CPUS_PER_NODE_LIMIT = 32
 NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
 MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
+MEM_PER_NODE_GB_LIMIT_HIGHMEM = 482 #493568 MB
 
 #Set global values for paths and file names
 THIS_PROG = __file__
@@ -60,7 +61,7 @@ SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_sc
 CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
-POSTCAL_SCRIPTS = [('concat.py',False,''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,'')] #Scripts run after calibration at top level directory when nspw > 1
+POSTCAL_SCRIPTS = [('concat.py',False,''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
 SCRIPTS = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -292,8 +293,12 @@ def validate_args(args,config,parser=None):
         raise_error(config, msg, parser)
 
     if args['mem'] > MEM_PER_NODE_GB_LIMIT:
-        msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
-        raise_error(config, msg, parser)
+        if args['partition'] != 'HighMem':
+            msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
+            raise_error(config, msg, parser)
+        elif args['mem'] > MEM_PER_NODE_GB_LIMIT_HIGHMEM:
+            msg = "The memory per node [-m --mem] must not exceed {0} (GB) when using 'HighMem' partition. You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT_HIGHMEM,args['mem'])
+            raise_error(config, msg, parser)
 
     if args['plane'] > args['ntasks_per_node']:
         msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
@@ -370,6 +375,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         params['singularity_call'] = 'run' #points to python that comes with CASA, including casac
     else:
         params['singularity_call'] = 'exec'
+    if not casa_script and not casacore:
+        params['casa_call'] = 'python'
 
     if arrayJob:
         command += """#Iterate over SPWs in job array, launching one after the other
@@ -391,7 +398,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
-                container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,SPWs='',account='b03-idia-ag',reservation=''):
+                container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,casacore=False,SPWs='',account='b03-idia-ag',reservation=''):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -427,6 +434,8 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
         Time limit to use for this job, in the form d-hh:mm:ss.
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?
+    casacore : bool, optional
+        Is the script that is called within this job a casacore script?
     SPWs : str, optional
         Comma-separated list of spw ranges.
     account : str, optional
@@ -445,18 +454,23 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params['cpus'] = 1
     if 'partition' in script and tasks*4 <= CPUS_PER_NODE_LIMIT:
         params['cpus'] = 4 #hard-code for 2/4 polarisations (TODO: check MS actually has 4, requiring CASA)
-    if 'tclean' in script or 'selfcal' in script:
+    if 'tclean' in script or 'selfcal' in script or 'bdsf' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
 
     #If requesting all CPUs, user may as well use all memory
     if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
         params['mem'] = MEM_PER_NODE_GB_LIMIT
 
-    #Use xvfb for plotting scripts, and casacore for validate_input.py
+    #Use xvfb for plotting scripts, casacore for validate_input.py, and just python for run_bdsf.py
     plot = ('plot' in script)
-    casacore = (script == 'validate_input.py')
+    if script == 'validate_input.py':
+        casa_script = False
+        casacore = True
+    elif script == 'run_bdsf.py':
+        casa_script = False
+        casacore = False
 
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=not casacore,plot=plot,SPWs=SPWs,casacore=casacore)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,casacore=casacore)
     if 'partition' in script and ',' in SPWs:
         params['ID'] = '%A_%a'
         params['array'] = '\n#SBATCH --array=0-{0}%2'.format(len(SPWs.split(','))-1)
@@ -540,7 +554,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     if 'calc_refant.sbatch' in precal_scripts:
         master.write('echo Calculating reference antenna, and copying result to SPW directories.\n')
     if 'partition.sbatch' in precal_scripts:
-        master.write('echo Running partition job array, iterating over SPWs.\n')
+        master.write('echo Running partition job array, iterating over {0} SPWs.\n'.format(len(SPWs.split(','))))
 
     partition = len(precal_scripts) > 0 and 'partition' in precal_scripts[-1]
     if partition:
@@ -576,13 +590,13 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         master.write('\ncd ..\n\n')
 
     if 'concat.sbatch' in postcal_scripts:
-        master.write('echo Will concatenate MSs/MMSs and create continuum cube across all SPWs for all fields in \"targetfields\" from \"{0}\".\n'.format(config))
+        master.write('echo Will concatenate MSs/MMSs and create quick-look continuum cube across all SPWs for target and calibrator fields from \"{0}\".\n'.format(config))
     scripts = postcal_scripts[:]
 
     #Hack to perform correct number of selfcal loops
-    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
+    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
         selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
-        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
 
     if len(scripts) > 0:
@@ -603,11 +617,13 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     #Write bash job scripts for the jobs run in this top level directory
     if toplevel:
         master.write('\necho Submitted the following jobIDs over all SPWs: $allSPWIDs\n')
+        master.write('\necho For jobs over all SPWs:\n')
         prefix = 'allSPW_'
         write_all_bash_jobs_scripts(master,extn,IDs='allSPWIDs',dir=dir,prefix=prefix,pad_length=pad_length)
         master.write('\nln -f -s {1}{2}{3} {0}/{1}{4}{3}\n'.format(dir,prefix,summaryScript,extn,fullSummaryScript))
 
-    header = '------------------------------------------------------------------------------------------------------------------------------------------------------------------' + '-'*pad_length
+    master.write('\necho For all jobs within the {0} SPW directories:\n'.format(len(SPWs.split(','))))
+    header = '-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------' + '-'*pad_length
     do = """echo "for f in {%s,}; do cd \$f; ./%s/%s%s; cd ..; done;""" % (SPWs,dir,killScript,extn)
     if not toplevel:
         do += ' \"'
@@ -671,9 +687,9 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Hack to perform correct number of selfcal loops
-    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
+    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
         selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
-        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
 
     command = 'sbatch'
@@ -756,7 +772,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel ${0}'.format(IDs), 'kill all the jobs', dir=dir, echo=echo)
-    do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,MaxRSS,State,ExitCode" """.format(IDs,15+pad_length)
+    do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,CPUTime,MaxRSS,State,ExitCode" """.format(IDs,15+pad_length)
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows'; done" """ % (IDs,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
@@ -904,7 +920,7 @@ def default_config(arg_dict):
         scripts = arg_dict['postcal_scripts']
         i = 0
         while i < len(scripts):
-            if 'selfcal' in scripts[i][0]:
+            if 'selfcal' in scripts[i][0] or 'bdsf' in scripts[i][0] or scripts[i][0] == 'make_pixmask.py':
                 scripts.pop(i)
                 i -= 1
             i += 1
@@ -964,13 +980,21 @@ def pop_script(kwargs,script):
     kwargs :  : dict
         Keyword arguments extracted from [slurm] section of config file, to be passed into write_jobs() function.
     script : str
-        Name of script."""
+        Name of script.
 
+    Returns:
+    --------
+    popped : bool
+        Was the script popped?"""
+
+    popped = False
     if script in kwargs['scripts']:
         index = kwargs['scripts'].index(script)
         kwargs['scripts'].pop(index)
         kwargs['threadsafe'].pop(index)
         kwargs['containers'].pop(index)
+        popped = True
+    return popped
 
 def format_args(config,submit,quiet,dependencies):
 
@@ -1065,7 +1089,8 @@ def format_args(config,submit,quiet,dependencies):
 
     #Pop script to calculate reference antenna if calcrefant=False. Assume it won't be in postcal scripts
     if not crosscal_kwargs['calcrefant']:
-        pop_script(kwargs,'calc_refant.py')
+        if pop_script(kwargs,'calc_refant.py'):
+            kwargs['num_precal_scripts'] -= 1
 
     #Replace empty containers with default container and remove unwanted kwargs
     for i in range(len(kwargs['containers'])):

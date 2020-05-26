@@ -9,9 +9,7 @@ from config_parser import validate_args as va
 from cal_scripts import bookkeeping
 
 def do_pre_flag(visname, fields, badfreqranges, badants):
-    clipfluxcal   = [0., 50.]
-    clipphasecal  = [0., 50.]
-    cliptarget    = [0., 50.]
+    clip = [0., 50.]
 
     if len(badfreqranges):
         for badfreq in badfreqranges:
@@ -25,13 +23,8 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", field=fields.fluxfield,
-            clipminmax=clipfluxcal, datacolumn="DATA",clipoutside=True,
-            clipzeros=True, extendpols=True, action="apply",flagbackup=True,
-            savepars=False, overwrite=True, writeflags=True)
-
-    flagdata(vis=visname, mode="clip", field=fields.secondaryfield,
-            clipminmax=clipphasecal, datacolumn="DATA",clipoutside=True,
+    flagdata(vis=visname, mode="clip", field=fields.gainfields,
+            clipminmax=clip, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
@@ -49,7 +42,7 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
             flagbackup=True, overwrite=True, writeflags=True)
 
     flagdata(vis=visname, mode="clip", field=fields.targetfield,
-            clipminmax=cliptarget, datacolumn="DATA",clipoutside=True,
+            clipminmax=clip, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 

@@ -161,7 +161,7 @@ def run_script(func):
         try:
             func(args,taskvals)
         except Exception as err:
-            logger.error('Exception found in the pipeline {0}: {1}'.format(type(err),err))
+            logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
             config_parser.overwrite_config(args['config'], conf_dict={'continue' : False}, conf_sec='run')
             if nspw > 1:
                 for SPW in spw.split(','):
@@ -169,6 +169,6 @@ def run_script(func):
                     config_parser.overwrite_config(spw_config, conf_dict={'continue' : False}, conf_sec='run')
             sys.exit(1)
     else:
-        logger.error('Exception found in pipeline. Skipping "{0}".'.format(os.path.split(sys.argv[2])[1]))
+        logger.error('Exception found in previous pipeline job, which set "continue=False" in [run] section of "{0}". Skipping "{1}".'.format(args['config'],os.path.split(sys.argv[2])[1]))
         #os.system('./killJobs.sh') # and cancelling remaining jobs (scanel not found since /opt overwritten)
         sys.exit(1)
