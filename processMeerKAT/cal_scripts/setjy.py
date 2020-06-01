@@ -48,9 +48,9 @@ def do_setjy(visname, spw, fields, standard):
         logger.info("Spix: %s", spix)
         logger.info("Ref freq %s", reffreq)
 
-        setjy(vis=visname,field=setjyname,scalebychan=True,standard="manual",fluxdensity=smodel,spix=spix,reffreq=reffreq)
+        setjy(vis=visname,field=setjyname,scalebychan=True,standard="manual",fluxdensity=smodel,spix=spix,reffreq=reffreq,ismms=True)
     else:
-        setjy(vis=visname, field=setjyname, spw=spw, scalebychan=True, standard=standard)
+        setjy(vis=visname, field=setjyname, spw=spw, scalebychan=True, standard=standard,ismms=True)
 
     fieldnames = msmd.fieldnames()
 
@@ -93,7 +93,7 @@ def do_setjy(visname, spw, fields, standard):
             reffreq=reffreq,
             polindex=[polindex],
             polangle=[polangle],
-            rotmeas=0)
+            rotmeas=0,ismms=True)
 
 
     # Check if 3C138 exists in the data
@@ -134,7 +134,7 @@ def do_setjy(visname, spw, fields, standard):
             reffreq=reffreq,
             polindex=[polindex],
             polangle=[polangle],
-            rotmeas=0)
+            rotmeas=0,ismms=True)
 
     msmd.done()
 

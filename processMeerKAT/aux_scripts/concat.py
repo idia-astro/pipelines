@@ -38,7 +38,6 @@ def do_concat(visname, fields):
 
     #Store bandwidth in MHz
     msmd.open(visname)
-    suffix = '' if msmd.bandwidths(-1).sum()/1e6 < 100 else '.tt0'
 
     newvis = visname
     logger.info('Beginning {0}.'.format(sys.argv[0]))
@@ -49,8 +48,24 @@ def do_concat(visname, fields):
         for target in field.split(','):
             fname = msmd.namesforfields(int(target))[0]
 
+            #Concat tt0 images (into continuum cube)
+            pattern = '*MHz/images/*{0}*image.tt0'.format(fname)
+            out = '{0}.{1}.contcube'.format(filebase,fname)
+            images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
+            if images is not None:
+                images.sort(key=sortbySPW)
+                logger.info('Creating continuum cube with following command:')
+                logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
+                ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
+
+            if os.path.exists(out):
+                if not os.path.exists(out+'.fits'):
+                    exportfits(imagename=out, fitsimage=out+'.fits')
+            else:
+                logger.error("Output image '{0}' not written.".format(out))
+
             #Concat images (into continuum cube)
-            pattern = '*MHz/images/*{0}*image{1}'.format(fname,suffix)
+            pattern = '*MHz/images/*{0}*image'.format(fname)
             out = '{0}.{1}.contcube'.format(filebase,fname)
             images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
             if images is not None:
