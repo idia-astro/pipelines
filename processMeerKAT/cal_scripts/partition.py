@@ -36,11 +36,11 @@ def main(args,taskvals):
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
     tasks = va(taskvals, 'slurm', 'ntasks_per_node', int)
     preavg = va(taskvals, 'crosscal', 'preavg', int, default=1)
-    scripts = taskvals['slurm']['scripts']
+    include_crosshand = True #va(taskvals, 'run', 'dopol', bool, default=False)
 
     msmd.open(visname)
     npol = msmd.ncorrforpol()[0]
-    include_crosshand = True #len(set([scripts[i][0] for i in range(len(scripts))]).intersection(set(['xy_yx_solve.py','xy_yx_apply.py','rl_lr_solve.py','rl_lr_apply.py']))) > 0
+
     if not include_crosshand and npol == 4:
         npol = 2
     CPUs = npol if tasks*npol <= processMeerKAT.CPUS_PER_NODE_LIMIT else 1 #hard-code for number of polarisations

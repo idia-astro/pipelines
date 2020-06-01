@@ -30,6 +30,7 @@ from cal_scripts import bookkeeping
 from shutil import copyfile
 import logging
 from time import gmtime
+from datetime import datetime
 logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s")
@@ -508,7 +509,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies=''):
+def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies='',timestamp=''):
 
     """Write master master script, which separately calls each of the master scripts in each SPW directory.
 
@@ -529,7 +530,9 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     pad_length : int, optional
         Length to pad the SLURM sacct output columns.
     dependencies : str, optional
-        Comma-separated list of SLURM job dependencies."""
+        Comma-separated list of SLURM job dependencies.
+    timestamp : str, optional
+        Timestamp to put on this run and related runs in SPW directories."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
@@ -567,7 +570,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     errorScript = 'findErrors'
     timingScript = 'displayTimes'
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
-    master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M')\n")
+    master.write("\nDATE={0}\n".format(timestamp))
     master.write('mkdir -p {0}\n'.format(dir))
     master.write('mkdir -p {0}\n\n'.format(LOG_DIR))
     extn = '_$DATE.sh'
@@ -651,7 +654,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
-def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='', date=''):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies=''):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -674,12 +677,14 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     echo : bool, optional
         Echo the pupose of each job script for the user?
     dependencies : str, optional
-        Comma-separated list of SLURM job dependencies.
-    date : str, optional
-        Date stamp to put on this run."""
+        Comma-separated list of SLURM job dependencies."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
+    timestamp = config_parser.get_key(config,'run','timestamp')
+    if timestamp == '':
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(timestamp)}, conf_sec='run')
 
     #Copy config file to TMP_CONFIG and inform user
     if verbose:
@@ -718,10 +723,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     #Add time as extn to this pipeline run, to give unique filenames
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
-    if date == '':
-        master.write("\nDATE=$(date '+%Y-%m-%d-%H-%M')\n")
-    else:
-        master.write("\nDATE={0}".format(date))
+    master.write("\nDATE={0}".format(timestamp))
     extn = '_$DATE.sh'
 
     #Copy contents of config file to jobScripts directory
@@ -812,8 +814,8 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
     if echo:
         master.write('echo Run ./{0}.sh to {1}.\n'.format(filename,purpose))
 
-def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,
-                plane=1,partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation=''):
+def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1,
+               partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', timestamp=''):
 
     """Write a series of sbatch job files to calibrate a CASA measurement set.
 
@@ -858,7 +860,9 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
     account : str, optional
         SLURM accounting group for sbatch jobs.
     reservation : str, optional
-        SLURM reservation to use."""
+        SLURM reservation to use.
+    timestamp : str, optional
+        Timestamp to put on this run and related runs in SPW directories."""
 
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
     pad_length = len(name)
@@ -883,7 +887,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
 
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once, precal scripts before this, and postcal scripts after this
-        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies)
+        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp)
     else:
         #Build master pipeline submission script
         write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies)
@@ -914,6 +918,8 @@ def default_config(arg_dict):
 
     #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
+
+    config_parser.overwrite_config(filename, conf_dict={'dopol' : arg_dict['dopol']}, conf_sec='run')
 
     if not arg_dict['do2GC']:
         config_parser.remove_section(filename, 'selfcal')
@@ -947,7 +953,7 @@ def default_config(arg_dict):
         os.system(command)
     else:
         #Skip extraction of field IDs and assume we're not processing multiple SPWs
-        logger.info('Skipping extraction of field IDs.')
+        logger.info('Skipping extraction of field IDs and assuming nspw=1.')
         config_parser.overwrite_config(filename, conf_dict={'nspw' : 1}, conf_sec='crosscal')
 
     logger.info('Config "{0}" generated.'.format(filename))
@@ -1080,6 +1086,9 @@ def format_args(config,submit,quiet,dependencies):
     includes_partition = any('partition' in script for script in kwargs['scripts'])
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     if nspw > 1:
+        #Write timestamp to this pipeline run
+        kwargs['timestamp'] = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(kwargs['timestamp'])}, conf_sec='run')
         nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
 
@@ -1257,6 +1266,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
             filebase = os.path.split(basename)[1]
             vis = '{0}.{1}.mms'.format(filebase,spw.replace('0:',''))
             logger.warn("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
+            orig_vis = config_parser.get_key(spw_config, 'data', 'vis')
+            config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='data')
             config_parser.overwrite_config(spw_config, conf_dict={'vis' : "'{0}'".format(vis)}, conf_sec='data')
 
     return nspw
