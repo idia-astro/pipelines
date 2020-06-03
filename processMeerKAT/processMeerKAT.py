@@ -916,9 +916,8 @@ def default_config(arg_dict):
     #Overwrite parameters in config under section [slurm]
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
-    #Add MS to config file under section [data]
+    #Add MS to config file under section [data] and dopol under section [run]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
-
     config_parser.overwrite_config(filename, conf_dict={'dopol' : arg_dict['dopol']}, conf_sec='run')
 
     if not arg_dict['do2GC']:
@@ -932,7 +931,6 @@ def default_config(arg_dict):
             i += 1
 
         config_parser.overwrite_config(filename, conf_dict={'postcal_scripts' : scripts}, conf_sec='slurm')
-
 
     if not arg_dict['nofields']:
         #Don't call srun if option --local used

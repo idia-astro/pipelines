@@ -23,7 +23,8 @@ def linfit(xInput, xDataList, yDataList):
     return yPredict
 
 
-def do_setjy(visname, spw, fields, standard):
+def do_setjy(visname, spw, fields, standard, dopol=False):
+
     fluxlist = ["J0408-6545", "0408-6545", ""]
 
     msmd.open(visname)
@@ -54,87 +55,87 @@ def do_setjy(visname, spw, fields, standard):
 
     fieldnames = msmd.fieldnames()
 
+    if dopol:
+        # Check if 3C286 exists in the data
+        is3C286 = False
+        try:
+            calibrator_3C286 = list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))[0]
+        except IndexError:
+            calibrator_3C286 = []
 
-    # Check if 3C286 exists in the data
-    is3C286 = False
-    try:
-        calibrator_3C286 = list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))[0]
-    except IndexError:
-        calibrator_3C286 = []
+        if len(calibrator_3C286):
+            is3C286 = True
+            id3C286 = str(msmd.fieldsforname(calibrator_3C286)[0])
 
-    if len(calibrator_3C286):
-        is3C286 = True
-        id3C286 = str(msmd.fieldsforname(calibrator_3C286)[0])
+        if is3C286:
+            logger.info("Detected calibrator name(s):  %s" % calibrator_3C286)
+            logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
+            logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
+            # central freq of spw
+            spwMeanFreq = msmd.meanfreq(0, unit='GHz')
+            freqList = np.array([1.05, 1.45, 1.64, 1.95])
+            # fractional linear polarisation
+            fracPolList = [0.086, 0.095, 0.099, 0.101]
+            polindex = linfit(spwMeanFreq, freqList, fracPolList)
+            logger.info("Predicted polindex at frequency %s: %s", spwMeanFreq, polindex)
+            # position angle of polarized intensity
+            polPositionAngleList = [33, 33, 33, 33]
+            polangle = linfit(spwMeanFreq, freqList, polPositionAngleList)
+            logger.info("Predicted pol angle at frequency %s: %s", spwMeanFreq, polangle)
 
-    if is3C286:
-        logger.info("Detected calibrator name(s):  %s" % calibrator_3C286)
-        logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
-        logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
-        # central freq of spw
-        spwMeanFreq = msmd.meanfreq(0, unit='GHz')
-        freqList = np.array([1.05, 1.45, 1.64, 1.95])
-        # fractional linear polarisation
-        fracPolList = [0.086, 0.095, 0.099, 0.101]
-        polindex = linfit(spwMeanFreq, freqList, fracPolList)
-        logger.info("Predicted polindex at frequency %s: %s", spwMeanFreq, polindex)
-        # position angle of polarized intensity
-        polPositionAngleList = [33, 33, 33, 33]
-        polangle = linfit(spwMeanFreq, freqList, polPositionAngleList)
-        logger.info("Predicted pol angle at frequency %s: %s", spwMeanFreq, polangle)
-
-        reffreq = "1.45GHz"
-        logger.info("Ref freq %s", reffreq)
-        setjy(vis=visname,
-            field=id3C286,
-            scalebychan=True,
-            standard="manual",
-            fluxdensity=[-14.6, 0.0, 0.0, 0.0],
-            #spix=-0.52, # between 1465MHz and 1565MHz
-            reffreq=reffreq,
-            polindex=[polindex],
-            polangle=[polangle],
-            rotmeas=0,ismms=True)
+            reffreq = "1.45GHz"
+            logger.info("Ref freq %s", reffreq)
+            setjy(vis=visname,
+                field=id3C286,
+                scalebychan=True,
+                standard="manual",
+                fluxdensity=[-14.6, 0.0, 0.0, 0.0],
+                #spix=-0.52, # between 1465MHz and 1565MHz
+                reffreq=reffreq,
+                polindex=[polindex],
+                polangle=[polangle],
+                rotmeas=0,ismms=True)
 
 
-    # Check if 3C138 exists in the data
-    is3C138 = False
-    try:
-        calibrator_3C138 = list(set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames)))[0]
-    except IndexError:
-        calibrator_3C138 = []
+        # Check if 3C138 exists in the data
+        is3C138 = False
+        try:
+            calibrator_3C138 = list(set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames)))[0]
+        except IndexError:
+            calibrator_3C138 = []
 
-    if len(calibrator_3C138):
-        is3C138 = True
-        id3C138 = str(msmd.fieldsforname(calibrator_3C138)[0])
+        if len(calibrator_3C138):
+            is3C138 = True
+            id3C138 = str(msmd.fieldsforname(calibrator_3C138)[0])
 
-    if is3C138:
-        logger.info("Detected calibrator name(s):  %s" % calibrator_3C138)
-        logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
-        logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
-        # central freq of spw
-        spwMeanFreq = msmd.meanfreq(0, unit='GHz')
-        freqList = np.array([1.05, 1.45, 1.64, 1.95])
-        # fractional linear polarisation
-        fracPolList = [0.056, 0.075, 0.084, 0.09]
-        polindex = linfit(spwMeanFreq, freqList, fracPolList)
-        logger.info("Predicted polindex at frequency %s: %s", spwMeanFreq, polindex)
-        # position angle of polarized intensity
-        polPositionAngleList = [-14, -11, -10, -10]
-        polangle = linfit(spwMeanFreq, freqList, polPositionAngleList)
-        logger.info("Predicted pol angle at frequency %s: %s", spwMeanFreq, polangle)
+        if is3C138:
+            logger.info("Detected calibrator name(s):  %s" % calibrator_3C138)
+            logger.info("Flux and spectral index taken/calculated from:  https://science.nrao.edu/facilities/vla/docs/manuals/oss/performance/fdscale")
+            logger.info("Estimating polarization index and position angle of polarized emission from linear fit based on: Perley & Butler 2013 (https://ui.adsabs.harvard.edu/abs/2013ApJS..204...19P/abstract)")
+            # central freq of spw
+            spwMeanFreq = msmd.meanfreq(0, unit='GHz')
+            freqList = np.array([1.05, 1.45, 1.64, 1.95])
+            # fractional linear polarisation
+            fracPolList = [0.056, 0.075, 0.084, 0.09]
+            polindex = linfit(spwMeanFreq, freqList, fracPolList)
+            logger.info("Predicted polindex at frequency %s: %s", spwMeanFreq, polindex)
+            # position angle of polarized intensity
+            polPositionAngleList = [-14, -11, -10, -10]
+            polangle = linfit(spwMeanFreq, freqList, polPositionAngleList)
+            logger.info("Predicted pol angle at frequency %s: %s", spwMeanFreq, polangle)
 
-        reffreq = "1.45GHz"
-        logger.info("Ref freq %s", reffreq)
-        setjy(vis=visname,
-            field=id3C138,
-            scalebychan=True,
-            standard="manual",
-            fluxdensity=[-8.26, 0.0, 0.0, 0.0],
-            #spix=-0.57,  # between 1465MHz and 1565MHz
-            reffreq=reffreq,
-            polindex=[polindex],
-            polangle=[polangle],
-            rotmeas=0,ismms=True)
+            reffreq = "1.45GHz"
+            logger.info("Ref freq %s", reffreq)
+            setjy(vis=visname,
+                field=id3C138,
+                scalebychan=True,
+                standard="manual",
+                fluxdensity=[-8.26, 0.0, 0.0, 0.0],
+                #spix=-0.57,  # between 1465MHz and 1565MHz
+                reffreq=reffreq,
+                polindex=[polindex],
+                polangle=[polangle],
+                rotmeas=0,ismms=True)
 
     msmd.done()
 
@@ -151,8 +152,9 @@ def main(args,taskvals):
 
     spw = va(taskvals, "crosscal", "spw", str, default="")
     standard = va(taskvals, "crosscal", "standard", str, default="Stevens-Reynolds 2016")
+    dopol = va(taskvals, 'run', 'dopol', bool, default=False)
 
-    do_setjy(visname, spw, fields, standard)
+    do_setjy(visname, spw, fields, standard, dopol)
 
 if __name__ == '__main__':
 

@@ -34,7 +34,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
     logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
             field = fields.bpassfield, refant = referenceant,
-            minblperant = minbaselines, solnorm = True,  solint = 'inf',
+            minblperant = minbaselines, solnorm = False,  solint = 'inf',
             combine = 'scan', bandtype = 'B', fillgaps = 8,
             gaintable = calfiles.kcorrfile, gainfield = fields.kcorrfield,
             parang = False, append = False)

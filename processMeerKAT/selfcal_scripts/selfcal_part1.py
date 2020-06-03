@@ -34,7 +34,7 @@ def selfcal_part1(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
             pixmask = ''
             imagename += '_nomask'
         elif 0 < loop <= (nloops):
-                applycal(vis=vis, selectdata=False, gaintable=all_caltables, parang=True)
+                applycal(vis=vis, selectdata=False, gaintable=all_caltables, parang=False)
 
                 flagdata(vis=vis, mode='rflag', datacolumn='RESIDUAL', field='', timecutoff=5.0,
                     freqcutoff=5.0, timefit='line', freqfit='line', flagdimension='freqtime',
