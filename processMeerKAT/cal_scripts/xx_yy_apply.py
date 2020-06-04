@@ -25,20 +25,20 @@ def do_parallel_cal_apply(visname, fields, calfiles):
     applycal(vis=visname, field=fields.fluxfield, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
                 fluxfile], gainfield=[fields.kcorrfield,
-                    fields.bpassfield, fields.fluxfield], parang=False)
+                    fields.bpassfield, fields.fluxfield], parang=False, interp='linear,linearflag')
 
     logger.info(" applying calibration -> secondary calibrator")
     applycal(vis=visname, field=fields.secondaryfield,
             selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile,
                 calfiles.bpassfile, fluxfile],
             gainfield=[fields.kcorrfield, fields.bpassfield,
-                fields.secondaryfield], parang=False)
+                fields.secondaryfield], parang=False, interp='linear,linearflag')
 
     logger.info(" applying calibration -> target calibrator")
     applycal(vis=visname, field=fields.targetfield, selectdata=False,
             calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
                 fluxfile], gainfield=[fields.kcorrfield,
-                    fields.bpassfield, fields.secondaryfield], parang=False)
+                    fields.bpassfield, fields.secondaryfield], parang=False, interp='linear,linearflag')
 
 
 def main(args,taskvals):

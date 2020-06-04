@@ -94,7 +94,9 @@ def check_path(path,update=False):
     path : str
         Path to script or container (if path found and update=True)."""
 
-    #Attempt to find path in pipeline directories and bash path first
+    #Attempt to find path firstly in CWD, then directory up, then bash path, then pipeline directories.
+    if os.path.exists(path) and path[0] != '/':
+        path = '{0}/{1}'.format(os.getcwd(),path)
     if not os.path.exists(path) and path != '':
         if os.path.exists('../{0}'.format(path)):
             newpath = '../{0}'.format(path)
@@ -216,7 +218,7 @@ def parse_args():
         if args.config is None:
             parser.error("You must input a config file [--config] to run the pipeline.")
         if not os.path.exists(args.config):
-            parser.error("Input config file '{0}' not found. Please set [-C --config].".format(args.config))
+            parser.error("Input config file '{0}' not found. Please set [-C --config] or write a new one with [-B --build].".format(args.config))
 
     #if user inputs a list a scripts, remove the default list
     if len(args.scripts) > len(SCRIPTS):
@@ -317,7 +319,7 @@ def validate_args(args,config,parser=None):
             raise_error(config, msg, parser)
 
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,casacore=False,logfile=True,plot=False,SPWs=''):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,casacore=False,logfile=True,plot=False,SPWs='',nspw=1):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -343,13 +345,15 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         This job is a plotting task that needs to call xvfb-run.
     SPWs : str, optional
         Comma-separated list of spw ranges.
+    nspw : int, optional
+        Number of spectral windows.
 
     Returns:
     --------
     command : str
         Bash command to call with srun or within sbatch file."""
 
-    arrayJob = ',' in SPWs and 'partition' in script
+    arrayJob = ',' in SPWs and 'partition' in script and nspw > 1
 
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
@@ -399,7 +403,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
-                container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,casacore=False,SPWs='',account='b03-idia-ag',reservation=''):
+                container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,casacore=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -439,6 +443,8 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
         Is the script that is called within this job a casacore script?
     SPWs : str, optional
         Comma-separated list of spw ranges.
+    nspw : int, optional
+        Number of spectral windows.
     account : str, optional
         SLURM accounting group for sbatch jobs.
     reservation : str, optional
@@ -453,10 +459,10 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
 
     #Use multiple CPUs for tclean and paratition scripts
     params['cpus'] = 1
-    if 'partition' in script and tasks*4 <= CPUS_PER_NODE_LIMIT:
-        params['cpus'] = 4 #hard-code for 2/4 polarisations (TODO: check MS actually has 4, requiring CASA)
-    if 'tclean' in script or 'selfcal' in script or 'bdsf' in script:
+    if 'tclean' in script or 'selfcal' in script or 'bdsf' in script or 'partition' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
+        if 'partition' in script and params['cpus'] > 4:
+            params['cpus'] = 4 #hard-code for 2/4 polarisations (TODO: check MS actually has npol=4, requiring CASA, or at least check dopol)
 
     #If requesting all CPUs, user may as well use all memory
     if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
@@ -471,10 +477,10 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
         casa_script = False
         casacore = False
 
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,casacore=casacore)
-    if 'partition' in script and ',' in SPWs:
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,nspw=nspw,casacore=casacore)
+    if 'partition' in script and ',' in SPWs and nspw > 1:
         params['ID'] = '%A_%a'
-        params['array'] = '\n#SBATCH --array=0-{0}%2'.format(len(SPWs.split(','))-1)
+        params['array'] = '\n#SBATCH --array=0-{0}%2'.format(nspw-1)
     else:
         params['ID'] = '%j'
         params['array'] = ''
@@ -874,10 +880,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
-                        container=containers[i],partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],account=account,reservation=reservation)
+                        container=containers[i],partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation)
         else:
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],
-                        partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],exclude=exclude,account=account,reservation=reservation)
+                        partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation)
 
     #Replace all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
@@ -1078,8 +1084,8 @@ def format_args(config,submit,quiet,dependencies):
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
-    if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
-        mem = mem // nspw
+    # if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
+    #     mem = mem // nspw
 
     includes_partition = any('partition' in script for script in kwargs['scripts'])
     #If single correctly formatted spw, split into nspw directories, and process each spw independently

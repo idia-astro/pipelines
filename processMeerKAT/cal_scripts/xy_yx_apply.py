@@ -52,7 +52,7 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     #                fields.fluxfield, fields.dpolfield,
     #                fields.xdelfield, fields.xpolfield,
     #                xyfield],
-    #            parang=True)
+    #            parang=True, interp='linear,linearflag')
 
 
     logger.info("applying calibrations: primary calibrator")
@@ -62,7 +62,7 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
                 calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield,fields.bpassfield, fields.fluxfield,
             fields.dpolfield,fields.xdelfield, fields.xpolfield],
-        parang = True)
+        parang = True, interp='linear,linearflag')
 
 
     logger.info(" applying calibrations: polarization calibrator")
@@ -72,7 +72,7 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
                 calfiles.xdelfile, calfiles.xpolfile],
         gainfield = [fields.kcorrfield,fields.bpassfield,xyfield,
             fields.dpolfield,fields.xdelfield,fields.xpolfield],
-        parang= True)
+        parang= True, interp='linear,linearflag')
 
 
     logger.info(" applying calibrations: secondary calibrators")
@@ -83,7 +83,7 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
         gainfield = [fields.kcorrfield, fields.bpassfield,
             fields.secondaryfield, fields.dpolfield, fields.xdelfield,
             fields.xpolfield],
-        parang= True)
+        parang= True, interp='linear,linearflag')
 
     logger.info(" applying calibrations: target fields")
     applycal(vis=visname, field = fields.targetfield,
@@ -93,7 +93,7 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
         gainfield = [fields.kcorrfield, fields.bpassfield,
             fields.secondaryfield, fields.dpolfield, fields.xdelfield,
             fields.xpolfield],
-        parang= True)
+        parang= True, interp='linear,linearflag')
 
 
 
