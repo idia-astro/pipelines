@@ -36,7 +36,7 @@ def main(args,taskvals):
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
     tasks = va(taskvals, 'slurm', 'ntasks_per_node', int)
     preavg = va(taskvals, 'crosscal', 'preavg', int, default=1)
-    include_crosshand = True #va(taskvals, 'run', 'dopol', bool, default=False)
+    include_crosshand = va(taskvals, 'run', 'dopol', bool, default=False)
 
     msmd.open(visname)
     npol = msmd.ncorrforpol()[0]
