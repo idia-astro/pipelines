@@ -638,7 +638,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         do += ' \"'
     write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir,prefix=prefix)
 
-    do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; if [ -d \"$f\" ]; then cd \$f; pwd; ./%s/%s%s %s; cd ..; else echo Directory $f doesn\'t exist; fi; counter=\$((counter+1)); echo '%s'; done; """
+    do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; if [ -d \"$f\" ]; then cd \$f; pwd; ./%s/%s%s %s; cd ..; else echo Directory $f doesn\\'t exist; fi; counter=\$((counter+1)); echo '%s'; done; """
     if toplevel:
         do += "echo -n 'All SPWs: '; pwd; "
     else:
