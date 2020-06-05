@@ -1236,7 +1236,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
         if unit == 'MHz':
             for freq in badfreqranges:
                 bad_low,bad_high = get_spw_bounds('0:{0}'.format(freq))[0:2]
-                if low > bad_low and high < bad_high:
+                if low >= bad_low and high <= bad_high:
                     logger.info("Won't process spw '0:{0}~{1}{2}', since it's completely encompassed by bad frequency range '{3}'.".format(low,high,unit,freq))
                     badfreq = True
                     break
