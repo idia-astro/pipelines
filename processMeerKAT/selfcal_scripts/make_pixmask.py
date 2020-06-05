@@ -31,10 +31,18 @@ def mask_image(vis, nloops, atrous, nterms, restart_no, loop):
     if loop == 0 and not any([os.path.exists(ff) for ff in [imagename + '.image.tt0', imagename + '.image']]):
         imagename += '_nomask'
 
+    # Note: bdsfname refers to a FITS file in run_bdsf.py, but to the CASA image here.
+    # because bdsf sometimes barfs on casa images with non-standard header keywords, but
+    # can process the corresponding FITS file.
+    #
+    # However in this script we are doing some header manipulation and so all the images need
+    # to be in the CASA format.
     if nterms[loop] > 1:
         bdsfname = imagename + ".image.tt0"
     else:
         bdsfname = imagename + ".image"
+
+    #bdsfname = imagename + '.fits'
 
     if not os.path.exists(bdsfname):
         raise IOError("Image %s does not exist" % bdsfname)

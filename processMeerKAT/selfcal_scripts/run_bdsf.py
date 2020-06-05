@@ -33,10 +33,12 @@ def run_bdsf(vis, nloops, atrous, nterms, restart_no, loop):
     if loop == 0 and not os.path.exists(maskfile):
         imagename += '_nomask'
 
-    if nterms[loop] > 1:
-        bdsfname = imagename + ".image.tt0"
-    else:
-        bdsfname = imagename + ".image"
+    #if nterms[loop] > 1:
+    #    bdsfname = imagename + ".image.tt0"
+    #else:
+    #    bdsfname = imagename + ".image"
+
+    bdsfname = imagename + '.fits'
 
     # Identify bright sources
     img = bdsf.process_image(bdsfname, adaptive_rms_box=True,
@@ -51,14 +53,17 @@ def run_bdsf(vis, nloops, atrous, nterms, restart_no, loop):
     img.export_image(outfile=maskfile, img_type='island_mask', img_format='casa', clobber=True)
 
     # Write out model image
-    modelname = imagename + '.bdsf_model'
-    if 'fits' in imagename.lower():
-        img.export_image(outfile=modelname, clobber=True, img_format='fits',
-            img_type='gaus_model')
+    modelname = imagename + '.bdsf_model.fits'
+    img.export_image(outfile=modelname, clobber=True, img_format='fits',
+        img_type='gaus_model')
 
-    if '.image' in imagename.lower():
-        img.export_image(outfile=modelname, clobber=True, img_format='casa',
-            img_type='gaus_model')
+    #if 'fits' in imagename.lower():
+    #    img.export_image(outfile=modelname, clobber=True, img_format='fits',
+    #        img_type='gaus_model')
+
+    #if '.image' in imagename.lower():
+    #    img.export_image(outfile=modelname, clobber=True, img_format='casa',
+    #        img_type='gaus_model')
 
 
     return loop
