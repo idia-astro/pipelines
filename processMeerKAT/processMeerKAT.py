@@ -633,12 +633,12 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
 
     master.write('\necho For all jobs within the {0} SPW directories:\n'.format(len(SPWs.split(','))))
     header = '-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------' + '-'*pad_length
-    do = """echo "for f in {%s,}; do cd \$f; ./%s/%s%s; cd ..; done;""" % (SPWs,dir,killScript,extn)
+    do = """echo "for f in {%s,}; do if [ -d \$f ]; then cd \$f; ./%s/%s%s; cd ..; else echo Directory \$f doesn\\'t exist; fi; done;""" % (SPWs,dir,killScript,extn)
     if not toplevel:
         do += ' \"'
     write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir,prefix=prefix)
 
-    do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; if [ -d \"$f\" ]; then cd \$f; pwd; ./%s/%s%s %s; cd ..; else echo Directory $f doesn\\'t exist; fi; counter=\$((counter+1)); echo '%s'; done; """
+    do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; if [ -d \$f ]; then cd \$f; pwd; ./%s/%s%s %s; cd ..; else echo Directory \$f doesn\\'t exist; fi; counter=\$((counter+1)); echo '%s'; done; """
     if toplevel:
         do += "echo -n 'All SPWs: '; pwd; "
     else:
@@ -1180,7 +1180,7 @@ def get_spw_bounds(spw):
 
     return low,high,unit,func
 
-def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
+def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,remove=True):
 
     """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
 
@@ -1200,6 +1200,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
         Path to CASA Measurement Set.
     partition : bool
         Does this run include the partition step?
+    remove : bool, optional
+        Remove SPWs completely encompassed by bad frequency ranges?
 
     Returns:
     --------
@@ -1233,7 +1235,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition):
     while i < nspw:
         badfreq = False
         low,high = get_spw_bounds(SPWs[i])[0:2]
-        if unit == 'MHz':
+        if unit == 'MHz' and remove:
             for freq in badfreqranges:
                 bad_low,bad_high = get_spw_bounds('0:{0}'.format(freq))[0:2]
                 if low >= bad_low and high <= bad_high:
