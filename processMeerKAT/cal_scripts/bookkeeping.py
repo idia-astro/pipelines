@@ -47,6 +47,7 @@ def get_field_ids(fields):
     """
 
     targetfield    = fields['targetfields']
+    extrafields    = fields['extrafields']
     fluxfield      = fields['fluxfield']
     bpassfield     = fields['bpassfield']
     secondaryfield = fields['phasecalfield']
@@ -63,10 +64,10 @@ def get_field_ids(fields):
 
     FieldIDs = namedtuple('FieldIDs', ['targetfield', 'fluxfield',
                     'bpassfield', 'secondaryfield', 'kcorrfield', 'xdelfield',
-                    'dpolfield', 'xpolfield', 'gainfields'])
+                    'dpolfield', 'xpolfield', 'gainfields', 'extrafields'])
 
     return FieldIDs(targetfield, fluxfield, bpassfield, secondaryfield,
-            kcorrfield, xdelfield, dpolfield, xpolfield, gainfields)
+            kcorrfield, xdelfield, dpolfield, xpolfield, gainfields, extrafields)
 
 
 def check_file(filepath):

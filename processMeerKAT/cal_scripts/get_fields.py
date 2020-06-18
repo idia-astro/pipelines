@@ -4,19 +4,18 @@
 #!/usr/bin/env python2.7
 import sys
 import os
+import numpy as np
 
 import processMeerKAT
 import config_parser
 
-import logging
-from time import gmtime
-logging.Formatter.converter = gmtime
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
+logger = processMeerKAT.logger
 
 # Get access to the msmd module for get_fields.py
 import casac
 msmd = casac.casac.msmetadata()
+tb = casac.casac.table()
+me = casac.casac.measures()
 
 def get_fields(MS):
 
@@ -61,7 +60,7 @@ def get_fields(MS):
 
     #Put any extra fields in target fields
     if len(extra_fields) > 0:
-        fieldIDs['targetfields'] = "{0},{1}'".format(fieldIDs['targetfields'][:-1],','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
+        fieldIDs['extrafields'] = "'{0}'".format(','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
 
     return fieldIDs
 
@@ -119,7 +118,7 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
             #Put any extra fields with intent CALIBRATE_BANDPASS in target field
             extras = list(set(fields) - set(extra_fields) - set([maxfield]))
             if len(extras) > 0:
-               logger.warn('Putting extra fields with intent "{0}" in "targetfields" - {1}'.format(intent,extras))
+               logger.warn('Putting extra fields with intent "{0}" in "extrafields" - {1}'.format(intent,extras))
                extra_fields += extras
 
     return fieldIDs
@@ -157,7 +156,23 @@ def check_refant(MS,refant,config,warn=True):
             logger.info("This is usually a well-behaved (stable) antenna. Edit '{0}' to change this, by updating 'refant' in [crosscal] section".format(config))
             logger.debug("Alternatively, set 'calcrefant=True' in [crosscal] section of '{0}', and include 'calc_refant.py' in 'scripts' in [slurm] section.".format(config)) #(included by default)
 
-def check_scans(MS,nodes,tasks):
+def check_pol(dopol):
+
+    """Check if 4 polarisations present, otherwise output a warning and force dopol=False.
+
+    Arguments / Returns:
+    --------------------
+    dopol : bool
+        Do polarisation calibration?"""
+
+    npol = msmd.ncorrforpol()[0]
+    if npol != 4:
+        logger.warn("Only {0} polarisations present in '{1}'. Cannot perform polarisation calibration.".format(npol,MS))
+        dopol = False
+
+    return dopol
+
+def check_scans(MS,nodes,tasks,dopol):
 
     """Check if the user has set the number of threads to a number larger than the number of scans.
     If so, display a warning and return the number of thread to be replaced in their config file.
@@ -170,6 +185,8 @@ def check_scans(MS,nodes,tasks):
         The number of nodes set by the user.
     tasks : int
         The number of tasks (per node) set by the user.
+    dopol : bool
+        Do polarisation calibration?
 
     Returns:
     --------
@@ -177,14 +194,17 @@ def check_scans(MS,nodes,tasks):
         A dictionary with updated values for nodes and tasks per node to match the number of scans."""
 
     nscans = msmd.nscans()
-    limit = int(1.1*(nscans/2 + 1))
+    limit = int(nscans/2)
+    tasks = 16 if not dopol else 8
 
     if abs(nodes * tasks - limit) > 0.1*limit:
         logger.warn('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
 
-        #Start with eight tasks on one node, and increase count of nodes (and then tasks per node) until limit reached
+        #Start with 8/16 tasks on one node, and increase count of nodes (and then tasks per node) until limit reached
         nodes = 1
-        tasks = 8
+        if tasks > limit:
+            tasks = limit
+
         while nodes * tasks < limit:
             if nodes < processMeerKAT.TOTAL_NODES_LIMIT:
                 nodes += 1
@@ -199,6 +219,56 @@ def check_scans(MS,nodes,tasks):
 
     threads = {'nodes' : nodes, 'ntasks_per_node' : tasks}
     return threads
+
+def parang_coverage(vis, calfield):
+
+    tb.open(vis+'::ANTENNA')
+    pos = tb.getcol('POSITION')
+    meanpos = np.mean(pos, axis=1)
+    frame = tb.getcolkeyword('POSITION','MEASINFO')['Ref']
+    units = tb.getcolkeyword('POSITION','QuantumUnits')
+    mpos  = me.position(frame,
+                    str(meanpos[0])+units[0],
+                    str(meanpos[1])+units[1],
+                    str(meanpos[2])+units[2])
+    me.doframe(mpos)
+    tb.close()
+
+    # _geodetic_ latitude
+    latr=me.measure(mpos,'WGS84')['m1']['value']
+    tb.open(vis+'::FIELD')
+    srcid = tb.getcol('SOURCE_ID')
+    dirs=tb.getcol('DELAY_DIR')[:,0,:]
+    tb.close()
+    tb.open(vis,nomodify=True)
+    st = tb.query('FIELD_ID=='+str(calfield))
+
+    # get time stamps of first and last row
+    nrows = st.nrows()
+    tbeg = st.getcol('TIME', startrow=0, nrow=1)[0]
+    tend = st.getcol('TIME', startrow=nrows-1, nrow=1)[0]
+
+    # calculate parallactic angles for first and last time
+    parang = np.zeros(2)
+
+    # calculate parallactic angle
+    rah = dirs[0,calfield]*12.0/np.pi
+    decr = dirs[1,calfield]
+
+    for itim, ts in enumerate([tbeg, tend]):
+        tm = me.epoch('UTC',str(ts)+'s')
+        last = me.measure(tm,'LAST')['m0']['value']
+        last -= np.floor(last)  # days
+        last *= 24.0  # hours
+        ha = last-rah  # hours
+        har = ha*2.0*np.pi/24.0
+        parang[itim] = np.arctan2((np.cos(latr)*np.sin(har)), (np.sin(latr)*np.cos(decr) - np.cos(latr)*np.sin(decr)*np.cos(har)))
+
+    delta_parang = np.rad2deg(parang[1] - parang[0])
+    logger.debug("Delta parang: {0}".format(delta_parang))
+    tb.close()
+
+    return np.abs(delta_parang) > 30
 
 
 def get_xy_field(visname, fields):
@@ -234,17 +304,26 @@ def get_xy_field(visname, fields):
 def main():
 
     args = processMeerKAT.parse_args()
+    processMeerKAT.setup_logger(args.config,args.verbose)
     msmd.open(args.MS)
 
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
     check_refant(args.MS, refant, args.config, warn=True)
-
-    threads = check_scans(args.MS,args.nodes,args.ntasks_per_node)
-    config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
-
+    dopol = check_pol(args.dopol)
     fields = get_fields(args.MS)
+
+    if dopol:
+        dopol = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
+        if not dopol:
+            logger.warn("Parang coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
+
+    threads = check_scans(args.MS,args.nodes,args.ntasks_per_node,dopol)
+
+    config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
+    config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run')
     config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
-    logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs).'.format(args.config))
+
+    logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
     msmd.done()
 
 if __name__ == "__main__":

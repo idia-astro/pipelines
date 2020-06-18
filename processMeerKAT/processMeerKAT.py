@@ -54,7 +54,7 @@ TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
-FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields']
+FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','preavg','specavg','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
 SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
@@ -171,11 +171,11 @@ def parse_args():
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
-    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=8,
-                        help="Use this number of nodes [default: 8; max: {0}].".format(TOTAL_NODES_LIMIT))
+    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
+                        help="Use this number of nodes [default: 1; max: {0}].".format(TOTAL_NODES_LIMIT))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=4,
-                        help="Use this number of tasks (per node) [default: 4; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
-    parser.add_argument("-P","--plane", metavar="num", required=False, type=int, default=1,
+                        help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+    parser.add_argument("-D","--plane", metavar="num", required=False, type=int, default=1,
                             help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
                         help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(MEM_PER_NODE_GB_LIMIT))
@@ -198,7 +198,7 @@ def parse_args():
     parser.add_argument("-s","--submit", action="store_true", required=False, default=False, help="Submit jobs immediately to SLURM queue [default: False].")
     parser.add_argument("-v","--verbose", action="store_true", required=False, default=False, help="Verbose output? [default: False].")
     parser.add_argument("-q","--quiet", action="store_true", required=False, default=False, help="Activate quiet mode, with suppressed output [default: False].")
-    parser.add_argument("-D","--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
+    parser.add_argument("-P","--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
     parser.add_argument("-2","--do2GC", action="store_true", required=False, default=False, help="Perform (2GC) self-calibration in the pipeline [default: False].")
     parser.add_argument("-x","--nofields", action="store_true", required=False, default=False, help="Do not read the input MS to extract field IDs [default: False].")
 
@@ -227,20 +227,6 @@ def parse_args():
         [args.precal_scripts.pop(0) for i in range(len(PRECAL_SCRIPTS))]
     if len(args.postcal_scripts) > len(POSTCAL_SCRIPTS):
         [args.postcal_scripts.pop(0) for i in range(len(POSTCAL_SCRIPTS))]
-
-    # If --dopol is passed in, replace second call of xx_yy* with xy_yx*
-    if args.dopol:
-        count = 0
-        for ind, ss in enumerate(SCRIPTS):
-            if ss[0] == 'xx_yy_solve.py' or ss[0] == 'xx_yy_apply.py':
-                count += 1
-
-            if count > 2:
-                if ss[0] == 'xx_yy_solve.py':
-                    SCRIPTS[ind] = ('xy_yx_solve.py', False, '')
-                if ss[0] == 'xx_yy_apply.py':
-                    SCRIPTS[ind] = ('xy_yx_apply.py', True, '')
-
 
     #validate arguments before returning them
     validate_args(vars(args),args.config,parser=parser)
@@ -286,6 +272,10 @@ def validate_args(args,config,parser=None):
         if args['MS'] not in [None,'None'] and not os.path.isdir(args['MS']):
             msg = "Input MS '{0}' not found.".format(args['MS'])
             raise_error(config, msg, parser)
+
+    if parser is not None and not args['build'] and args['MS']:
+        msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
+        raise_error(config, msg, parser)
 
     if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
         msg = "The number of tasks per node [-t --ntasks-per-node] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks_per_node'])
@@ -395,14 +385,14 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
     #Get rid of annoying msmd output from casacore call
     if casacore:
-        command += " 2>&1 | grep -v 'msmetadata_cmpt.cc::open\|MSMetaData::_computeScanAndSubScanProperties'"
+        command += " 2>&1 | grep -v 'msmetadata_cmpt.cc::open\|MSMetaData::_computeScanAndSubScanProperties\|MeasIERS::fillMeas(MeasIERS::Files, Double)\|Position:'"
     if arrayJob:
         command += '\ncd ..\n'
 
     return command
 
 
-def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
+def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
                 container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,casacore=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
@@ -461,8 +451,13 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params['cpus'] = 1
     if 'tclean' in script or 'selfcal' in script or 'bdsf' in script or 'partition' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
-        if 'partition' in script and params['cpus'] > 4:
-            params['cpus'] = 4 #hard-code for 2/4 polarisations (TODO: check MS actually has npol=4, requiring CASA, or at least check dopol)
+    #hard-code for 2/4 polarisations (TODO: check MS actually has npol=2/4, requiring CASA)
+    if 'partition' in script:
+        dopol = config_parser.get_key(TMP_CONFIG, 'run', 'dopol')
+        if dopol and 4*tasks < CPUS_PER_NODE_LIMIT:
+            params['cpus'] = 4
+        elif not dopol and params['cpus'] > 2:
+            params['cpus'] = 2
 
     #If requesting all CPUs, user may as well use all memory
     if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
@@ -480,7 +475,7 @@ def write_sbatch(script,args,nodes=8,tasks=4,mem=MEM_PER_NODE_GB_LIMIT,name="job
     params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,nspw=nspw,casacore=casacore)
     if 'partition' in script and ',' in SPWs and nspw > 1:
         params['ID'] = '%A_%a'
-        params['array'] = '\n#SBATCH --array=0-{0}%2'.format(nspw-1)
+        params['array'] = '\n#SBATCH --array=0-{0}%4'.format(nspw-1)
     else:
         params['ID'] = '%j'
         params['array'] = ''
@@ -914,12 +909,12 @@ def default_config(arg_dict):
     #Copy default config to current location
     copyfile('{0}/{1}'.format(SCRIPT_DIR,CONFIG),filename)
 
-    #Add SLURM arguments to config file under section [slurm]
+    #Add SLURM CL arguments to config file under section [slurm]
     slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
     for key in SLURM_CONFIG_STR_KEYS:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
 
-    #Overwrite parameters in config under section [slurm]
+    #Overwrite CL parameters in config under section [slurm]
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
     #Add MS to config file under section [data] and dopol under section [run]
@@ -951,6 +946,10 @@ def default_config(arg_dict):
 
         #Write and submit srun command to extract fields, and insert them into config file under section [fields]
         params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)
+        if arg_dict['dopol']:
+            params += ' -P'
+        if arg_dict['verbose']:
+            params += ' -v'
         command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
         logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
         logger.debug('Using the following command:\n\t{0}'.format(command))
@@ -959,6 +958,23 @@ def default_config(arg_dict):
         #Skip extraction of field IDs and assume we're not processing multiple SPWs
         logger.info('Skipping extraction of field IDs and assuming nspw=1.')
         config_parser.overwrite_config(filename, conf_dict={'nspw' : 1}, conf_sec='crosscal')
+
+    #If dopol=True, replace second call of xx_yy_* scripts with xy_yx_* scripts
+    #Check in config (not CL args), in case get_fields.py forces dopol=False, and assume we only want to set this for 'scripts'
+    dopol = config_parser.get_key(filename, 'run', 'dopol')
+    if dopol:
+        count = 0
+        for ind, ss in enumerate(arg_dict['scripts']):
+            if ss[0] == 'xx_yy_solve.py' or ss[0] == 'xx_yy_apply.py':
+                count += 1
+
+            if count > 2:
+                if ss[0] == 'xx_yy_solve.py':
+                    arg_dict['scripts'][ind] = ('xy_yx_solve.py', False, '')
+                if ss[0] == 'xx_yy_apply.py':
+                    arg_dict['scripts'][ind] = ('xy_yx_apply.py', True, '')
+
+        config_parser.overwrite_config(filename, conf_dict={'scripts' : arg_dict['scripts']}, conf_sec='slurm')
 
     logger.info('Config "{0}" generated.'.format(filename))
 
@@ -1087,6 +1103,11 @@ def format_args(config,submit,quiet,dependencies):
     # if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
     #     mem = mem // nspw
 
+    dopol = config_parser.get_key(config, 'run', 'dopol')
+    if not dopol and ('xy_yx_solve.py' in kwargs['scripts'] or 'xy_yx_apply.py' in kwargs['scripts']):
+        logger.warn("Cross-hand calibration scripts 'xy_yx_*' found in scripts. Forcing dopol=True in '[run]' section of '{0}'.".format(config))
+        config_parser.overwrite_config(config, conf_dict={'dopol' : True}, conf_sec='run')
+
     includes_partition = any('partition' in script for script in kwargs['scripts'])
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     if nspw > 1:
@@ -1119,15 +1140,15 @@ def format_args(config,submit,quiet,dependencies):
     if dependencies != '':
         kwargs['dependencies'] = dependencies
 
+    if len(kwargs['scripts']) == 0:
+        logger.error('Nothing to do. Please insert scripts into "scripts" parameter in "{0}".'.format(config))
+        sys.exit(1)
+
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
     if not quiet:
         logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
-
-    if len(kwargs['scripts']) == 0:
-        logger.error('Nothing to do. Please insert scripts into "scripts" parameter in "{0}".'.format(config))
-        sys.exit(1)
 
     return kwargs
 

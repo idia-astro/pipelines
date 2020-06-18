@@ -26,6 +26,7 @@ def linfit(xInput, xDataList, yDataList):
 def do_setjy(visname, spw, fields, standard, dopol=False):
 
     fluxlist = ["J0408-6545", "0408-6545", ""]
+    ismms = False
 
     msmd.open(visname)
     fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(",")])
@@ -49,9 +50,9 @@ def do_setjy(visname, spw, fields, standard, dopol=False):
         logger.info("Spix: %s", spix)
         logger.info("Ref freq %s", reffreq)
 
-        setjy(vis=visname,field=setjyname,scalebychan=True,standard="manual",fluxdensity=smodel,spix=spix,reffreq=reffreq,ismms=True)
+        setjy(vis=visname,field=setjyname,scalebychan=True,standard="manual",fluxdensity=smodel,spix=spix,reffreq=reffreq,ismms=ismms)
     else:
-        setjy(vis=visname, field=setjyname, spw=spw, scalebychan=True, standard=standard,ismms=True)
+        setjy(vis=visname, field=setjyname, spw=spw, scalebychan=True, standard=standard,ismms=ismms)
 
     fieldnames = msmd.fieldnames()
 
@@ -94,7 +95,7 @@ def do_setjy(visname, spw, fields, standard, dopol=False):
                 reffreq=reffreq,
                 polindex=[polindex],
                 polangle=[polangle],
-                rotmeas=0,ismms=True)
+                rotmeas=0,ismms=ismms)
 
 
         # Check if 3C138 exists in the data
@@ -135,7 +136,7 @@ def do_setjy(visname, spw, fields, standard, dopol=False):
                 reffreq=reffreq,
                 polindex=[polindex],
                 polangle=[polangle],
-                rotmeas=0,ismms=True)
+                rotmeas=0,ismms=ismms)
 
     msmd.done()
 

@@ -58,11 +58,11 @@ def do_concat(visname, fields):
                 logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
                 ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
 
-            if os.path.exists(out):
-                if not os.path.exists(out+'.fits'):
-                    exportfits(imagename=out, fitsimage=out+'.fits')
-            else:
-                logger.error("Output image '{0}' not written.".format(out))
+                if os.path.exists(out):
+                    if not os.path.exists(out+'.fits'):
+                        exportfits(imagename=out, fitsimage=out+'.fits')
+                else:
+                    logger.error("Output image '{0}' not written.".format(out))
 
             #Concat images (into continuum cube)
             pattern = '*MHz/images/*{0}*image'.format(fname)
@@ -74,11 +74,11 @@ def do_concat(visname, fields):
                 logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
                 ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
 
-            if os.path.exists(out):
-                if not os.path.exists(out+'.fits'):
-                    exportfits(imagename=out, fitsimage=out+'.fits')
-            else:
-                logger.error("Output image '{0}' not written.".format(out))
+                if os.path.exists(out):
+                    if not os.path.exists(out+'.fits'):
+                        exportfits(imagename=out, fitsimage=out+'.fits')
+                else:
+                    logger.error("Output image '{0}' not written.".format(out))
 
             #Concat MSs
             pattern = '*MHz/*{0}*.ms'.format(fname)
@@ -92,8 +92,8 @@ def do_concat(visname, fields):
                 if target == fields.targetfield.split(',')[0]:
                     newvis = out
 
-            if not os.path.exists(out):
-                logger.error("Output MS '{0}' not written.".format(out))
+                if not os.path.exists(out):
+                    logger.error("Output MS '{0}' not written.".format(out))
 
             #Concat MMSs
             pattern = '*MHz/*{0}*.mms'.format(fname)
@@ -107,8 +107,8 @@ def do_concat(visname, fields):
                 if target == fields.targetfield.split(',')[0]:
                     newvis = out
 
-            if not os.path.exists(out):
-                logger.error("Output MMS '{0}' not written.".format(out))
+                if not os.path.exists(out):
+                    logger.error("Output MMS '{0}' not written.".format(out))
 
     msmd.done()
     logger.info('Completed {0}.'.format(sys.argv[0]))

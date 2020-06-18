@@ -6,10 +6,11 @@ bpassfield = ''
 fluxfield = ''
 phasecalfield = ''
 targetfields = ''
+extrafields = ''
 
 [slurm]                           # See processMeerKAT.py -h for documentation
-nodes = 2
-ntasks_per_node = 8
+nodes = 1
+ntasks_per_node = 16
 plane = 1
 mem = 236                         # Use this many GB of memory (per node)
 partition = 'Main'                # SLURM partition to use
@@ -63,7 +64,7 @@ imsize = [6827, 6827]
 wprojplanes = 128
 niter = [8000, 11000, 14000, 15000, 200000]
 threshold = [100e-6, 50e-6, 20e-6, 10e-6, 4e-6] # In units of Jy
-multiscale = [15, 10, 5]
+multiscale = []
 nterms = 2                        # Number of taylor terms
 gridder = 'wproject'
 deconvolver = 'mtmfs'

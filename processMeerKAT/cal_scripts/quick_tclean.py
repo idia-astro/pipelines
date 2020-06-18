@@ -67,8 +67,8 @@ def run_tclean(visname, fields, keepmms):
             exportfits(imagename=tt+'.image'+suffix, fitsimage=tt+'.fits')
 
 
-    #Image all calibrator fields and export to fits
-    for subf in fields.gainfields.split(','):
+    #Image all calibrator (and extra) fields and export to fits
+    for subf in fields.gainfields.split(',') + fields.extrafields.split(','):
         fname = msmd.namesforfields(int(subf))[0]
 
         secimname = os.path.splitext(os.path.split(visname)[1])[0]
