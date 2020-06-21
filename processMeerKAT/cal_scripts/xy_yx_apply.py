@@ -75,25 +75,12 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
         parang= True, interp='linear,linearflag')
 
 
-    logger.info(" applying calibrations: secondary calibrators")
-    applycal(vis=visname, field = fields.secondaryfield,
+    logger.info(" applying calibrations: phase calibrator, targets and extra fields")
+    applycal(vis=visname, field = ','.join(fields.secondaryfield + fields.targetfield + fields.extrafields),
             selectdata = False, calwt = False,
-        gaintable = [calfiles.kcorrfile, calfiles.bpassfile, fluxfile,
-            calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile],
-        gainfield = [fields.kcorrfield, fields.bpassfield,
-            fields.secondaryfield, fields.dpolfield, fields.xdelfield,
-            fields.xpolfield],
-        parang= True, interp='linear,linearflag')
-
-    logger.info(" applying calibrations: target fields")
-    applycal(vis=visname, field = fields.targetfield,
-            selectdata = False, calwt = False, gaintable = [calfiles.kcorrfile,
-                calfiles.bpassfile, fluxfile, calfiles.dpolfile,
-                calfiles.xdelfile, calfiles.xpolfile],
-        gainfield = [fields.kcorrfield, fields.bpassfield,
-            fields.secondaryfield, fields.dpolfield, fields.xdelfield,
-            fields.xpolfield],
-        parang= True, interp='linear,linearflag')
+            gaintable = [calfiles.kcorrfile, calfiles.bpassfile, fluxfile, calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile],
+            gainfield = [fields.kcorrfield, fields.bpassfield, fields.secondaryfield, fields.dpolfield, fields.xdelfield, fields.xpolfield],
+            parang= True, interp='linear,linearflag')
 
 
 

@@ -22,24 +22,14 @@ def do_parallel_cal_apply(visname, fields, calfiles):
         fluxfile = calfiles.gainfile
 
     logger.info(" applying calibration -> primary calibrator")
-    applycal(vis=visname, field=fields.fluxfield, selectdata=False,
-            calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
-                fluxfile], gainfield=[fields.kcorrfield,
-                    fields.bpassfield, fields.fluxfield], parang=False, interp='linear,linearflag')
+    applycal(vis=visname, field=fields.fluxfield,
+            selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile, fluxfile],
+            gainfield=[fields.kcorrfield, fields.bpassfield, fields.fluxfield], parang=False, interp='linear,linearflag')
 
-    logger.info(" applying calibration -> secondary calibrator")
-    applycal(vis=visname, field=fields.secondaryfield,
-            selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile,
-                calfiles.bpassfile, fluxfile],
-            gainfield=[fields.kcorrfield, fields.bpassfield,
-                fields.secondaryfield], parang=False, interp='linear,linearflag')
-
-    logger.info(" applying calibration -> target calibrator")
-    applycal(vis=visname, field=fields.targetfield, selectdata=False,
-            calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile,
-                fluxfile], gainfield=[fields.kcorrfield,
-                    fields.bpassfield, fields.secondaryfield], parang=False, interp='linear,linearflag')
-
+    logger.info(" applying calibration -> phase calibrator, targets and extra fields")
+    applycal(vis=visname, field=','.join(fields.secondaryfield + fields.targetfield + fields.extrafields),
+            selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile, fluxfile],
+            gainfield=[fields.kcorrfield, fields.bpassfield, fields.secondaryfield], parang=False, interp='linear,linearflag')
 
 def main(args,taskvals):
 

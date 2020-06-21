@@ -222,6 +222,20 @@ def check_scans(MS,nodes,tasks,dopol):
 
 def parang_coverage(vis, calfield):
 
+    """Check whether the parallactic angle coverage of the phase calibrator field is > 30 degrees, necessary to do polarisation calibration.
+
+    Arguments:
+    ----------
+    vis : str
+        Input measurement set (relative or absolute path).
+    calfield : int
+        Phase calibrator field ID.
+
+    Returns:
+    --------
+    angle : bool
+        Is the parallactic angle coverage of the phase calibrator field > 30 degrees?"""
+
     tb.open(vis+'::ANTENNA')
     pos = tb.getcol('POSITION')
     meanpos = np.mean(pos, axis=1)
