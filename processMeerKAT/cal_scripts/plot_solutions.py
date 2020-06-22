@@ -86,7 +86,7 @@ def plot_antennas(caltype,fields,calfiles,xaxis='freq',yaxis='amp'):
 
 def main(args,taskvals):
 
-    visname = va(taskvals, 'data', 'crosscal_vis', str)
+    visname = va(taskvals, 'run', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)

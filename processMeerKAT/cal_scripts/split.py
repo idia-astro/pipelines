@@ -15,18 +15,19 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
     newvis = visname
 
     for field in fields:
-        for subf in field.split(','):
-            fname = msmd.namesforfields(int(subf))[0]
+        if field != '':
+            for subf in field.split(','):
+                fname = msmd.namesforfields(int(subf))[0]
 
-            outname = '%s.%s.%s' % (outputbase, fname, extn)
-            if not os.path.exists(outname):
+                outname = '%s.%s.%s' % (outputbase, fname, extn)
+                if not os.path.exists(outname):
 
-                split(vis=visname, outputvis=outname, datacolumn='corrected',
-                            field=fname, spw=spw, keepflags=False, keepmms=keepmms,
-                            width=specavg, timebin=timeavg)
+                    split(vis=visname, outputvis=outname, datacolumn='corrected',
+                                field=fname, spw=spw, keepflags=False, keepmms=keepmms,
+                                width=specavg, timebin=timeavg)
 
-            if subf == fields.targetfield.split(',')[0]:
-                newvis = outname
+                if subf == fields.targetfield.split(',')[0]:
+                    newvis = outname
 
     return newvis
 
@@ -47,7 +48,7 @@ def main(args,taskvals):
     newvis = split_vis(visname, spw, fields, specavg, timeavg, keepmms)
 
     config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
-    config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='data')
+    config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
     msmd.done()
 
 if __name__ == '__main__':

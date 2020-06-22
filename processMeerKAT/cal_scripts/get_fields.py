@@ -334,7 +334,7 @@ def main():
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node,dopol)
 
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
-    config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run')
+    config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
     config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
 
     logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))

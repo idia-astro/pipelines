@@ -50,7 +50,7 @@ def main(args,taskvals):
     vis = "'{0}'".format(visname)
 
     config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'vis':mvis})
-    config_parser.overwrite_config(args['config'], conf_sec='data', conf_dict={'orig_vis':vis})
+    config_parser.overwrite_config(args['config'], conf_sec='run', sec_comment='# Internal variables for pipeline execution', conf_dict={'orig_vis':vis})
     msmd.done()
 
 if __name__ == '__main__':

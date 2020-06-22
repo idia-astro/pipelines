@@ -2,6 +2,7 @@
 #See processMeerKAT.py for license details.
 
 import sys
+import traceback
 
 import config_parser
 from collections import namedtuple
@@ -163,11 +164,12 @@ def run_script(func):
             func(args,taskvals)
         except Exception as err:
             logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
-            config_parser.overwrite_config(args['config'], conf_dict={'continue' : False}, conf_sec='run')
+            logger.error(traceback.format_exc())
+            config_parser.overwrite_config(args['config'], conf_dict={'continue' : False}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
             if nspw > 1:
                 for SPW in spw.split(','):
                     spw_config = '{0}/{1}'.format(SPW.replace('0:',''),args['config'])
-                    config_parser.overwrite_config(spw_config, conf_dict={'continue' : False}, conf_sec='run')
+                    config_parser.overwrite_config(spw_config, conf_dict={'continue' : False}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
             sys.exit(1)
     else:
         logger.error('Exception found in previous pipeline job, which set "continue=False" in [run] section of "{0}". Skipping "{1}".'.format(args['config'],os.path.split(sys.argv[2])[1]))

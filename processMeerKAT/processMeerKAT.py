@@ -582,7 +582,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         master.write('output=$({0} --config ./{1} --run --submit --quiet'.format(os.path.split(THIS_PROG)[1],config))
         if partition:
             master.write(' --dependencies=$partitionID\_{0}'.format(i))
-        elif toplevel:
+        elif len(precal_scripts) > 0:
             master.write(' --dependencies=$allSPWIDs')
         elif dependencies != '':
             master.write(' --dependencies={0}'.format(dependencies))
@@ -685,7 +685,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     timestamp = config_parser.get_key(config,'run','timestamp')
     if timestamp == '':
         timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(timestamp)}, conf_sec='run')
+        config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(timestamp)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
 
     #Copy config file to TMP_CONFIG and inform user
     if verbose:
@@ -919,7 +919,7 @@ def default_config(arg_dict):
 
     #Add MS to config file under section [data] and dopol under section [run]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
-    config_parser.overwrite_config(filename, conf_dict={'dopol' : arg_dict['dopol']}, conf_sec='run')
+    config_parser.overwrite_config(filename, conf_dict={'dopol' : arg_dict['dopol']}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
 
     if not arg_dict['do2GC']:
         config_parser.remove_section(filename, 'selfcal')
@@ -1106,14 +1106,14 @@ def format_args(config,submit,quiet,dependencies):
     dopol = config_parser.get_key(config, 'run', 'dopol')
     if not dopol and ('xy_yx_solve.py' in kwargs['scripts'] or 'xy_yx_apply.py' in kwargs['scripts']):
         logger.warn("Cross-hand calibration scripts 'xy_yx_*' found in scripts. Forcing dopol=True in '[run]' section of '{0}'.".format(config))
-        config_parser.overwrite_config(config, conf_dict={'dopol' : True}, conf_sec='run')
+        config_parser.overwrite_config(config, conf_dict={'dopol' : True}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
 
     includes_partition = any('partition' in script for script in kwargs['scripts'])
     #If single correctly formatted spw, split into nspw directories, and process each spw independently
     if nspw > 1:
         #Write timestamp to this pipeline run
         kwargs['timestamp'] = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(kwargs['timestamp'])}, conf_sec='run')
+        config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(kwargs['timestamp'])}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
         nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
 
@@ -1294,7 +1294,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,remove=True):
             vis = '{0}.{1}.mms'.format(filebase,spw.replace('0:',''))
             logger.warn("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
             orig_vis = config_parser.get_key(spw_config, 'data', 'vis')
-            config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='data')
+            config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
             config_parser.overwrite_config(spw_config, conf_dict={'vis' : "'{0}'".format(vis)}, conf_sec='data')
 
     return nspw
