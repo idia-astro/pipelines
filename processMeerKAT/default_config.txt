@@ -41,8 +41,8 @@ scripts = [ ('validate_input.py',False,''),
 
 [crosscal]
 minbaselines = 4                  # Minimum number of baselines to use while calibrating
-preavg = 1                        # Number of channels to average before calibration (during partition)
-specavg = 1                       # Number of channels to average after calibration (during split)
+chanbin = 1                       # Number of channels to average before calibration (during partition)
+width = 1                         # Number of channels to (further) average after calibration (during split)
 timeavg = '8s'                    # Time interval to average after calibration (during split)
 keepmms = True                    # Output MMS (True) or MS (False) during split
 spw = '0:880~1680MHz'             # Spectral window / frequencies to extract for MMS
@@ -72,5 +72,5 @@ solint = ['10min','5min','2min','1min']
 calmode = 'p'
 atrous = True                     # Source find for diffuse emission (see PyBDSF docs)
 
-[run]
+[run]                             # Internal variables for pipeline execution
 continue = True

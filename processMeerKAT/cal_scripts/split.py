@@ -40,7 +40,7 @@ def main(args,taskvals):
 
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
 
-    specavg = va(taskvals, 'crosscal', 'specavg', int, default=1)
+    specavg = va(taskvals, 'crosscal', 'width', int, default=1)
     timeavg = va(taskvals, 'crosscal', 'timeavg', str, default='8s')
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 

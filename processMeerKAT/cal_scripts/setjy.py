@@ -26,7 +26,7 @@ def linfit(xInput, xDataList, yDataList):
 def do_setjy(visname, spw, fields, standard, dopol=False):
 
     fluxlist = ["J0408-6545", "0408-6545", ""]
-    ismms = False
+    ismms = True
 
     msmd.open(visname)
     fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(",")])
