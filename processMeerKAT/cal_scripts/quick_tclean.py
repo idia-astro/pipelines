@@ -69,20 +69,21 @@ def run_tclean(visname, fields, keepmms):
 
     #Image all calibrator (and extra) fields and export to fits
     for subf in fields.gainfields.split(',') + fields.extrafields.split(','):
-        fname = msmd.namesforfields(int(subf))[0]
+        if subf != '':
+            fname = msmd.namesforfields(int(subf))[0]
 
-        secimname = os.path.splitext(os.path.split(visname)[1])[0]
-        inname = '%s.%s.%s' % (secimname, fname, extn)
-        secimname = os.path.join(impath, secimname + '_%s.im' % (fname))
+            secimname = os.path.splitext(os.path.split(visname)[1])[0]
+            inname = '%s.%s.%s' % (secimname, fname, extn)
+            secimname = os.path.join(impath, secimname + '_%s.im' % (fname))
 
-        if len(glob.glob(secimname + '*')) == 0:
-            tclean(vis=inname, imagename=secimname, datacolumn='corrected',
-                    imsize=[512,512], threshold=0,niter=1000, weighting='briggs',
-                    robust=0, cell='2arcsec', specmode='mfs', deconvolver=deconvolver,
-                    nterms=terms, scales=[], savemodel='none', gridder='standard',
-                    restoration=True, pblimit=0, parallel=True)
+            if len(glob.glob(secimname + '*')) == 0:
+                tclean(vis=inname, imagename=secimname, datacolumn='corrected',
+                        imsize=[512,512], threshold=0,niter=1000, weighting='briggs',
+                        robust=0, cell='2arcsec', specmode='mfs', deconvolver=deconvolver,
+                        nterms=terms, scales=[], savemodel='none', gridder='standard',
+                        restoration=True, pblimit=0, parallel=True)
 
-            exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
+                exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
 
     msmd.done()
 
