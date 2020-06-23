@@ -156,22 +156,6 @@ def check_refant(MS,refant,config,warn=True):
             logger.info("This is usually a well-behaved (stable) antenna. Edit '{0}' to change this, by updating 'refant' in [crosscal] section".format(config))
             logger.debug("Alternatively, set 'calcrefant=True' in [crosscal] section of '{0}', and include 'calc_refant.py' in 'scripts' in [slurm] section.".format(config)) #(included by default)
 
-def check_pol(dopol):
-
-    """Check if 4 polarisations present, otherwise output a warning and force dopol=False.
-
-    Arguments / Returns:
-    --------------------
-    dopol : bool
-        Do polarisation calibration?"""
-
-    npol = msmd.ncorrforpol()[0]
-    if npol != 4:
-        logger.warn("Only {0} polarisations present in '{1}'. Cannot perform polarisation calibration.".format(npol,MS))
-        dopol = False
-
-    return dopol
-
 def check_scans(MS,nodes,tasks,dopol):
 
     """Check if the user has set the number of threads to a number larger than the number of scans.
@@ -233,8 +217,8 @@ def parang_coverage(vis, calfield):
 
     Returns:
     --------
-    angle : bool
-        Is the parallactic angle coverage of the phase calibrator field > 30 degrees?"""
+    delta_parang : float
+        The parallactic angle coverage of the phase calibrator field."""
 
     tb.open(vis+'::ANTENNA')
     pos = tb.getcol('POSITION')
@@ -282,7 +266,7 @@ def parang_coverage(vis, calfield):
     logger.debug("Delta parang: {0}".format(delta_parang))
     tb.close()
 
-    return np.abs(delta_parang) > 30
+    np.abs(delta_parang)
 
 
 def get_xy_field(visname, fields):
@@ -322,22 +306,26 @@ def main():
     msmd.open(args.MS)
 
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
-    check_refant(args.MS, refant, args.config, warn=True)
-    dopol = check_pol(args.dopol)
     fields = get_fields(args.MS)
+    logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
 
-    if dopol:
-        dopol = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
-        if not dopol:
-            logger.warn("Parang coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
+    npol = msmd.ncorrforpol()[0]
+    parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
 
+    if npol < 4:
+        logger.warn("Only {0} polarisations present in '{1}'. Any attempted polarisation calibration will fail, so setting dopol=False in [run] section of '{2}'.".format(npol,args.MS,args.config))
+        dopol = False
+    elif parang < 30:
+        logger.warn("Parallactic angle coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
+        dopol = False
+
+    check_refant(args.MS, refant, args.config, warn=True)
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node,dopol)
 
-    config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
     config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
+    config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
     config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
 
-    logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
     msmd.done()
 
 if __name__ == "__main__":

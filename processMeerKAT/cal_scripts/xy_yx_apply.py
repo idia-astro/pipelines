@@ -76,8 +76,8 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
 
     logger.info(" applying calibrations: phase calibrator, targets and extra fields")
-    applycal(vis=visname, field = ','.join(fields.secondaryfield + fields.targetfield + fields.extrafields),
-            selectdata = False, calwt = False,
+    field = ','.join(set(','.join([fields.secondaryfield] + [fields.targetfield] + [fields.extrafields]).split(','))) #remove duplicate fields
+    applycal(vis=visname, field = field, selectdata = False, calwt = False,
             gaintable = [calfiles.kcorrfile, calfiles.bpassfile, fluxfile, calfiles.dpolfile, calfiles.xdelfile, calfiles.xpolfile],
             gainfield = [fields.kcorrfield, fields.bpassfield, fields.secondaryfield, fields.dpolfield, fields.xdelfield, fields.xpolfield],
             parang= True, interp='linear,linearflag')
