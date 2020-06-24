@@ -355,7 +355,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['plot_call'] = ''
     command = ''
 
-    #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory (TODO: don't assume this!)
+    #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
     if not os.path.exists(script):
         params['script'] = check_path(script, update=True)
 
@@ -451,7 +451,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     params['cpus'] = 1
     if 'tclean' in script or 'selfcal' in script or 'bdsf' in script or 'partition' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
-    #hard-code for 2/4 polarisations (TODO: check MS actually has npol=2/4, requiring CASA)
+    #hard-code for 2/4 polarisations
     if 'partition' in script:
         dopol = config_parser.get_key(TMP_CONFIG, 'run', 'dopol')
         if dopol and 4*tasks < CPUS_PER_NODE_LIMIT:
@@ -510,7 +510,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies='',timestamp=''):
+def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies='',timestamp='',slurm_kwargs={}):
 
     """Write master master script, which separately calls each of the master scripts in each SPW directory.
 
@@ -533,7 +533,9 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     dependencies : str, optional
         Comma-separated list of SLURM job dependencies.
     timestamp : str, optional
-        Timestamp to put on this run and related runs in SPW directories."""
+        Timestamp to put on this run and related runs in SPW directories.
+    slurm_kwargs : list, optional
+        Parameters parsed from [slurm] section of config."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
@@ -570,6 +572,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     fullSummaryScript = 'fullSummary'
     errorScript = 'findErrors'
     timingScript = 'displayTimes'
+    cleanupScript = 'cleanup'
+
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
     master.write("\nDATE={0}\n".format(timestamp))
     master.write('mkdir -p {0}\n'.format(dir))
@@ -594,7 +598,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         master.write('\ncd ..\n\n')
 
     if 'concat.sbatch' in postcal_scripts:
-        master.write('echo Will concatenate MSs/MMSs and create quick-look continuum cube across all SPWs for target and calibrator fields from \"{0}\".\n'.format(config))
+        master.write('echo Will concatenate MSs/MMSs and create quick-look continuum cube across all SPWs for all fields from \"{0}\".\n'.format(config))
     scripts = postcal_scripts[:]
 
     #Hack to perform correct number of selfcal loops
@@ -623,15 +627,15 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         master.write('\necho Submitted the following jobIDs over all SPWs: $allSPWIDs\n')
         master.write('\necho For jobs over all SPWs:\n')
         prefix = 'allSPW_'
-        write_all_bash_jobs_scripts(master,extn,IDs='allSPWIDs',dir=dir,prefix=prefix,pad_length=pad_length)
+        write_all_bash_jobs_scripts(master,extn,IDs='allSPWIDs',dir=dir,prefix=prefix,pad_length=pad_length,slurm_kwargs=slurm_kwargs)
         master.write('\nln -f -s {1}{2}{3} {0}/{1}{4}{3}\n'.format(dir,prefix,summaryScript,extn,fullSummaryScript))
 
     master.write('\necho For all jobs within the {0} SPW directories:\n'.format(len(SPWs.split(','))))
     header = '-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------' + '-'*pad_length
-    do = """echo "for f in {%s,}; do if [ -d \$f ]; then cd \$f; ./%s/%s%s; cd ..; else echo Directory \$f doesn\\'t exist; fi; done;""" % (SPWs,dir,killScript,extn)
-    if not toplevel:
-        do += ' \"'
-    write_bash_job_script(master, killScript, extn, do, 'kill all the jobs', dir=dir,prefix=prefix)
+    do = """echo "for f in {%s,}; do if [ -d \$f ]; then cd \$f; ./%s/%s%s; cd ..; else echo Directory \$f doesn\\'t exist; fi; done;%s"""
+    suffix = '' if toplevel else ' \"'
+    write_bash_job_script(master, killScript, extn, do % (SPWs,dir,killScript,extn,suffix), 'kill all the jobs', dir=dir,prefix=prefix)
+    write_bash_job_script(master, cleanupScript, extn, do % (SPWs,dir,cleanupScript,extn,' \"'), 'remove the MMSs/MSs within SPW directories \(after pipeline has run\), while leaving the concatenated data at the top level', dir=dir)
 
     do = """echo "counter=1; for f in {%s,}; do echo -n SPW \#\$counter:; echo -n ' '; if [ -d \$f ]; then cd \$f; pwd; ./%s/%s%s %s; cd ..; else echo Directory \$f doesn\\'t exist; fi; counter=\$((counter+1)); echo '%s'; done; """
     if toplevel:
@@ -655,7 +659,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
-def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies=''):
+def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -678,7 +682,9 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     echo : bool, optional
         Echo the pupose of each job script for the user?
     dependencies : str, optional
-        Comma-separated list of SLURM job dependencies."""
+        Comma-separated list of SLURM job dependencies.
+    slurm_kwargs : list, optional
+        Parameters parsed from [slurm] section of config."""
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
@@ -732,7 +738,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('cp {0} {1}/{2}_$DATE.txt\n'.format(config,dir,os.path.splitext(config)[0]))
 
     #Write each job script - kill script, summary script, error script, and timing script
-    write_all_bash_jobs_scripts(master,extn,IDs='IDs',dir=dir,echo=echo,pad_length=pad_length)
+    write_all_bash_jobs_scripts(master,extn,IDs='IDs',dir=dir,echo=echo,pad_length=pad_length,slurm_kwargs=slurm_kwargs)
 
     #Close master submission script and make executable
     master.close()
@@ -746,7 +752,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
-def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefix='',pad_length=5):
+def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefix='',pad_length=5, slurm_kwargs={}):
 
     """Write all the bash job scripts for a given set of job IDs.
 
@@ -765,13 +771,16 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
     prefix : str, optional
         Additional prefix to place on the beginning of these script names.
     pad_length : int, optional
-        Length to pad the SLURM sacct output columns."""
+        Length to pad the SLURM sacct output columns.
+    slurm_kwargs : list, optional
+        Parameters parsed from [slurm] section of config."""
 
     #Add time as extn to this pipeline run, to give unique filenames
     killScript = prefix + 'killJobs'
     summaryScript = prefix + 'summary'
     errorScript = prefix + 'findErrors'
     timingScript = prefix + 'displayTimes'
+    cleanupScript = prefix + 'cleanup'
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel ${0}'.format(IDs), 'kill all the jobs', dir=dir, echo=echo)
@@ -781,6 +790,8 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do ls %s/*\$ID*; cat %s/*\$ID* | grep INFO | head -n 1 | cut -d 'I' -f1; cat %s/*\$ID* | grep INFO | tail -n 1 | cut -d 'I' -f1; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir, echo=echo)
+    do = """echo "%s rm -r *ms" """ % srun(slurm_kwargs, qos=True, time=10, mem=1)
+    write_bash_job_script(master, cleanupScript, extn, do, 'remove MSs/MMSs from this directory \(after pipeline has run\)', dir=dir, echo=echo)
 
 def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=True,prefix=''):
 
@@ -806,7 +817,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
         Additional prefix to place on the beginning of the script, called from the top level directory (instead of SPW directories)."""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
-    do2 = './{0}/{1}{2}{3} \"'.format(dir,prefix,filename,extn) if prefix != '' else ' '
+    do2 = ' ./{0}/{1}{2}{3} \"'.format(dir,prefix,filename,extn) if prefix != '' else ' '
     master.write('\n#Create {0}.sh file, make executable and symlink to current version\n'.format(filename))
     master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
     master.write('{0}{1}>> {2}\n'.format(do,do2,fname))
@@ -814,6 +825,36 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
     master.write('ln -f -s {0} {1}.sh\n'.format(fname,filename))
     if echo:
         master.write('echo Run ./{0}.sh to {1}.\n'.format(filename,purpose))
+
+def srun(arg_dict,qos=True,time=10,mem=4):
+
+    """Return srun call, with certain parameters appended.
+
+    Arguments:
+    ----------
+    arg_dict : dict
+        Dictionary of arguments passed into this script, which is used to append parameters to srun call.
+    qos : bool, optional
+        Quality of service, set to True for interactive jobs, to increase likelihood of scheduling.
+    mem : int, optional
+        The memory in GB (per node) to use for this call.
+    time : str, optional
+        Time limit to use for this call, in the form d-hh:mm:ss.
+
+    Returns:
+    --------
+    call : str
+        srun call with arguments appended."""
+
+    call = 'srun --time={0} --mem={1}GB --partition={2}'.format(time,mem,arg_dict['partition'])
+    if qos:
+        call += ' --qos qos-interactive'
+    if arg_dict['exclude'] != '':
+        call += ' --exclude={0}'.format(arg_dict['exclude'])
+    if arg_dict['reservation'] != '':
+        call += ' --reservation={0}'.format(arg_dict['reservation'])
+
+    return call
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1,
                partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', timestamp=''):
@@ -865,6 +906,7 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
     timestamp : str, optional
         Timestamp to put on this run and related runs in SPW directories."""
 
+    kwargs = locals()
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
     pad_length = len(name)
 
@@ -888,10 +930,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
 
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once, precal scripts before this, and postcal scripts after this
-        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp)
+        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp,slurm_kwargs=kwargs)
     else:
         #Build master pipeline submission script
-        write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies)
+        write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies,slurm_kwargs=kwargs)
 
 
 def default_config(arg_dict):
@@ -938,11 +980,7 @@ def default_config(arg_dict):
         if arg_dict['local']:
             mpi_wrapper = ''
         else:
-            mpi_wrapper = 'srun --qos qos-interactive --nodes=1 --ntasks=1 --time=10 --mem=4GB --partition={0}'.format(arg_dict['partition'])
-            if arg_dict['exclude'] != '':
-                mpi_wrapper += ' --exclude={0}'.format(arg_dict['exclude'])
-            if arg_dict['reservation'] != '':
-                mpi_wrapper += ' --reservation={0}'.format(arg_dict['reservation'])
+            mpi_wrapper = srun(arg_dict)
 
         #Write and submit srun command to extract fields, and insert them into config file under section [fields]
         params =  '-B -M {MS} -C {config} -N {nodes} -t {ntasks_per_node}'.format(**arg_dict)
