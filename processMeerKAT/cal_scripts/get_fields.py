@@ -179,13 +179,14 @@ def check_scans(MS,nodes,tasks,dopol):
 
     nscans = msmd.nscans()
     limit = int(nscans/2)
-    tasks = 16 if not dopol else 8
 
     if abs(nodes * tasks - limit) > 0.1*limit:
         logger.warn('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
 
         #Start with 8/16 tasks on one node, and increase count of nodes (and then tasks per node) until limit reached
         nodes = 1
+        tasks = 16 if not dopol else 8
+        
         if tasks > limit:
             tasks = limit
 

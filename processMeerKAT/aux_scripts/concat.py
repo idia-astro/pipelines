@@ -44,71 +44,72 @@ def do_concat(visname, fields):
     basename, ext = os.path.splitext(visname)
     filebase = os.path.split(basename)[1]
 
-    for field in [fields.targetfield,fields.gainfields]:
-        for target in field.split(','):
-            fname = msmd.namesforfields(int(target))[0]
+    for field in [fields.targetfield,fields.gainfields,fields.extrafields]:
+        if field != '':
+            for target in field.split(','):
+                fname = msmd.namesforfields(int(target))[0]
 
-            #Concat tt0 images (into continuum cube)
-            pattern = '*MHz/images/*{0}*image.tt0'.format(fname)
-            out = '{0}.{1}.contcube'.format(filebase,fname)
-            images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
-            if images is not None:
-                images.sort(key=sortbySPW)
-                logger.info('Creating continuum cube with following command:')
-                logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
-                ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
+                #Concat tt0 images (into continuum cube)
+                pattern = '*MHz/images/*{0}*image.tt0'.format(fname)
+                out = '{0}.{1}.contcube'.format(filebase,fname)
+                images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
+                if images is not None:
+                    images.sort(key=sortbySPW)
+                    logger.info('Creating continuum cube with following command:')
+                    logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
+                    ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
 
-                if os.path.exists(out):
-                    if not os.path.exists(out+'.fits'):
-                        exportfits(imagename=out, fitsimage=out+'.fits')
-                else:
-                    logger.error("Output image '{0}' not written.".format(out))
+                    if os.path.exists(out):
+                        if not os.path.exists(out+'.fits'):
+                            exportfits(imagename=out, fitsimage=out+'.fits')
+                    else:
+                        logger.error("Output image '{0}' not written.".format(out))
 
-            #Concat images (into continuum cube)
-            pattern = '*MHz/images/*{0}*image'.format(fname)
-            out = '{0}.{1}.contcube'.format(filebase,fname)
-            images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
-            if images is not None:
-                images.sort(key=sortbySPW)
-                logger.info('Creating continuum cube with following command:')
-                logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
-                ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
+                #Concat images (into continuum cube)
+                pattern = '*MHz/images/*{0}*image'.format(fname)
+                out = '{0}.{1}.contcube'.format(filebase,fname)
+                images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
+                if images is not None:
+                    images.sort(key=sortbySPW)
+                    logger.info('Creating continuum cube with following command:')
+                    logger.info('ia.imageconcat(infiles={0}, outfile={1}, axis=-1, relax=True)'.format(images,out))
+                    ia.imageconcat(infiles=images, outfile=out, axis=-1, relax=True)
 
-                if os.path.exists(out):
-                    if not os.path.exists(out+'.fits'):
-                        exportfits(imagename=out, fitsimage=out+'.fits')
-                else:
-                    logger.error("Output image '{0}' not written.".format(out))
+                    if os.path.exists(out):
+                        if not os.path.exists(out+'.fits'):
+                            exportfits(imagename=out, fitsimage=out+'.fits')
+                    else:
+                        logger.error("Output image '{0}' not written.".format(out))
 
-            #Concat MSs
-            pattern = '*MHz/*{0}*.ms'.format(fname)
-            out = '{0}.{1}.ms'.format(filebase,fname)
-            MSs = check_output(fname,pattern,out,job='concat',filetype='MS')
-            if MSs is not None:
-                MSs.sort(key=sortbySPW)
-                logger.info('Concatenating MSs with following command:')
-                logger.info('concat(vis={0}, concatvis={1})'.format(MSs,out))
-                concat(vis=MSs, concatvis=out)
-                if target == fields.targetfield.split(',')[0]:
-                    newvis = out
+                #Concat MSs
+                pattern = '*MHz/*{0}*.ms'.format(fname)
+                out = '{0}.{1}.ms'.format(filebase,fname)
+                MSs = check_output(fname,pattern,out,job='concat',filetype='MS')
+                if MSs is not None:
+                    MSs.sort(key=sortbySPW)
+                    logger.info('Concatenating MSs with following command:')
+                    logger.info('concat(vis={0}, concatvis={1})'.format(MSs,out))
+                    concat(vis=MSs, concatvis=out)
+                    if target == fields.targetfield.split(',')[0]:
+                        newvis = out
 
-                if not os.path.exists(out):
-                    logger.error("Output MS '{0}' not written.".format(out))
+                    if not os.path.exists(out):
+                        logger.error("Output MS '{0}' not written.".format(out))
 
-            #Concat MMSs
-            pattern = '*MHz/*{0}*.mms'.format(fname)
-            out = '{0}.{1}.mms'.format(filebase,fname)
-            MMSs = check_output(fname,pattern,out,job='virtualconcat',filetype='MMS')
-            if MMSs is not None:
-                MMSs.sort(key=sortbySPW)
-                logger.info('Concatenating MMSs with following command:')
-                logger.info('virtualconcat(vis={0}, concatvis={1})'.format(MMSs,out))
-                virtualconcat(vis=MMSs, concatvis=out)
-                if target == fields.targetfield.split(',')[0]:
-                    newvis = out
+                #Concat MMSs
+                pattern = '*MHz/*{0}*.mms'.format(fname)
+                out = '{0}.{1}.mms'.format(filebase,fname)
+                MMSs = check_output(fname,pattern,out,job='virtualconcat',filetype='MMS')
+                if MMSs is not None:
+                    MMSs.sort(key=sortbySPW)
+                    logger.info('Concatenating MMSs with following command:')
+                    logger.info('virtualconcat(vis={0}, concatvis={1})'.format(MMSs,out))
+                    virtualconcat(vis=MMSs, concatvis=out)
+                    if target == fields.targetfield.split(',')[0]:
+                        newvis = out
 
-                if not os.path.exists(out):
-                    logger.error("Output MMS '{0}' not written.".format(out))
+                    if not os.path.exists(out):
+                        logger.error("Output MMS '{0}' not written.".format(out))
 
     msmd.done()
     logger.info('Completed {0}.'.format(sys.argv[0]))

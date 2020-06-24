@@ -13,17 +13,18 @@ from cal_scripts import get_fields
 import processMeerKAT
 from cal_scripts import bookkeeping
 
-def do_partition(visname, spw, preavg, CPUs, include_crosshand):
+def do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms):
     # Get the .ms bit of the filename, case independent
     basename, ext = os.path.splitext(visname)
     filebase = os.path.split(basename)[1]
+    extn = 'mms' if createmms else 'ms'
 
-    mvis = '{0}.{1}.mms'.format(filebase,spw.replace('0:',''))
-    nscan = msmd.nscans()
+    mvis = '{0}.{1}.{2}'.format(filebase,spw.replace('0:',''),extn)
+    nscan = 1 if not createmms else msmd.nscans()
     chanaverage = True if preavg > 1 else False
     correlation = '' if include_crosshand else 'XX,YY'
 
-    mstransform(vis=visname, outputvis=mvis, spw=spw, createmms=True, datacolumn='DATA', chanaverage=chanaverage, chanbin=preavg,
+    mstransform(vis=visname, outputvis=mvis, spw=spw, createmms=createmms, datacolumn='DATA', chanaverage=chanaverage, chanbin=preavg,
                 numsubms=nscan, separationaxis='scan', keepflags=False, usewtspectrum=True, nthreads=CPUs, antenna='*&', correlation=correlation)
 
     return mvis
@@ -37,6 +38,7 @@ def main(args,taskvals):
     tasks = va(taskvals, 'slurm', 'ntasks_per_node', int)
     preavg = va(taskvals, 'crosscal', 'chanbin', int, default=1)
     include_crosshand = va(taskvals, 'run', 'dopol', bool, default=False)
+    createmms = va(taskvals, 'crosscal', 'createmms', bool, default=True)
 
     msmd.open(visname)
     npol = msmd.ncorrforpol()[0]
@@ -45,7 +47,7 @@ def main(args,taskvals):
         npol = 2
     CPUs = npol if tasks*npol <= processMeerKAT.CPUS_PER_NODE_LIMIT else 1 #hard-code for number of polarisations
 
-    mvis = do_partition(visname, spw, preavg, CPUs, include_crosshand)
+    mvis = do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms)
     mvis = "'{0}'".format(mvis)
     vis = "'{0}'".format(visname)
 

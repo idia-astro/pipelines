@@ -44,6 +44,7 @@ minbaselines = 4                  # Minimum number of baselines to use while cal
 chanbin = 1                       # Number of channels to average before calibration (during partition)
 width = 1                         # Number of channels to (further) average after calibration (during split)
 timeavg = '8s'                    # Time interval to average after calibration (during split)
+createmms = True                  # Create MMS (True) or MS (False) for cross-calibration during partition
 keepmms = True                    # Output MMS (True) or MS (False) during split
 spw = '0:880~1680MHz'             # Spectral window / frequencies to extract for MMS
 nspw = 16                         # Number of spectral windows to split into

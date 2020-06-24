@@ -55,7 +55,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
-CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','spw','nspw','calcrefant','refant','standard','badants','badfreqranges','keepmms']
+CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
 SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
@@ -173,7 +173,7 @@ def parse_args():
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
                         help="Use this number of nodes [default: 1; max: {0}].".format(TOTAL_NODES_LIMIT))
-    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=4,
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=16,
                         help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
     parser.add_argument("-D","--plane", metavar="num", required=False, type=int, default=1,
                             help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
@@ -1099,6 +1099,22 @@ def format_args(config,submit,quiet,dependencies):
     kwargs['threadsafe'] = [i[1] for i in scripts]
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
+    if not crosscal_kwargs['createmms']:
+        logger.info("You've set 'createmms = False' in '{0}', so forcing 'keepmms = False'. Will use single CPU for every job other than 'quick_tclean.py', if present.".format(config))
+        config_parser.overwrite_config(config, conf_dict={'keepmms' : False}, conf_sec='crosscal')
+        kwargs['threadsafe'] = [False]*len(scripts)
+
+    elif not crosscal_kwargs['keepmms']:
+        #Set threadsafe=False for split and postcal scripts (since working with MS not MMS).
+        if 'split.py' in kwargs['scripts']:
+            kwargs['threadsafe'][kwargs['scripts'].index('split.py')] = False
+        if nspw != 1:
+            kwargs['threadsafe'][kwargs['num_precal_scripts']:] = [False]*len(kwargs['postcal_scripts'])
+
+    #Set threadsafe=True for quick-tclean, as this uses MPI even for an MS
+    if 'quick_tclean.py' in kwargs['scripts']:
+        kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = True
+
     #Only reduce the memory footprint if we're not using all CPUs on each node
     # if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
     #     mem = mem // nspw
@@ -1114,12 +1130,8 @@ def format_args(config,submit,quiet,dependencies):
         #Write timestamp to this pipeline run
         kwargs['timestamp'] = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(kwargs['timestamp'])}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
-        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition)
+        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition, createmms = crosscal_kwargs['createmms'])
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
-
-    #Set threadsafe=False for split if keepmms=False. Assume it won't be in precal or postcal scripts
-    if 'split.py' in kwargs['scripts'] and not crosscal_kwargs['keepmms']:
-        kwargs['threadsafe'][kwargs['scripts'].index('split.py')] = False
 
     #Pop script to calculate reference antenna if calcrefant=False. Assume it won't be in postcal scripts
     if not crosscal_kwargs['calcrefant']:
@@ -1201,7 +1213,7 @@ def get_spw_bounds(spw):
 
     return low,high,unit,func
 
-def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,remove=True):
+def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remove=True):
 
     """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
 
@@ -1221,6 +1233,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,remove=True):
         Path to CASA Measurement Set.
     partition : bool
         Does this run include the partition step?
+    createmms : bool
+        Create MMS as output?
     remove : bool, optional
         Remove SPWs completely encompassed by bad frequency ranges?
 
@@ -1291,7 +1305,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,remove=True):
         elif not partition:
             basename, ext = os.path.splitext(MS.rstrip('/ '))
             filebase = os.path.split(basename)[1]
-            vis = '{0}.{1}.mms'.format(filebase,spw.replace('0:',''))
+            extn = 'mms' if createmms else 'ms'
+            vis = '{0}.{1}.{2}'.format(filebase,spw.replace('0:',''),extn)
             logger.warn("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
             orig_vis = config_parser.get_key(spw_config, 'data', 'vis')
             config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')

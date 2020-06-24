@@ -23,10 +23,10 @@ def linfit(xInput, xDataList, yDataList):
     return yPredict
 
 
-def do_setjy(visname, spw, fields, standard, dopol=False):
+def do_setjy(visname, spw, fields, standard, dopol=False, createmms=True):
 
     fluxlist = ["J0408-6545", "0408-6545", ""]
-    ismms = True
+    ismms = createmms
 
     msmd.open(visname)
     fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(",")])
@@ -154,8 +154,9 @@ def main(args,taskvals):
     spw = va(taskvals, "crosscal", "spw", str, default="")
     standard = va(taskvals, "crosscal", "standard", str, default="Stevens-Reynolds 2016")
     dopol = va(taskvals, 'run', 'dopol', bool, default=False)
+    createmms = va(taskvals, 'crosscal', 'createmms', bool, default=True)
 
-    do_setjy(visname, spw, fields, standard, dopol)
+    do_setjy(visname, spw, fields, standard, dopol, createmms)
 
 if __name__ == '__main__':
 
