@@ -186,7 +186,7 @@ def check_scans(MS,nodes,tasks,dopol):
         #Start with 8/16 tasks on one node, and increase count of nodes (and then tasks per node) until limit reached
         nodes = 1
         tasks = 16 if not dopol else 8
-        
+
         if tasks > limit:
             tasks = limit
 

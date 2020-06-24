@@ -10,7 +10,7 @@ extrafields = ''
 
 [slurm]                           # See processMeerKAT.py -h for documentation
 nodes = 1
-ntasks_per_node = 16
+ntasks_per_node = 8
 plane = 1
 mem = 236                         # Use this many GB of memory (per node)
 partition = 'Main'                # SLURM partition to use

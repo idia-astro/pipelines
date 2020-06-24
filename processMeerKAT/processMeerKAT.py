@@ -173,7 +173,7 @@ def parse_args():
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
                         help="Use this number of nodes [default: 1; max: {0}].".format(TOTAL_NODES_LIMIT))
-    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=16,
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
                         help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
     parser.add_argument("-D","--plane", metavar="num", required=False, type=int, default=1,
                             help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
