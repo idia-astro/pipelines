@@ -306,6 +306,7 @@ def main():
     processMeerKAT.setup_logger(args.config,args.verbose)
     msmd.open(args.MS)
 
+    dopol = args.dopol
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
     fields = get_fields(args.MS)
     logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
