@@ -267,7 +267,7 @@ def parang_coverage(vis, calfield):
     logger.debug("Delta parang: {0}".format(delta_parang))
     tb.close()
 
-    np.abs(delta_parang)
+    return np.abs(delta_parang)
 
 
 def get_xy_field(visname, fields):
