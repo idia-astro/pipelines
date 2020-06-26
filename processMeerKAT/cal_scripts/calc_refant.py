@@ -97,6 +97,8 @@ def main(args,taskvals):
                 config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'refant' : "'{0}'".format(refant)})
                 config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'badants' : badants})
                 config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'calcrefant' : False})
+    else:
+        logger.info("Skipping calculation of reference antenna, as 'calcrefant=False' in '{0}'.".format(args['config']))
 
 if __name__ == '__main__':
 

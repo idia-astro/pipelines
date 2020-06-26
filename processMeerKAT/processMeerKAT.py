@@ -62,7 +62,7 @@ SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_sc
 CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
-POSTCAL_SCRIPTS = [('concat.py',False,''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
+POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
 SCRIPTS = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -1008,9 +1008,9 @@ def default_config(arg_dict):
 
             if count > 2:
                 if ss[0] == 'xx_yy_solve.py':
-                    arg_dict['scripts'][ind] = ('xy_yx_solve.py', False, '')
+                    arg_dict['scripts'][ind] = ('xy_yx_solve.py',arg_dict['scripts'][ind][1],arg_dict['scripts'][ind][2])
                 if ss[0] == 'xx_yy_apply.py':
-                    arg_dict['scripts'][ind] = ('xy_yx_apply.py', True, '')
+                    arg_dict['scripts'][ind] = ('xy_yx_apply.py',arg_dict['scripts'][ind][1],arg_dict['scripts'][ind][2])
 
         config_parser.overwrite_config(filename, conf_dict={'scripts' : arg_dict['scripts']}, conf_sec='slurm')
 
@@ -1115,6 +1115,11 @@ def format_args(config,submit,quiet,dependencies):
     if nspw == 1:
         if len(kwargs['precal_scripts']) > 0 or len(kwargs['postcal_scripts']) > 0:
             logger.warn('Appending "precal_scripts" to beginning of "scripts", and "postcal_script" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
+
+            #Drop first instance of calc_refant.py from precal scripts in preference for one in scripts (after flag_round_1.py)
+            if 'calc_refant.py' in [i[0] for i in kwargs['precal_scripts']] and 'calc_refant.py' in [i[0] for i in kwargs['scripts']]:
+                kwargs['precal_scripts'].pop([i[0] for i in kwargs['precal_scripts']].index('calc_refant.py'))
+
             scripts = kwargs['precal_scripts'] + kwargs['scripts'] + kwargs['postcal_scripts']
             config_parser.overwrite_config(config, conf_dict={'scripts' : scripts}, conf_sec='slurm')
             config_parser.overwrite_config(config, conf_dict={'precal_scripts' : []}, conf_sec='slurm')
@@ -1123,6 +1128,7 @@ def format_args(config,submit,quiet,dependencies):
         else:
             scripts = kwargs['scripts']
     else:
+
         scripts = kwargs['precal_scripts'] + kwargs['postcal_scripts']
 
     kwargs['num_precal_scripts'] = len(kwargs['precal_scripts'])
@@ -1240,8 +1246,8 @@ def get_spw_bounds(spw):
         # Can only do when using CASA
         # if unit == '':
         #     msmd.open(MS)
-        #     low_MHz = msmd.chanfreqs(0)[low] / 1e9
-        #     high_MHz = msmd.chanfreqs(0)[high] / 1e9
+        #     low_MHz = msmd.chanfreqs(0)[low] / 1e6
+        #     high_MHz = msmd.chanfreqs(0)[high] / 1e6
         #     msmd.done()
         # else:
         #     low_MHz=qa.convertfreq('{0}{1}'.format(low,unit),'MHz')['value']

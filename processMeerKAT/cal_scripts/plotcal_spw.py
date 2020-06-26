@@ -3,11 +3,12 @@
 import os
 import glob
 import config_parser
+import traceback
+
 import matplotlib
 # Agg doesn't need X - matplotlib doesn't work with xvfb
 matplotlib.use('Agg', warn=False)
 import matplotlib.pyplot as plt
-
 
 from config_parser import validate_args as va
 from cal_scripts import bookkeeping
@@ -15,17 +16,21 @@ import glob
 PLOT_DIR = 'plots'
 EXTN = 'pdf'
 
+import logging
+from time import gmtime
+logging.Formatter.converter = gmtime
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
+
 def avg_ants(arrlist):
     return [np.mean(arr, axis=-1) for arr in arrlist]
 
-def plotcal(plotstr, field_id, spwdir, caldir, table_ext, title, outname, xlim=None, ylim=None):
+def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=None, ylim=None):
     # Check plotstr and ant
     if not any([plotstr in ss for ss in ['amp,time', 'phase,time', 'amp,freq', 'phase,freq', 'delay,freq', 'imag,real']]):
         raise ValueError("Invalid plotstr.")
 
     tables = []
-    #dirs = glob.glob(os.path.join(path, spwdir))
-    dirs = glob.glob(spwdir)
     cwd = os.getcwd()
     for dd in dirs:
         tmpdir = os.path.join(dd, caldir)
@@ -45,6 +50,8 @@ def plotcal(plotstr, field_id, spwdir, caldir, table_ext, title, outname, xlim=N
 
     xstr = plotstr.split(',')[1]
     ystr = plotstr.split(',')[0]
+    do_field_sel = False
+    field = 0
 
     for tt in tables:
         tb.open(tt+'/ANTENNA')
@@ -150,7 +157,7 @@ def plotcal(plotstr, field_id, spwdir, caldir, table_ext, title, outname, xlim=N
             xdaty = xdaty.reshape(fields.shape)
             xdaty = xdaty[idx]
     else:
-        print("Warning : No field selection performed. Only one field present in the caltable")
+        logger.warning("No field selection performed. Only one field present in the caltable")
         field_id = np.unique(field)[0]
 
     if 'freq' in xstr.lower():
@@ -194,77 +201,84 @@ def plotcal(plotstr, field_id, spwdir, caldir, table_ext, title, outname, xlim=N
     plt.legend()
     plt.tight_layout()
 
-    plt.savefig(outname+'.pdf', bbox_inches='tight')
-    plt.savefig(outname+'.png', bbox_inches='tight')
-
+    plt.savefig('{0}.{1}'.format(outname,EXTN), bbox_inches='tight')
 
 
 def main(args,taskvals):
+
     try:
+        if not os.path.exists(PLOT_DIR):
+            os.mkdir(PLOT_DIR)
+
         fields = bookkeeping.get_field_ids(taskvals['fields'])
 
         caldir = 'caltables'
-        spwdir = "*MHz"
+        spwdir = config_parser.parse_spw(args['config'])[3]
+
+        if type(spwdir) is str:
+            spwdir = glob.glob(spwdir)
 
         for ff in fields.gainfields.split(','):
             plotstr='phase,time'
             table_ext = 'gcal'
             title='Gain Phase'
-            outname = 'field_{}_gain_phase'.format(ff)
+            outname = '{}/field_{}_gain_phase'.format(PLOT_DIR,ff)
             plotcal(plotstr, int(ff), spwdir, caldir, table_ext, title, outname)
 
             plotstr='amp,time'
             table_ext = 'gcal'
             title='Gain Amp'
-            outname = 'field_{}_gain_amp'.format(ff)
+            outname = '{}/field_{}_gain_amp'.format(PLOT_DIR,ff)
             plotcal(plotstr, int(ff), spwdir, caldir, table_ext, title, outname)
 
         #print("k")
         #plotstr='delay,freq'
         #table_ext = 'kcal'
         #title='Delay'
-        #outname = 'field_{}_delay'.format(fields.fluxfield)
+        #outname = '{}/field_{}_delay'.format(PLOT_DIR,fields.fluxfield)
         #plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
 
         #print("kcross")
         #plotstr='delay,freq'
         #table_ext = 'xdel'
         #title='Crosshand Delay'
-        #outname = 'field_{}_crosshanddelay'.format(fields.fluxfield)
+        #outname = '{}/field_{}_crosshanddelay'.format(PLOT_DIR,fields.fluxfield)
         #plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
 
         plotstr='amp,freq'
         table_ext = 'bcal'
         title='Bandpass Amp'
-        outname = 'field_{}_bandpass_amp'.format(fields.fluxfield)
+        outname = '{}/field_{}_bandpass_amp'.format(PLOT_DIR,fields.fluxfield)
         plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'bcal'
         title='Bandpass Phase'
-        outname = 'field_{}_bandpass_phase'.format(fields.fluxfield)
+        outname = '{}/field_{}_bandpass_phase'.format(PLOT_DIR,fields.fluxfield)
         plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
 
         plotstr='amp,freq'
         table_ext = 'pcal'
         title='Leakage Amp'
-        outname = 'field_{}_leakage_amp'.format(fields.dpolfield)
+        outname = '{}/field_{}_leakage_amp'.format(PLOT_DIR,fields.dpolfield)
         plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname, None, [0, 0.1])
 
         plotstr='phase,freq'
         table_ext = 'pcal'
         title='Leakage Phase'
-        outname = 'field_{}_leakage_phase'.format(fields.dpolfield)
+        outname = '{}/field_{}_leakage_phase'.format(PLOT_DIR,fields.dpolfield)
         plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'xyambcal'
         title='XY Phase'
-        outname = 'field_{}_xy_phase'.format(fields.dpolfield)
+        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,fields.dpolfield)
         plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname)
 
-    except Exception as e:
-        print(e)
+    except Exception as err:
+        logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
+        logger.error(traceback.format_exc())
 
 if __name__ == "__main__":
+
     bookkeeping.run_script(main)

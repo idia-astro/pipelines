@@ -202,8 +202,48 @@ def check_scans(MS,nodes,tasks,dopol):
         if nodes*tasks != limit:
             logger.info('For the best results, update your config file so that nodes x tasks per node = {0}.'.format(limit))
 
+    if nodes > 4:
+        logger.warn("Large allocation of {0} nodes found. Please consider setting 'createmms=False' in config file, if using large number of SPWs.".format(nodes))
+
     threads = {'nodes' : nodes, 'ntasks_per_node' : tasks}
     return threads
+
+def check_spw(config):
+
+    """Check SPW bounds are within the SPW bounds of the MS. If not, output a warning and update the SPW.
+
+    Arguments:
+    ----------
+    config : str
+        Path to config file.
+
+    Returns:
+    --------
+    The SPW to be written to the config, potentially udpated."""
+
+    update = False
+    low,high,unit,dirs = config_parser.parse_spw(config)
+    nspw = msmd.nspw()
+
+    if nspw > 1:
+        logger.warn("Expected 1 SPW but found nspw={0}. Please manually edit 'spw' in '{1}'.".format(nspw,config))
+
+    ms_low = msmd.chanfreqs(0)[0] / 1e6
+    ms_high = msmd.chanfreqs(nspw-1)[-1] / 1e6
+
+    if low < ms_low:
+        low = int(round(ms_low+0.5))
+        update = True
+    if high > ms_high:
+        high = int(round(ms_high-0.5))
+        update = True
+
+    SPW = '0:{0}~{1}MHz'.format(low,high)
+
+    if update:
+        logger.warn('Default SPW outside SPW of input MS ({0}~{1}MHz). Forcing SPW={2}'.format(ms_low,ms_high,SPW))
+
+    return SPW
 
 def parang_coverage(vis, calfield):
 
@@ -323,10 +363,12 @@ def main():
 
     check_refant(args.MS, refant, args.config, warn=True)
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node,dopol)
+    SPW = check_spw(args.config)
 
     config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
     config_parser.overwrite_config(args.config, conf_dict=fields, conf_sec='fields')
+    config_parser.overwrite_config(args.config, conf_dict={'spw' : "'{0}'".format(SPW)}, conf_sec='crosscal')
 
     msmd.done()
 

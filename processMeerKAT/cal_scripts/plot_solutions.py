@@ -97,21 +97,22 @@ def main(args,taskvals):
     if not os.path.exists(PLOT_DIR):
         os.mkdir(PLOT_DIR)
 
-    #Plot solutions for bandpass calibrator
-    plotms(vis=calfiles.bpassfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/bpass_real_imag.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/bpass_freq_amp.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_freq_phase.png'.format(PLOT_DIR),showgui=False)
-
-    #Plot solutions for phase calibrator
-    plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/phasecal_time_amp.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/phasecal_time_phase.png'.format(PLOT_DIR),showgui=False)
-
-    #Plot solutions for individual antennas of bandpass and phase calibrator in 3x2 panels
-    plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='amp')
-    plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='phase')
-    plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='amp')
-    plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='phase')
+    # #Superseded by 'plotcal_spw.py'
+    # #Plot solutions for bandpass calibrator
+    # plotms(vis=calfiles.bpassfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/bpass_real_imag.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/bpass_freq_amp.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_freq_phase.png'.format(PLOT_DIR),showgui=False)
+    #
+    # #Plot solutions for phase calibrator
+    # plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/phasecal_time_amp.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/phasecal_time_phase.png'.format(PLOT_DIR),showgui=False)
+    #
+    # #Plot solutions for individual antennas of bandpass and phase calibrator in 3x2 panels
+    # plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='amp')
+    # plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='phase')
+    # plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='amp')
+    # plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='phase')
 
 
     extn = 'mms' if keepmms else 'ms'

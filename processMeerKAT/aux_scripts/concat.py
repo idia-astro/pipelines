@@ -19,9 +19,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def sortbySPW(visname):
     return float(visname.split('~')[0])
 
-def check_output(fname,pattern,out,job='concat',filetype='image'):
+def check_output(fname,files,pattern,out,job='concat',filetype='image'):
 
-    files = glob.glob(pattern)
     if os.path.exists(out):
         logger.info('Output file "{0}" already exists. Skipping {1}.'.format(out,job))
         return None
@@ -34,9 +33,35 @@ def check_output(fname,pattern,out,job='concat',filetype='image'):
         return None
     return files
 
-def do_concat(visname, fields):
+def get_infiles(dirs,suffix):
 
-    #Store bandwidth in MHz
+    any = False
+    if type(dirs) is str:
+        pattern = '{0}/{1}'.format(dirs,suffix)
+        files = glob.glob(pattern)
+    elif type(dirs) is list:
+        files=[]
+        for i,loc in enumerate(dirs):
+            img = glob.glob('{0}/{1}'.format(loc,suffix))
+            if len(img) > 0:
+                if any is False: #output error msg for previous cases
+                    for j in range(0,i):
+                        logger.warning("Expected to find file with '{0}/{1}".format(dirs[j],suffix))
+                any = True
+                files.append(img[0])
+            elif any:
+                logger.warning("Expected to find file with '{0}/{1}".format(loc,suffix))
+
+        pattern = '{%s}/%s' % (','.join(dirs),suffix)
+
+    else:
+        logger.error('Only type str and list is supported when searching for files to concatenate. Please check "spw" parameter in your config.')
+        files = []
+
+    return files,pattern
+
+def do_concat(visname, fields, dirs='*MHz'):
+
     msmd.open(visname)
 
     newvis = visname
@@ -50,9 +75,10 @@ def do_concat(visname, fields):
                 fname = msmd.namesforfields(int(target))[0]
 
                 #Concat tt0 images (into continuum cube)
-                pattern = '*MHz/images/*{0}*image.tt0'.format(fname)
+                suffix = 'images/*{0}*image.tt0'.format(fname)
+                files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.contcube'.format(filebase,fname)
-                images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
+                images = check_output(fname,files,pattern,out,job='imageconcat',filetype='image')
                 if images is not None:
                     images.sort(key=sortbySPW)
                     logger.info('Creating continuum cube with following command:')
@@ -63,12 +89,13 @@ def do_concat(visname, fields):
                         if not os.path.exists(out+'.fits'):
                             exportfits(imagename=out, fitsimage=out+'.fits')
                     else:
-                        logger.error("Output image '{0}' not written.".format(out))
+                        logger.error("Output image '{0}' attempted to write but was not written.".format(out))
 
                 #Concat images (into continuum cube)
-                pattern = '*MHz/images/*{0}*image'.format(fname)
+                suffix = 'images/*{0}*image'.format(fname)
+                files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.contcube'.format(filebase,fname)
-                images = check_output(fname,pattern,out,job='imageconcat',filetype='image')
+                images = check_output(fname,files,pattern,out,job='imageconcat',filetype='image')
                 if images is not None:
                     images.sort(key=sortbySPW)
                     logger.info('Creating continuum cube with following command:')
@@ -79,12 +106,13 @@ def do_concat(visname, fields):
                         if not os.path.exists(out+'.fits'):
                             exportfits(imagename=out, fitsimage=out+'.fits')
                     else:
-                        logger.error("Output image '{0}' not written.".format(out))
+                        logger.error("Output image '{0}' attempted to write but was not written.".format(out))
 
                 #Concat MSs
-                pattern = '*MHz/*{0}*.ms'.format(fname)
+                suffix = '*{0}*.ms'.format(fname)
+                files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.ms'.format(filebase,fname)
-                MSs = check_output(fname,pattern,out,job='concat',filetype='MS')
+                MSs = check_output(fname,files,pattern,out,job='concat',filetype='MS')
                 if MSs is not None:
                     MSs.sort(key=sortbySPW)
                     logger.info('Concatenating MSs with following command:')
@@ -94,12 +122,13 @@ def do_concat(visname, fields):
                         newvis = out
 
                     if not os.path.exists(out):
-                        logger.error("Output MS '{0}' not written.".format(out))
+                        logger.error("Output MS '{0}' attempted to write but was not written.".format(out))
 
                 #Concat MMSs
-                pattern = '*MHz/*{0}*.mms'.format(fname)
+                suffix = '*{0}*.mms'.format(fname)
+                files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.mms'.format(filebase,fname)
-                MMSs = check_output(fname,pattern,out,job='virtualconcat',filetype='MMS')
+                MMSs = check_output(fname,files,pattern,out,job='virtualconcat',filetype='MMS')
                 if MMSs is not None:
                     MMSs.sort(key=sortbySPW)
                     logger.info('Concatenating MMSs with following command:')
@@ -109,7 +138,7 @@ def do_concat(visname, fields):
                         newvis = out
 
                     if not os.path.exists(out):
-                        logger.error("Output MMS '{0}' not written.".format(out))
+                        logger.error("Output MMS '{0}' attempted to write but was not written.".format(out))
 
     msmd.done()
     logger.info('Completed {0}.'.format(sys.argv[0]))
@@ -120,11 +149,16 @@ def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
+    nspw = va(taskvals, 'crosscal', 'nspw', int, default='')
     fields = bookkeeping.get_field_ids(taskvals['fields'])
+    dirs = config_parser.parse_spw(args['config'])[3]
 
-    newvis = do_concat(visname, fields)
-    config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
-    config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
+    if ',' in spw:
+        newvis = do_concat(visname, fields, dirs)
+        config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
+        config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
+    else:
+        logger.error("Only found one SPW in '{0}', so will skip concat.".format(args['config']))
 
 if __name__ == '__main__':
 
