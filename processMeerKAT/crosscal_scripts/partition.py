@@ -9,9 +9,9 @@ import os
 
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import get_fields
+import read_ms
 import processMeerKAT
-from cal_scripts import bookkeeping
+import bookkeeping
 
 def do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms):
     # Get the .ms bit of the filename, case independent

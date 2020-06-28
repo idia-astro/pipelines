@@ -11,7 +11,7 @@ matplotlib.use('Agg', warn=False)
 import matplotlib.pyplot as plt
 
 from config_parser import validate_args as va
-from cal_scripts import bookkeeping
+import bookkeeping
 import glob
 PLOT_DIR = 'plots'
 EXTN = 'pdf'

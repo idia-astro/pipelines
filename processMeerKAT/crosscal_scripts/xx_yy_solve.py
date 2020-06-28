@@ -6,7 +6,7 @@ import os
 import shutil
 
 import config_parser
-from cal_scripts import bookkeeping
+import bookkeeping
 from config_parser import validate_args as va
 
 import logging

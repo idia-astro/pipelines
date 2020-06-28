@@ -6,7 +6,7 @@ import os
 import shutil
 
 import config_parser
-from cal_scripts import bookkeeping, get_fields
+import bookkeeping, read_ms
 from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 
@@ -30,7 +30,7 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     calfiles = calfiles._replace(xpolfile=xy0pfile)
     fields = fields._replace(xpolfield=fields.dpolfield)
 
-    xyfield = get_fields.get_xy_field(visname, fields)
+    xyfield = read_ms.get_xy_field(visname, fields)
 
     if len(fields.gainfields) > 1:
         fluxfile = calfiles.fluxfile

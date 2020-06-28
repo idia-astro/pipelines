@@ -8,7 +8,7 @@ import os
 
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import bookkeeping
+import bookkeeping
 import processMeerKAT
 
 import logging

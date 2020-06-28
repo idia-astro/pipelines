@@ -26,7 +26,7 @@ import os
 import sys
 import re
 import config_parser
-from cal_scripts import bookkeeping
+import bookkeeping
 from shutil import copyfile
 import logging
 from time import gmtime
@@ -46,7 +46,7 @@ MEM_PER_NODE_GB_LIMIT_HIGHMEM = 482 #493568 MB
 THIS_PROG = __file__
 SCRIPT_DIR = os.path.dirname(THIS_PROG)
 LOG_DIR = 'logs'
-CALIB_SCRIPTS_DIR = 'cal_scripts'
+CALIB_SCRIPTS_DIR = 'crosscal_scripts'
 AUX_SCRIPTS_DIR = 'aux_scripts'
 SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
 CONFIG = 'default_config.txt'
@@ -94,20 +94,22 @@ def check_path(path,update=False):
     path : str
         Path to script or container (if path found and update=True)."""
 
-    #Attempt to find path firstly in CWD, then directory up, then bash path, then pipeline directories.
+    #Attempt to find path firstly in CWD, then directory up, then pipeline directories, then bash path.
     if os.path.exists(path) and path[0] != '/':
         path = '{0}/{1}'.format(os.getcwd(),path)
     if not os.path.exists(path) and path != '':
         if os.path.exists('../{0}'.format(path)):
             newpath = '../{0}'.format(path)
-        elif os.path.exists(check_bash_path(path)):
-            newpath = check_bash_path(path)
+        elif os.path.exists('{0}/{1}'.format(SCRIPT_DIR,path)):
+            newpath = '{0}/{1}'.format(SCRIPT_DIR,path)
         elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
             newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)
         elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)):
             newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)
         elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,SELFCAL_SCRIPTS_DIR,path)):
             newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,SELFCAL_SCRIPTS_DIR,path)
+        elif os.path.exists(check_bash_path(path)):
+            newpath = check_bash_path(path)
         else:
             #If it still doesn't exist, throw error
             raise IOError('File "{0}" not found.'.format(path))
@@ -988,7 +990,7 @@ def default_config(arg_dict):
             params += ' -P'
         if arg_dict['verbose']:
             params += ' -v'
-        command = write_command('get_fields.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
+        command = write_command('read_ms.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
         logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
         logger.debug('Using the following command:\n\t{0}'.format(command))
         os.system(command)
@@ -998,7 +1000,7 @@ def default_config(arg_dict):
         config_parser.overwrite_config(filename, conf_dict={'nspw' : 1}, conf_sec='crosscal')
 
     #If dopol=True, replace second call of xx_yy_* scripts with xy_yx_* scripts
-    #Check in config (not CL args), in case get_fields.py forces dopol=False, and assume we only want to set this for 'scripts'
+    #Check in config (not CL args), in case read_ms.py forces dopol=False, and assume we only want to set this for 'scripts'
     dopol = config_parser.get_key(filename, 'run', 'dopol')
     if dopol:
         count = 0

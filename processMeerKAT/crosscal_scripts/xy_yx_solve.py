@@ -6,7 +6,7 @@ import os
 import shutil
 
 import config_parser
-from cal_scripts import bookkeeping, get_fields
+import bookkeeping, read_ms
 from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 
@@ -25,7 +25,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
         os.rename(caldir,caldir+'_round1')
         os.makedirs(caldir)
 
-    xyfield = get_fields.get_xy_field(visname, fields)
+    xyfield = read_ms.get_xy_field(visname, fields)
 
     logger.info(" starting antenna-based delay (kcorr)\n -> %s" % calfiles.kcorrfile)
     gaincal(vis=visname, caltable = calfiles.kcorrfile,

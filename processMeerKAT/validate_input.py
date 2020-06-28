@@ -7,7 +7,7 @@ import os
 import config_parser
 from config_parser import validate_args as va
 import processMeerKAT
-from cal_scripts import get_fields, bookkeeping
+import read_ms, bookkeeping
 import casac
 msmd = casac.casac.msmetadata()
 
@@ -39,7 +39,7 @@ def main(args,taskvals):
     if not calcrefant:
         refant = va(taskvals, 'crosscal', 'refant', str)
         msmd.open(visname)
-        get_fields.check_refant(MS=visname, refant=refant, config=args['config'], warn=False)
+        read_ms.check_refant(MS=visname, refant=refant, config=args['config'], warn=False)
         msmd.done()
 
     if not os.path.exists(visname):

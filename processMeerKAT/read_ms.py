@@ -11,13 +11,13 @@ import config_parser
 
 logger = processMeerKAT.logger
 
-# Get access to the msmd module for get_fields.py
+# Get access to the msmd module for read_ms.py
 import casac
 msmd = casac.casac.msmetadata()
 tb = casac.casac.table()
 me = casac.casac.measures()
 
-def get_fields(MS):
+def read_ms(MS):
 
     """Extract field numbers from intent, including calibrators for bandpass, flux, phase & amplitude, and the target. Only the
     target allows for multiple field IDs, while all others extract the field with the most scans and put all other IDs as target fields.
@@ -348,7 +348,7 @@ def main():
 
     dopol = args.dopol
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
-    fields = get_fields(args.MS)
+    fields = read_ms(args.MS)
     logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
 
     npol = msmd.ncorrforpol()[0]
