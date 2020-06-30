@@ -1,7 +1,7 @@
-#!/usr/bin/env python2.7
-
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
+
+#!/usr/bin/env python2.7
 
 import argparse
 import ConfigParser
@@ -13,7 +13,7 @@ def parse_args():
     Parse the command line arguments
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', required=True, help='Name of the input config file')
+    parser.add_argument('-C','--config', default=processMeerKAT.CONFIG, required=False, help='Name of the input config file')
 
     args, __ = parser.parse_known_args()
 
@@ -48,6 +48,30 @@ def parse_config(filename):
 
     return taskvals, config
 
+def has_key(filename, section, key):
+    config_dict,config = parse_config(filename)
+    if has_section(filename, section) and key in config_dict[section]:
+        return True
+    return False
+
+def has_section(filename, section):
+
+    config_dict,config = parse_config(filename)
+    return section in config_dict
+
+def get_key(filename, section, key):
+    config_dict,config = parse_config(filename)
+    if has_key(filename, section, key):
+        return config_dict[section][key]
+    return ''
+
+def remove_section(filename, section):
+
+    config_dict,config = parse_config(filename)
+    config.remove_section(section)
+    config_file = open(filename, 'w')
+    config.write(config_file)
+    config_file.close()
 
 def overwrite_config(filename, conf_dict={}, conf_sec='', sec_comment=''):
 
@@ -69,6 +93,32 @@ def overwrite_config(filename, conf_dict={}, conf_sec='', sec_comment=''):
     config.write(config_file)
     config_file.close()
 
+def parse_spw(filename):
+
+    config_dict,config = parse_config(filename)
+    spw = config_dict['crosscal']['spw']
+    nspw = config_dict['crosscal']['nspw']
+
+    if ',' in spw:
+        SPWs = spw.split(',')
+        low,high,unit,dirs = [0]*len(SPWs),[0]*len(SPWs),['']*len(SPWs),['']*len(SPWs)
+        for i,SPW in enumerate(SPWs):
+            low[i],high[i],unit[i],func = processMeerKAT.get_spw_bounds(SPW)
+            dirs[i] = '{0}~{1}{2}'.format(low[i],high[i],unit[i])
+
+        lowest = min(low)
+        highest = max(high)
+
+        # Uncomment to use e.g. '*MHz'
+        # if all([i == unit[0] for i in unit]):
+        #     unit = unit[0]
+        #     dirs = '*{0}'.format(unit)
+
+    else:
+        low,high,unit,func = processMeerKAT.get_spw_bounds(spw)
+        dirs = []
+
+    return low,high,unit,dirs
 
 def validate_args(kwdict, section, key, dtype, default=None):
     """

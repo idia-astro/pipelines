@@ -1,4 +1,4 @@
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import sys
@@ -6,12 +6,10 @@ import os
 
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import bookkeeping
+import bookkeeping
 
 def do_pre_flag(visname, fields, badfreqranges, badants):
-    clipfluxcal   = [0., 50.]
-    clipphasecal  = [0., 50.]
-    cliptarget    = [0., 20.]
+    clip = [0., 50.]
 
     if len(badfreqranges):
         for badfreq in badfreqranges:
@@ -25,13 +23,8 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", field=fields.fluxfield,
-            clipminmax=clipfluxcal, datacolumn="DATA",clipoutside=True,
-            clipzeros=True, extendpols=True, action="apply",flagbackup=True,
-            savepars=False, overwrite=True, writeflags=True)
-
-    flagdata(vis=visname, mode="clip", field=fields.secondaryfield,
-            clipminmax=clipphasecal, datacolumn="DATA",clipoutside=True,
+    flagdata(vis=visname, mode="clip", field=fields.gainfields,
+            clipminmax=clip, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
@@ -49,7 +42,7 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
             flagbackup=True, overwrite=True, writeflags=True)
 
     flagdata(vis=visname, mode="clip", field=fields.targetfield,
-            clipminmax=cliptarget, datacolumn="DATA",clipoutside=True,
+            clipminmax=clip, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
@@ -68,21 +61,18 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
     flagdata(vis=visname, mode='summary', datacolumn='DATA',
             name=visname+'.flag.summary')
 
-
-
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
 
-    badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['944~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
+    badfreqranges = taskvals['crosscal'].pop('badfreqranges', ['935~947MHz', '1160~1310MHz', '1476~1611MHz', '1670~1700MHz'])
     badants = taskvals['crosscal'].pop('badants')
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     do_pre_flag(visname, fields, badfreqranges, badants)
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

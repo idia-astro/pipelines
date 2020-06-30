@@ -1,10 +1,10 @@
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import os
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import bookkeeping
+import bookkeeping
 import glob
 PLOT_DIR = 'plots'
 EXTN = 'pdf'
@@ -84,14 +84,9 @@ def plot_antennas(caltype,fields,calfiles,xaxis='freq',yaxis='amp'):
     os.system('rm {0}'.format(' '.join(plots)))
 
 
-def main():
+def main(args,taskvals):
 
-    config = config_parser.parse_args()['config']
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(config)
-
-    visname = va(taskvals, 'data', 'vis', str)
+    visname = va(taskvals, 'run', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
@@ -102,21 +97,22 @@ def main():
     if not os.path.exists(PLOT_DIR):
         os.mkdir(PLOT_DIR)
 
-    #Plot solutions for bandpass calibrator
-    plotms(vis=calfiles.bpassfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/bpass_real_imag.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/bpass_freq_amp.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_freq_phase.png'.format(PLOT_DIR),showgui=False)
-
-    #Plot solutions for phase calibrator
-    plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/phasecal_time_amp.png'.format(PLOT_DIR),showgui=False)
-    plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/phasecal_time_phase.png'.format(PLOT_DIR),showgui=False)
-
-    #Plot solutions for individual antennas of bandpass and phase calibrator in 3x2 panels
-    plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='amp')
-    plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='phase')
-    plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='amp')
-    plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='phase')
+    # #Superseded by 'plotcal_spw.py'
+    # #Plot solutions for bandpass calibrator
+    # plotms(vis=calfiles.bpassfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/bpass_real_imag.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/bpass_freq_amp.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.bpassfile, xaxis='freq', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/bpass_freq_phase.png'.format(PLOT_DIR),showgui=False)
+    #
+    # #Plot solutions for phase calibrator
+    # plotms(vis=calfiles.gainfile, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/phasecal_real_imag.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Amp', coloraxis='antenna1', plotfile='{0}/phasecal_time_amp.png'.format(PLOT_DIR),showgui=False)
+    # plotms(vis=calfiles.gainfile, xaxis='Time', yaxis='Phase', coloraxis='antenna1', plotfile='{0}/phasecal_time_phase.png'.format(PLOT_DIR),showgui=False)
+    #
+    # #Plot solutions for individual antennas of bandpass and phase calibrator in 3x2 panels
+    # plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='amp')
+    # plot_antennas('bpass',fields,calfiles,xaxis='freq',yaxis='phase')
+    # plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='amp')
+    # plot_antennas('phasecal',fields,calfiles,xaxis='time',yaxis='phase')
 
 
     extn = 'mms' if keepmms else 'ms'
@@ -128,9 +124,9 @@ def main():
                 plotms(vis=inname, xaxis='freq', yaxis='Amp', coloraxis='corr', plotfile='{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname),showgui=False)
                 plotms(vis=inname, xaxis='Real', yaxis='Imag', coloraxis='corr', plotfile='{0}/{1}_real_imag.png'.format(PLOT_DIR,fname),showgui=False)
 
-    msmd.close()
     msmd.done()
 
 
 if __name__ == "__main__":
-    main()
+
+    bookkeeping.run_script(main)

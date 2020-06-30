@@ -1,4 +1,4 @@
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import sys
@@ -6,7 +6,7 @@ import os
 
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import bookkeeping
+import bookkeeping
 import glob
 
 def run_tclean(visname, fields, keepmms):
@@ -18,13 +18,11 @@ def run_tclean(visname, fields, keepmms):
 
     #Store bandwidth in MHz
     msmd.open(visname)
-    BW = msmd.bandwidths(-1)/1e6
+    BW = msmd.bandwidths(-1).sum()/1e6
 
     if keepmms == True:
-        parallel = True
         extn = 'mms'
     else:
-        parallel = False
         extn = 'ms'
 
     #Use 1 taylor term for BW < 100 MHz
@@ -43,14 +41,9 @@ def run_tclean(visname, fields, keepmms):
 
     #Store target names
     targimname = []
-    if len(fields.targetfield.split(',')) > 1:
-        for tt in fields.targetfield.split(','):
-            fname = msmd.namesforfields(int(tt))[0]
-            tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
-            targimname.append(os.path.join(impath, tmpname))
-    else:
-        fname = msmd.namesforfields(int(fields.targetfield))[0]
-        tmpname = os.path.splitext(visname)[0] + '_%s.im' % (fname)
+    for tt in fields.targetfield.split(','):
+        fname = msmd.namesforfields(int(tt))[0]
+        tmpname = os.path.splitext(os.path.split(visname)[1])[0] + '_%s.im' % (fname)
         targimname.append(os.path.join(impath, tmpname))
 
     #Image target and export to fits
@@ -61,7 +54,7 @@ def run_tclean(visname, fields, keepmms):
             field = fields.targetfield
 
         fname = msmd.namesforfields(int(field))[0]
-        inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
+        inname = '%s.%s.%s' % (os.path.splitext(os.path.split(visname)[1])[0], fname, extn)
 
         if len(glob.glob(tt + '*')) == 0:
             tclean(vis=inname, imagename=tt, datacolumn='corrected',
@@ -69,17 +62,17 @@ def run_tclean(visname, fields, keepmms):
                     weighting='briggs', robust=0, cell='2arcsec',
                     specmode='mfs', deconvolver=deconvolver, nterms=terms, scales=[],
                     savemodel='none', gridder='standard',
-                    restoration=True, pblimit=0, parallel=parallel)
+                    restoration=True, pblimit=0, parallel=True)
 
             exportfits(imagename=tt+'.image'+suffix, fitsimage=tt+'.fits')
 
 
-    #Image all calibrator fields and export to fits
-    for field in [fields.gainfields,fields.bpassfield]:
-        for subf in field.split(','):
+    #Image all calibrator (and extra) fields and export to fits
+    for subf in fields.gainfields.split(',') + fields.extrafields.split(','):
+        if subf != '':
             fname = msmd.namesforfields(int(subf))[0]
 
-            secimname = os.path.splitext(visname)[0]
+            secimname = os.path.splitext(os.path.split(visname)[1])[0]
             inname = '%s.%s.%s' % (secimname, fname, extn)
             secimname = os.path.join(impath, secimname + '_%s.im' % (fname))
 
@@ -88,24 +81,22 @@ def run_tclean(visname, fields, keepmms):
                         imsize=[512,512], threshold=0,niter=1000, weighting='briggs',
                         robust=0, cell='2arcsec', specmode='mfs', deconvolver=deconvolver,
                         nterms=terms, scales=[], savemodel='none', gridder='standard',
-                        restoration=True, pblimit=0, parallel=parallel)
+                        restoration=True, pblimit=0, parallel=True)
 
                 exportfits(imagename=secimname+'.image'+suffix, fitsimage=secimname+'.fits')
 
-    msmd.close()
     msmd.done()
 
 
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
+def main(args,taskvals):
 
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
-
-    visname = va(taskvals, 'data', 'vis', str)
+    visname = va(taskvals, 'run', 'crosscal_vis', str)
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     run_tclean(visname, fields, keepmms)
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)

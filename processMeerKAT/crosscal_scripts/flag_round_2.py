@@ -1,4 +1,4 @@
-#Copyright (C) 2019 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import sys
@@ -6,12 +6,12 @@ import os
 
 import config_parser
 from config_parser import validate_args as va
-from cal_scripts import bookkeeping
+import bookkeeping
 
 def do_pre_flag_2(visname, fields):
     clipfluxcal   = [0., 50.]
     clipphasecal  = [0., 50.]
-    cliptarget    = [0., 20.]
+    cliptarget    = [0., 50.]
 
     flagdata(vis=visname, mode="clip", field=fields.fluxfield,
             clipminmax=clipfluxcal, datacolumn="corrected", clipoutside=True,
@@ -76,13 +76,7 @@ def do_pre_flag_2(visname, fields):
             extendflags=True, name=visname + 'summary.split', action="apply",
             flagbackup=True, overwrite=True, writeflags=True)
 
-
-if __name__ == '__main__':
-    # Get the name of the config file
-    args = config_parser.parse_args()
-
-    # Parse config file
-    taskvals, config = config_parser.parse_config(args['config'])
+def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
 
@@ -90,3 +84,7 @@ if __name__ == '__main__':
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     do_pre_flag_2(visname, fields)
+
+if __name__ == '__main__':
+
+    bookkeeping.run_script(main)
