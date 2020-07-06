@@ -3,7 +3,7 @@
 __version__ = '1.1'
 
 license = """
-    Process MeerKAT data via CASA measurement set.
+    Process MeerKAT data via CASA MeasurementSet.
     Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy.
     support@ilifu.ac.za
 
@@ -169,9 +169,9 @@ def parse_args():
         else:
             return check_path(val)
 
-    parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA measurement set. Version: {0}'.format(__version__))
+    parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA MeasurementSet. Version: {0}'.format(__version__))
 
-    parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to measurement set.")
+    parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
                         help="Use this number of nodes [default: 1; max: {0}].".format(TOTAL_NODES_LIMIT))
@@ -713,7 +713,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
-        master.write('echo Submitting {0} SLURM queue with following command:\necho {1}\n'.format(scripts[0],command))
+        master.write('echo Submitting {0} to SLURM queue with following command:\necho {1} {0}\n'.format(scripts[0],command))
     master.write("IDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
     scripts.pop(0)
 
@@ -723,7 +723,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         command = 'sbatch -d afterok:$IDs --kill-on-invalid-dep=yes'
         master.write('\n#{0}\n'.format(script))
         if verbose:
-            master.write('echo Submitting {0} SLURM queue with following command\necho {1} {0}\n'.format(script,command))
+            master.write('echo Submitting {0} to SLURM queue with following command\necho {1} {0}\n'.format(script,command))
         master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
     master.write('\n#Output message and create {0} directory\n'.format(dir))
@@ -861,7 +861,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1,
                partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', timestamp=''):
 
-    """Write a series of sbatch job files to calibrate a CASA measurement set.
+    """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
 
     Arguments:
     ----------
@@ -991,7 +991,7 @@ def default_config(arg_dict):
         if arg_dict['verbose']:
             params += ' -v'
         command = write_command('read_ms.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
-        logger.info('Extracting field IDs from measurement set "{0}" using CASA.'.format(MS))
+        logger.info('Extracting field IDs from MeasurementSet "{0}" using CASA.'.format(MS))
         logger.debug('Using the following command:\n\t{0}'.format(command))
         os.system(command)
     else:
@@ -1116,7 +1116,7 @@ def format_args(config,submit,quiet,dependencies):
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
         if len(kwargs['precal_scripts']) > 0 or len(kwargs['postcal_scripts']) > 0:
-            logger.warn('Appending "precal_scripts" to beginning of "scripts", and "postcal_script" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
+            logger.warn('Appending "precal_scripts" to beginning of "scripts", and "postcal_scripts" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
 
             #Drop first instance of calc_refant.py from precal scripts in preference for one in scripts (after flag_round_1.py)
             if 'calc_refant.py' in [i[0] for i in kwargs['precal_scripts']] and 'calc_refant.py' in [i[0] for i in kwargs['scripts']]:
@@ -1276,7 +1276,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
     badfreqranges : list
         List of bad frequency ranges in MHz.
     MS : str
-        Path to CASA Measurement Set.
+        Path to CASA MeasurementSet.
     partition : bool
         Does this run include the partition step?
     createmms : bool
