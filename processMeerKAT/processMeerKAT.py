@@ -604,8 +604,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     scripts = postcal_scripts[:]
 
     #Hack to perform correct number of selfcal loops
-    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
-        selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
+    if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
+        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
 
@@ -618,7 +618,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         else:
             master.write("allSPWIDs+=,$({0} | cut -d ' ' -f4)\n".format(command))
         for script in scripts:
-            command = 'sbatch -d afterok:$allSPWIDs'
+            command = 'sbatch -d afterok:$allSPWIDs --kill-on-invalid-dep=yes'
             master.write('\n#{0}\n'.format(script))
             master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
     master.write('\necho Submitted the following jobIDs within the {0} SPW directories: $IDs\n'.format(len(SPWs.split(','))))
