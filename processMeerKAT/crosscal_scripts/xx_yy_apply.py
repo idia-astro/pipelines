@@ -27,7 +27,7 @@ def do_parallel_cal_apply(visname, fields, calfiles):
             gainfield=[fields.kcorrfield, fields.bpassfield, fields.fluxfield], parang=False, interp='linear,linearflag')
 
     logger.info(" applying calibration -> phase calibrator, targets and extra fields")
-    field = ','.join(set(','.join([fields.secondaryfield] + [fields.targetfield] + [fields.extrafields]).split(','))) #remove duplicate fields
+    field = ','.join(set([i for i in (','.join([fields.secondaryfield] + [fields.targetfield] + [fields.extrafields]).split(',')) if i])) #remove duplicate and empty fields
     applycal(vis=visname, field=field, selectdata=False, calwt=False, gaintable=[calfiles.kcorrfile, calfiles.bpassfile, fluxfile],
             gainfield=[fields.kcorrfield, fields.bpassfield, fields.secondaryfield], parang=False, interp='linear,linearflag')
 
