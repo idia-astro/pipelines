@@ -9,12 +9,12 @@ from config_parser import validate_args as va
 import bookkeeping
 
 def do_pre_flag(visname, fields, badfreqranges, badants):
+
     clip = [0., 50.]
 
     if len(badfreqranges):
-        for badfreq in badfreqranges:
-            badspw = '0:' + badfreq
-            flagdata(vis=visname, mode='manual', spw=badspw)
+        badspw = '0:' + ',0:'.join(badfreqranges)
+        flagdata(vis=visname, mode='manual', spw=badspw)
 
     if len(badants):
         badants = ",".join([str(bb) for bb in badants])
@@ -23,28 +23,22 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
     flagdata(vis=visname, mode='manual', autocorr=True, action='apply',
             flagbackup=True, savepars=False, writeflags=True)
 
-    flagdata(vis=visname, mode="clip", field=fields.gainfields,
+    #Manually clip all fields in config
+    allfields = ','.join(set([i for i in (','.join([fields.gainfields] + [fields.targetfield] + [fields.extrafields]).split(',')) if i])) #remove duplicate and empty fields
+
+    flagdata(vis=visname, mode="clip", field=allfields,
             clipminmax=clip, datacolumn="DATA",clipoutside=True,
             clipzeros=True, extendpols=True, action="apply",flagbackup=True,
             savepars=False, overwrite=True, writeflags=True)
 
-    flagdata(vis=visname, mode='tfcrop', field=fields.gainfields,
+    #tfcrop calfields and targetfield with different cutoffs / fits
+    calfields = ','.join(set([i for i in (','.join([fields.gainfields] + [fields.extrafields]).split(',')) if i])) #remove duplicate and empty fields
+
+    flagdata(vis=visname, mode='tfcrop', field=calfields,
             ntime='scan', timecutoff=5.0, freqcutoff=5.0, timefit='line',
             freqfit='line', extendflags=False, timedevscale=5., freqdevscale=5.,
             extendpols=True, growaround=False, action='apply', flagbackup=True,
             overwrite=True, writeflags=True, datacolumn='DATA')
-
-    # Conservatively extend flags
-    flagdata(vis=visname, mode='extend', field=fields.gainfields,
-            datacolumn='data', clipzeros=True, ntime='scan', extendflags=False,
-            extendpols=True, growtime=80., growfreq=80., growaround=False,
-            flagneartime=False, flagnearfreq=False, action='apply',
-            flagbackup=True, overwrite=True, writeflags=True)
-
-    flagdata(vis=visname, mode="clip", field=fields.targetfield,
-            clipminmax=clip, datacolumn="DATA",clipoutside=True,
-            clipzeros=True, extendpols=True, action="apply",flagbackup=True,
-            savepars=False, overwrite=True, writeflags=True)
 
     flagdata(vis=visname, mode='tfcrop', field=fields.targetfield,
             ntime='scan', timecutoff=6.0, freqcutoff=6.0, timefit='poly',
@@ -52,7 +46,8 @@ def do_pre_flag(visname, fields, badfreqranges, badants):
             extendpols=True, growaround=False, action='apply', flagbackup=True,
             overwrite=True, writeflags=True, datacolumn='DATA')
 
-    flagdata(vis=visname, mode='extend', field=fields.targetfield,
+    # Conservatively extend flags for all fields in config
+    flagdata(vis=visname, mode='extend', field=allfields,
             datacolumn='data', clipzeros=True, ntime='scan', extendflags=False,
             extendpols=True, growtime=80., growfreq=80., growaround=False,
             flagneartime=False, flagnearfreq=False, action='apply',
