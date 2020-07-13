@@ -10,19 +10,9 @@ import bookkeeping
 
 def do_pre_flag_2(visname, fields):
 
-    clip   = [0., 50.]
-
-    #Manually clip all fields in config
-    allfields = ','.join(set([i for i in (','.join([fields.gainfields] + [fields.targetfield] + [fields.extrafields]).split(',')) if i])) #remove duplicate and empty fields
-
-    flagdata(vis=visname, mode="clip", field=allfields,
-            clipminmax=clip, datacolumn="corrected", clipoutside=True,
-            clipzeros=True, extendpols=False, action="apply", flagbackup=True,
-            savepars=False, overwrite=True, writeflags=True)
-
     calfields = ','.join(set([i for i in (','.join([fields.gainfields] + [fields.extrafields]).split(',')) if i])) #remove duplicate and empty fields
 
-    # After clip, now flag using 'tfcrop' option for flux, phase cal and extra fields tight flagging
+    # Flag using 'tfcrop' option for flux, phase cal and extra fields tight flagging
     flagdata(vis=visname, mode="tfcrop", datacolumn="corrected",
             field=calfields, ntime="scan", timecutoff=6.0,
             freqcutoff=5.0, timefit="line", freqfit="line",
