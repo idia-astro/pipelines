@@ -41,16 +41,19 @@ def get_fields(MS):
 
     fieldIDs = {}
     extra_fields = []
+    intents = msmd.intents()
 
     #Set default for any missing intent as field for intent CALIBRATE_FLUX
-    default = msmd.fieldsforintent('CALIBRATE_FLUX')[0]
-    if default.size == 0:
-        logger.error('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(msmd.intents(),MS))
+    fluxcal = msmd.fieldsforintent('CALIBRATE_FLUX')
+    if 'CALIBRATE_FLUX' not in intents or fluxcal.size == 0:
+        logger.error('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(intents,MS))
         return fieldIDs
+    else:
+        default = fluxcal[0]
 
     #Use 'CALIBRATE_PHASE' or if missing, 'CALIBRATE_AMPLI'
     phasecal_intent = 'CALIBRATE_PHASE'
-    if phasecal_intent not in msmd.intents():
+    if phasecal_intent not in intents:
         phasecal_intent = 'CALIBRATE_AMPLI'
 
     fieldIDs['fluxfield'] = get_field(MS,'CALIBRATE_FLUX','fluxfield',extra_fields)
@@ -352,12 +355,14 @@ def main():
     logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
 
     npol = msmd.ncorrforpol()[0]
-    parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
+    parang = 0
+    if 'phasecalfield' in fields:
+        parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
 
     if npol < 4:
         logger.warn("Only {0} polarisations present in '{1}'. Any attempted polarisation calibration will fail, so setting dopol=False in [run] section of '{2}'.".format(npol,args.MS,args.config))
         dopol = False
-    elif parang < 30:
+    elif 0 < parang < 30:
         logger.warn("Parallactic angle coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
         dopol = False
 
