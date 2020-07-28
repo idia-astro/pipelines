@@ -117,7 +117,7 @@ def main(args,taskvals):
 
     extn = 'mms' if keepmms else 'ms'
     for field in fields:
-        if field != ''
+        if field != '':
             for subf in field.split(','):
                 fname = msmd.namesforfields(int(subf))[0]
                 inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
