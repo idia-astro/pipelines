@@ -597,11 +597,11 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
             master.write(' --dependencies=$allSPWIDs')
         elif dependencies != '':
             master.write(' --dependencies={0}'.format(dependencies))
-        master.write(')\necho $output\n')
+        master.write(')\necho -e $output\n')
         if i == 0:
-            master.write("IDs=$(echo $output | cut -d ' ' -f7)")
+            master.write("IDs=$(echo $output | sed 's/.*IDs\:\s\(.*\)/\\1/')")
         else:
-            master.write("IDs+=,$(echo $output | cut -d ' ' -f7)")
+            master.write("IDs+=,$(echo $output | sed 's/.*IDs\:\s\(.*\)/\\1/')")
         master.write('\ncd ..\n\n')
 
     if 'concat.sbatch' in postcal_scripts:
@@ -718,7 +718,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
-        master.write('echo Submitting {0} to SLURM queue with following command:\necho {1} {0}\n'.format(scripts[0],command))
+        master.write('echo Submitting {0} to SLURM queue with following command:\necho {1} {0}.\n'.format(scripts[0],command))
     master.write("IDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
     scripts.pop(0)
 
@@ -728,7 +728,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         command = 'sbatch -d afterok:$IDs --kill-on-invalid-dep=yes'
         master.write('\n#{0}\n'.format(script))
         if verbose:
-            master.write('echo Submitting {0} to SLURM queue with following command\necho {1} {0}\n'.format(script,command))
+            master.write('echo Submitting {0} to SLURM queue with following command\necho {1} {0}.\n'.format(script,command))
         master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
     master.write('\n#Output message and create {0} directory\n'.format(dir))
@@ -1135,7 +1135,6 @@ def format_args(config,submit,quiet,dependencies):
         else:
             scripts = kwargs['scripts']
     else:
-
         scripts = kwargs['precal_scripts'] + kwargs['postcal_scripts']
 
     kwargs['num_precal_scripts'] = len(kwargs['precal_scripts'])
@@ -1205,7 +1204,7 @@ def format_args(config,submit,quiet,dependencies):
 
     if len(kwargs['scripts']) == 0:
         logger.error('Nothing to do. Please insert scripts into "scripts" parameter in "{0}".'.format(config))
-        sys.exit(1)
+        #sys.exit(1)
 
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
