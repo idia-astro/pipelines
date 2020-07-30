@@ -301,7 +301,7 @@ def validate_args(args,config,parser=None):
 
     if args['account'] not in ['b03-idia-ag','b05-pipelines-ag']:
         from platform import node
-        if node() == 'slurm-login' or 'slwrk' in node():
+        if node() == 'slurm-login' or 'slwrk' in node() or 'compute' in node():
             accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30 | grep -v 'Account\|--'); do echo -n $f,; done").read()[:-1].split(',')
             if args['account'] not in accounts:
                 msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
@@ -732,7 +732,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         master.write("IDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
     master.write('\n#Output message and create {0} directory\n'.format(dir))
-    master.write('echo Submitted sbatch jobs with following IDs: $IDs\n')
+    master.write('echo Submitted sbatch jobs with following IDs: $IDs\n') #DON'T CHANGE as this output is relied on by bash sed expression in write_spw_master()
     master.write('mkdir -p {0}\n'.format(dir))
 
     #Add time as extn to this pipeline run, to give unique filenames
