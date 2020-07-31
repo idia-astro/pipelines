@@ -617,11 +617,11 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     if len(scripts) > 0:
         command = "sbatch -d afterany:${IDs//,/:}"
         master.write('\n#{0}\n'.format(scripts[0]))
-        scripts.pop(0)
         if len(precal_scripts) == 0:
             master.write("allSPWIDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
         else:
             master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
+        scripts.pop(0)
         for script in scripts:
             command = "sbatch -d afterok:${allSPWIDs//,/:} --kill-on-invalid-dep=yes"
             master.write('\n#{0}\n'.format(script))
