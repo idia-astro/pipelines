@@ -554,13 +554,13 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         command = 'sbatch'
         if dependencies != '':
             master.write('\n#Run after these dependencies\nDep={0}\n'.format(dependencies))
-            command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
+            command += " -d afterok:${Dep//,/:} --kill-on-invalid-dep=yes" #can also use sed 's/,/:/g' or tr , :
             dependencies = '' #Remove dependencies so it isn't fed into launching SPW scripts
         master.write('\n#{0}\n'.format(scripts[0]))
         master.write("allSPWIDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
         scripts.pop(0)
     for script in scripts:
-        command = 'sbatch -d afterok:$allSPWIDs --kill-on-invalid-dep=yes'
+        command = "sbatch -d afterok:${allSPWIDs//,/:} --kill-on-invalid-dep=yes"
         master.write('\n#{0}\n'.format(script))
         master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
 
@@ -615,15 +615,15 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         scripts.append('selfcal_part1.sbatch')
 
     if len(scripts) > 0:
-        command = 'sbatch -d afterany:$IDs {0}'.format(scripts[0])
+        command = "sbatch -d afterany:${IDs//,/:}"
         master.write('\n#{0}\n'.format(scripts[0]))
         scripts.pop(0)
         if len(precal_scripts) == 0:
-            master.write("allSPWIDs=$({0} | cut -d ' ' -f4)\n".format(command))
+            master.write("allSPWIDs=$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
         else:
-            master.write("allSPWIDs+=,$({0} | cut -d ' ' -f4)\n".format(command))
+            master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,scripts[0]))
         for script in scripts:
-            command = 'sbatch -d afterok:$allSPWIDs --kill-on-invalid-dep=yes'
+            command = "sbatch -d afterok:${allSPWIDs//,/:} --kill-on-invalid-dep=yes"
             master.write('\n#{0}\n'.format(script))
             master.write("allSPWIDs+=,$({0} {1} | cut -d ' ' -f4)\n".format(command,script))
     master.write('\necho Submitted the following jobIDs within the {0} SPW directories: $IDs\n'.format(len(SPWs.split(','))))
@@ -715,7 +715,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     if dependencies != '':
         master.write('\n#Run after these dependencies\nDep={0}\n'.format(dependencies))
-        command += ' -d afterok:$Dep --kill-on-invalid-dep=yes'
+        command += " -d afterok:${Dep//,/:} --kill-on-invalid-dep=yes"
     master.write('\n#{0}\n'.format(scripts[0]))
     if verbose:
         master.write('echo Submitting {0} to SLURM queue with following command:\necho {1} {0}.\n'.format(scripts[0],command))
@@ -725,7 +725,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     #Submit each script with dependency on all previous scripts, and extract job IDs
     for script in scripts:
-        command = 'sbatch -d afterok:$IDs --kill-on-invalid-dep=yes'
+        command = "sbatch -d afterok:${IDs//,/:} --kill-on-invalid-dep=yes"
         master.write('\n#{0}\n'.format(script))
         if verbose:
             master.write('echo Submitting {0} to SLURM queue with following command\necho {1} {0}.\n'.format(script,command))
