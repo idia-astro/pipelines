@@ -25,6 +25,8 @@ def linfit(xInput, xDataList, yDataList):
 
 def do_setjy(visname, spw, fields, standard, dopol=False, createmms=True):
 
+    delmod(vis=visname) #if this isn't called, setjy job completes but has exit code 1; clearcal(vis=visname) also works
+
     fluxlist = ["J0408-6545", "0408-6545", ""]
     ismms = createmms
 
