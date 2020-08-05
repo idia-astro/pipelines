@@ -301,7 +301,7 @@ def validate_args(args,config,parser=None):
 
     if args['account'] not in ['b03-idia-ag','b05-pipelines-ag']:
         from platform import node
-        if node() == 'slurm-login' or 'slwrk' in node() or 'compute' in node():
+        if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
             accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30 | grep -v 'Account\|--'); do echo -n $f,; done").read()[:-1].split(',')
             if args['account'] not in accounts:
                 msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
@@ -649,8 +649,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         do += "echo -n 'All SPWs: '; pwd; "
     else:
         do += ' \"'
-    write_bash_job_script(master, summaryScript, extn, do % (SPWs,dir,summaryScript,extn,"| grep -v 'PENDING\|COMPLETED'",header), 'view the progress \(for running or failed jobs\)', dir=dir,prefix=prefix)
-    write_bash_job_script(master, fullSummaryScript, extn, do % (SPWs,dir,summaryScript,extn,'',header), 'view the progress \(for all jobs\)', dir=dir,prefix=prefix)
+    write_bash_job_script(master, summaryScript, extn, do % (SPWs,dir,summaryScript,extn,"\$@ | grep -v 'PENDING\|COMPLETED'",header), 'view the progress \(for running or failed jobs\)', dir=dir,prefix=prefix)
+    write_bash_job_script(master, fullSummaryScript, extn, do % (SPWs,dir,summaryScript,extn,'\$@',header), 'view the progress \(for all jobs\)', dir=dir,prefix=prefix)
     header = '------------------------------------------------------------------------------------------' + '-'*pad_length
     write_bash_job_script(master, errorScript, extn, do % (SPWs,dir,errorScript,extn,'',header), 'find errors \(after pipeline has run\)', dir=dir,prefix=prefix)
     write_bash_job_script(master, timingScript, extn, do % (SPWs,dir,timingScript,extn,'',header), 'display start and end timestamps \(after pipeline has run\)', dir=dir,prefix=prefix)
@@ -791,7 +791,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
 
     #Write each job script - kill script, summary script, and error script
     write_bash_job_script(master, killScript, extn, 'echo scancel ${0}'.format(IDs), 'kill all the jobs', dir=dir, echo=echo)
-    do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,CPUTime,MaxRSS,State,ExitCode" \"\$@\" """.format(IDs,15+pad_length)
+    do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,CPUTime,MaxRSS,State,ExitCode" \$@ """.format(IDs,15+pad_length)
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do files=\$(ls %s/*\$ID* 2>/dev/null | wc -l); if [ \$((files)) != 0 ]; then ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows'; else echo %s/*\$ID* logs don\\'t exist \(yet\); fi; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
@@ -824,7 +824,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
         Additional prefix to place on the beginning of the script, called from the top level directory (instead of SPW directories)."""
 
     fname = '{0}/{1}{2}'.format(dir,filename,extn)
-    do2 = ' ./{0}/{1}{2}{3} \"'.format(dir,prefix,filename,extn) if prefix != '' else ' '
+    do2 = ' ./{0}/{1}{2}{3} \$@ \"'.format(dir,prefix,filename,extn) if prefix != '' else ' '
     master.write('\n#Create {0}.sh file, make executable and symlink to current version\n'.format(filename))
     master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
     master.write('{0}{1}>> {2}\n'.format(do,do2,fname))
