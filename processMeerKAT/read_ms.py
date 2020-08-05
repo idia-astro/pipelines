@@ -17,7 +17,7 @@ msmd = casac.casac.msmetadata()
 tb = casac.casac.table()
 me = casac.casac.measures()
 
-def read_ms(MS):
+def get_fields(MS):
 
     """Extract field numbers from intent, including calibrators for bandpass, flux, phase & amplitude, and the target. Only the
     target allows for multiple field IDs, while all others extract the field with the most scans and put all other IDs as target fields.
@@ -25,7 +25,7 @@ def read_ms(MS):
     Arguments:
     ----------
     MS : str
-        Input measurement set (relative or absolute path).
+        Input MeasurementSet (relative or absolute path).
 
     Returns:
     --------
@@ -41,16 +41,19 @@ def read_ms(MS):
 
     fieldIDs = {}
     extra_fields = []
+    intents = msmd.intents()
 
     #Set default for any missing intent as field for intent CALIBRATE_FLUX
-    default = msmd.fieldsforintent('CALIBRATE_FLUX')[0]
-    if default.size == 0:
-        logger.error('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(msmd.intents(),MS))
+    fluxcal = msmd.fieldsforintent('CALIBRATE_FLUX')
+    if 'CALIBRATE_FLUX' not in intents or fluxcal.size == 0:
+        logger.error('You must have a field with intent "CALIBRATE_FLUX". I only found {0} in dataset "{1}".'.format(intents,MS))
         return fieldIDs
+    else:
+        default = fluxcal[0]
 
     #Use 'CALIBRATE_PHASE' or if missing, 'CALIBRATE_AMPLI'
     phasecal_intent = 'CALIBRATE_PHASE'
-    if phasecal_intent not in msmd.intents():
+    if phasecal_intent not in intents:
         phasecal_intent = 'CALIBRATE_AMPLI'
 
     fieldIDs['fluxfield'] = get_field(MS,'CALIBRATE_FLUX','fluxfield',extra_fields)
@@ -73,7 +76,7 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
     Arguments:
     ----------
     MS : str
-        Input measurement set (relative or absolute path).
+        Input MeasurementSet (relative or absolute path).
     intent : str
         Calibration intent.
     fieldname : str
@@ -130,7 +133,7 @@ def check_refant(MS,refant,config,warn=True):
     Arguments:
     ----------
     MS : str
-        Input measurement set (relative or absolute path).
+        Input MeasurementSet (relative or absolute path).
     refant: str
         Input reference antenna.
     config : str
@@ -153,7 +156,7 @@ def check_refant(MS,refant,config,warn=True):
     else:
         logger.info("Using reference antenna '{0}'.".format(refant))
         if refant == 'm059':
-            logger.info("This is usually a well-behaved (stable) antenna. Edit '{0}' to change this, by updating 'refant' in [crosscal] section".format(config))
+            logger.info("This is usually a well-behaved (stable) antenna. Edit '{0}' to change this, by updating 'refant' in [crosscal] section.".format(config))
             logger.debug("Alternatively, set 'calcrefant=True' in [crosscal] section of '{0}', and include 'calc_refant.py' in 'scripts' in [slurm] section.".format(config)) #(included by default)
 
 def check_scans(MS,nodes,tasks,dopol):
@@ -164,7 +167,7 @@ def check_scans(MS,nodes,tasks,dopol):
     Arguments:
     ----------
     MS : str
-        Input measurement set (relative or absolute path).
+        Input MeasurementSet (relative or absolute path).
     nodes : int
         The number of nodes set by the user.
     tasks : int
@@ -231,10 +234,10 @@ def check_spw(config):
     ms_low = msmd.chanfreqs(0)[0] / 1e6
     ms_high = msmd.chanfreqs(nspw-1)[-1] / 1e6
 
-    if low < ms_low:
+    if low < ms_low - 1:
         low = int(round(ms_low+0.5))
         update = True
-    if high > ms_high:
+    if high > ms_high + 1:
         high = int(round(ms_high-0.5))
         update = True
 
@@ -252,7 +255,7 @@ def parang_coverage(vis, calfield):
     Arguments:
     ----------
     vis : str
-        Input measurement set (relative or absolute path).
+        Input MeasurementSet (relative or absolute path).
     calfield : int
         Phase calibrator field ID.
 
@@ -348,16 +351,18 @@ def main():
 
     dopol = args.dopol
     refant = config_parser.parse_config(args.config)[0]['crosscal']['refant']
-    fields = read_ms(args.MS)
+    fields = get_fields(args.MS)
     logger.info('[fields] section written to "{0}". Edit this section if you need to change field IDs (comma-seperated string for multiple IDs, not supported for calibrators).'.format(args.config))
 
     npol = msmd.ncorrforpol()[0]
-    parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
+    parang = 0
+    if 'phasecalfield' in fields:
+        parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
 
     if npol < 4:
         logger.warn("Only {0} polarisations present in '{1}'. Any attempted polarisation calibration will fail, so setting dopol=False in [run] section of '{2}'.".format(npol,args.MS,args.config))
         dopol = False
-    elif parang < 30:
+    elif 0 < parang < 30:
         logger.warn("Parallactic angle coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
         dopol = False
 
