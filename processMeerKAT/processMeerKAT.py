@@ -39,8 +39,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s")
 TOTAL_NODES_LIMIT = 79
 CPUS_PER_NODE_LIMIT = 32
 NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
-MEM_PER_NODE_GB_LIMIT = 236 #241664 MB
-MEM_PER_NODE_GB_LIMIT_HIGHMEM = 482 #493568 MB
+MEM_PER_NODE_GB_LIMIT = 232 #237568 MB
+MEM_PER_NODE_GB_LIMIT_HIGHMEM = 480 #491520 MB
 
 #Set global values for paths and file names
 THIS_PROG = __file__
@@ -470,7 +470,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     if script == 'validate_input.py':
         casa_script = False
         casacore = True
-    elif script == 'run_bdsf.py':
+    elif 'run_bdsf.py' in script:
         casa_script = False
         casacore = False
 
@@ -488,6 +488,9 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         params['array'] = ''
     params['exclude'] = '\n#SBATCH --exclude={0}'.format(exclude) if exclude != '' else ''
     params['reservation'] = '\n#SBATCH --reservation={0}'.format(reservation) if reservation != '' else ''
+
+    if 'selfcal' in script:
+        params['command'] = 'ulimit -n 16384\n' + params['command']
 
     contents = """#!/bin/bash{array}{exclude}{reservation}
     #SBATCH --account={account}
@@ -1166,8 +1169,8 @@ def format_args(config,submit,quiet,dependencies):
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = True
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
-    # if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
-    #     mem = mem // nspw
+    if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
+        mem = mem // nspw
 
     dopol = config_parser.get_key(config, 'run', 'dopol')
     if not dopol and ('xy_yx_solve.py' in kwargs['scripts'] or 'xy_yx_apply.py' in kwargs['scripts']):
