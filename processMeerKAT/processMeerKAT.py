@@ -1169,8 +1169,8 @@ def format_args(config,submit,quiet,dependencies):
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = True
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
-    if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT:
-        mem = mem // nspw
+    if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT and nspw > 1:
+        mem = mem // (nspw/2)
 
     dopol = config_parser.get_key(config, 'run', 'dopol')
     if not dopol and ('xy_yx_solve.py' in kwargs['scripts'] or 'xy_yx_apply.py' in kwargs['scripts']):
