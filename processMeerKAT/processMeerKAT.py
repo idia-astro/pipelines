@@ -1246,8 +1246,9 @@ def get_spw_bounds(spw):
     bounds = spw.split(':')[-1].split('~')
     if ',' not in spw and ':' in spw and '~' in spw and len(bounds) == 2 and bounds[1] != '':
         high,unit=re.search(r'(\d+\.*\d*)(\w*)',bounds[1]).groups()
-        func = int if unit == '' else float
+        func = int if unit == '' or '.' not in bounds[0] else float
         low = func(bounds[0])
+        func = int if unit == '' or '.' not in high else float
         high = func(high)
 
         if unit != 'MHz':
