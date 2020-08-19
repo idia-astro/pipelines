@@ -16,27 +16,12 @@ logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-def polfield_name(visname):
-    msmd.open(visname)
-    fieldnames = msmd.fieldnames()
-    msmd.close()
-
-    polfield = ''
-    if any([ff in ["3C286", "1328+307", "1331+305", "J1331+3030"] for ff in fieldnames]):
-        polfield= list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))[0]
-    elif any(ff in ["3C138", "0518+165", "0521+166", "J0521+1638"] for ff in fieldnames]):
-        polfield = list(set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames)))[0]
-    else:
-        logger.warning("No valid polarization field found. Defaulting to use the phase calibrator to solve for XY phase.")
-        logger.warning("The polarization solutions found will likely be wrong. Please check the results carefully.")
-
-    return polfield
 
 def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
     fluxfile = calfiles.fluxfile
 
-    polfield = polfield_name(visname)
+    polfield = bookkeeping.polfield_name(visname)
     if polfield == '':
         polfield = fields.secondaryfield
 

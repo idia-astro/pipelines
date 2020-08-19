@@ -326,7 +326,7 @@ def get_xy_field(visname, fields):
 
     msmd.open(visname)
     fieldnames = msmd.fieldnames()
-    msmd.close()
+    msmd.done()
 
     # Use 3C286 or 3C138 if present in the data
     calibrator_3C286 = set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames))
@@ -340,8 +340,6 @@ def get_xy_field(visname, fields):
         xyfield = fields.dpolfield
 
     return xyfield
-
-
 
 def main():
 
