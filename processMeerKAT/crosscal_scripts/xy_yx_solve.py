@@ -18,9 +18,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 
 
 def polfield_name(visname):
-    msmd.open(visname)
+
     fieldnames = msmd.fieldnames()
-    msmd.close()
 
     polfield = ''
     if any([ff in ["3C286", "1328+307", "1331+305", "J1331+3030"] for ff in fieldnames]):
@@ -162,6 +161,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 def main(args,taskvals):
 
     visname = va(taskvals, 'data', 'vis', str)
+    msmd.open(visname)
 
     calfiles, caldir = bookkeeping.bookkeeping(visname)
     fields = bookkeeping.get_field_ids(taskvals['fields'])
@@ -170,8 +170,9 @@ def main(args,taskvals):
     minbaselines = va(taskvals, 'crosscal', 'minbaselines', int, default=4)
     standard = va(taskvals, 'crosscal', 'standard', str, default='Perley-Butler 2010')
 
-    do_cross_cal(visname, fields, calfiles, refant, caldir,
-            minbaselines, standard)
+    do_cross_cal(visname, fields, calfiles, refant, caldir, minbaselines, standard)
+
+    msmd.close()
 
 if __name__ == '__main__':
 
