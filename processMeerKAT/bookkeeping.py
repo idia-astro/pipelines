@@ -78,7 +78,7 @@ def polfield_name(visname):
     polfield = ''
     if any([ff in ["3C286", "1328+307", "1331+305", "J1331+3030"] for ff in fieldnames]):
         polfield= list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))[0]
-    elif any(ff in ["3C138", "0518+165", "0521+166", "J0521+1638"] for ff in fieldnames]):
+    elif any([ff in ["3C138", "0518+165", "0521+166", "J0521+1638"] for ff in fieldnames]):
         polfield = list(set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames)))[0]
     else:
         logger.warning("No valid polarization field found. Defaulting to use the phase calibrator to solve for XY phase.")
