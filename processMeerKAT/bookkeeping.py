@@ -71,6 +71,8 @@ def get_field_ids(fields):
 
 def polfield_name(visname):
 
+    import casac
+    msmd = casac.casac.msmetadata()
     msmd.open(visname)
     fieldnames = msmd.fieldnames()
     msmd.done()

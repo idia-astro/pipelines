@@ -26,13 +26,13 @@ def qu_polfield(polfield, visname):
     meanfreq = msmd.meanfreq(0, unit='GHz')
     msmd.done()
 
-    if polfield == '3C286':
+    if polfield in ["3C286", "1328+307", "1331+305", "J1331+3030"]:
         # From a fit to the coeffs in Perley Butler 2013.
         # Strictly only valid between 1 and 2 GHz, but we take some liberties and extend it down to 0.88 GHz
         polcoeffs = [-0.01406664,  0.05911261,  0.03935245]
         stokesIcoeffs = [0.0336, -0.1715, -0.4605, 1.2515]
         polang = 33 # in deg
-    elif polfield == '3C138':
+    elif polfield in ["3C138", "0518+165", "0521+166", "J0521+1638"]:
         polcoeffs = [-0.02445133,  0.11164503, -0.03445281]
         polangpoly = np.poly1d([-7.48339776,  27.19000892, -25.09725939,  -8.96189414])
         polang = polangpoly(meanfreq)
@@ -132,7 +132,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gaintype = 'XYf+QU', minblperant = minbaselines,
             preavg = 200.0,
             gaintable = [calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
-            gainfield = [fields.bpassfield, fields.bpassfield, 'J0521+1638'],
+            gainfield = [fields.bpassfield, fields.bpassfield, polcal],
             append = False)
     bookkeeping.check_file(xy0ambpfile)
 
