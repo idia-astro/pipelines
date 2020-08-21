@@ -145,7 +145,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
         elif 'phase' in ystr.lower():
             ydatx = lengthen(ydatx, np.rad2deg(np.angle(datx)))
-            ydaty = lengthen(ydatx, np.rad2deg(np.angle(daty)))
+            ydaty = lengthen(ydaty, np.rad2deg(np.angle(daty)))
             #ydatx.extend(np.rad2deg(np.angle(datx)))
             #ydaty.extend(np.rad2deg(np.angle(daty)))
 
@@ -173,6 +173,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     ydatx = np.asarray(ydatx)
     ydaty = np.asarray(ydaty)
+
 
     if do_field_sel:
         xdat = xdat.reshape(fields.shape)
