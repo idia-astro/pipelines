@@ -53,8 +53,8 @@ def qu_polfield(polfield, visname):
     ## in Jy
     #stokesIval = np.power(10, stokesIval)
 
-    q = polval * np.cos(np.deg2rad(polang))
-    u = polval * np.sin(np.deg2rad(polang))
+    q = polval * np.cos(np.deg2rad(2*polang))
+    u = polval * np.sin(np.deg2rad(2*polang))
 
     return q, u
 
