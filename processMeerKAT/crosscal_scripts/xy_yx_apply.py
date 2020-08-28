@@ -33,22 +33,22 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
     logger.info(" applying calibration: primary calibrator")
     applycal(vis=visname, field=fields.fluxfield,
-            selectdata=False, calwt=False, gaintable=[ionofile, calfiles.bpassfile, fluxfile, calfiles.dpolfile,calfiles.xpolfile],
-            gainfield=[fields.bpassfield, fields.bpassfield, fields.fluxfield, fields.bpassfield, polfield],
+            selectdata=False, calwt=False, gaintable=[calfiles.bpassfile, fluxfile, calfiles.dpolfile,calfiles.xpolfile],
+            gainfield=[fields.bpassfield, fields.fluxfield, fields.bpassfield, polfield],
             parang=True, interp='nearest,linearflag,nearest,nearest')
 
     if polfield != fields.secondaryfield:
         logger.info(" applying calibration: polarization calibrator")
         applycal(vis=visname, field=polfield,
-                selectdata=False, calwt=False, gaintable=[ionofile, calfiles.bpassfile, fluxfile, calfiles.dpolfile,calfiles.xpolfile],
-                gainfield=[fields.bpassfield, fields.bpassfield, polfield, fields.bpassfield, polfield],
+                selectdata=False, calwt=False, gaintable=[calfiles.bpassfile, fluxfile, calfiles.dpolfile,calfiles.xpolfile],
+                gainfield=[fields.bpassfield, polfield, fields.bpassfield, polfield],
                 parang=True, interp='nearest,linearflag,nearest,nearest')
 
     logger.info(" applying calibrations: phase calibrator, targets and extra fields")
     field = ','.join(set([i for i in (','.join([fields.secondaryfield] + [fields.targetfield] + [fields.extrafields]).split(',')) if i])) #remove duplicate and empty fields
     applycal(vis=visname, field=field, selectdata=False, calwt=False,
-            gaintable=[ionofile, calfiles.bpassfile, fluxfile, calfiles.dpolfile, calfiles.xpolfile],
-            gainfield=[fields.bpassfield, fields.bpassfield,fields.secondaryfield,fields.bpassfield,polfield],
+            gaintable=[calfiles.bpassfile, fluxfile, calfiles.dpolfile, calfiles.xpolfile],
+            gainfield=[fields.bpassfield,fields.secondaryfield,fields.bpassfield,polfield],
             parang=True, interp='nearest,nearest,nearest,nearest')
 
 

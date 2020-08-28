@@ -92,8 +92,6 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             field = fields.bpassfield, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  solint = '10min',
             combine = 'scan', bandtype = 'B', fillgaps = 8,
-             gaintable = [ionofile],
-            gainfield = [fields.bpassfield],
             parang = False, append = False)
     bookkeeping.check_file(calfiles.bpassfile)
 
@@ -101,8 +99,8 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     polcal(vis=visname, caltable = calfiles.dpolfile, field = fields.bpassfield,
             refant = '', solint = 'inf', combine = 'scan',
             poltype = 'Dflls', preavg= 200.0,
-            gaintable = [ionofile, calfiles.bpassfile],
-            gainfield = [fields.bpassfield, fields.bpassfield],
+            gaintable = [calfiles.bpassfile],
+            gainfield = [fields.bpassfield],
             append = False)
     bookkeeping.check_file(calfiles.dpolfile)
 
@@ -111,8 +109,8 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             field = fields.gainfields, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'T',
             solint = 'inf', combine = '', calmode='ap',
-            gaintable=[ionofile, calfiles.bpassfile,calfiles.dpolfile],
-            gainfield=[fields.bpassfield, fields.bpassfield,fields.bpassfield],
+            gaintable=[calfiles.bpassfile,calfiles.dpolfile],
+            gainfield=[fields.bpassfield,fields.bpassfield],
             parang = False, append = False)
     bookkeeping.check_file(calfiles.gainfile)
 
@@ -122,8 +120,8 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 field = polfield, refant = referenceant,
                 minblperant = minbaselines, solnorm = False,  gaintype = 'T',
                 solint = 'inf', combine = '', calmode='ap',
-                gaintable=[ionofile, calfiles.bpassfile,calfiles.dpolfile],
-                gainfield=[fields.bpassfield, fields.bpassfield,fields.bpassfield],
+                gaintable=[calfiles.bpassfile,calfiles.dpolfile],
+                gainfield=[fields.bpassfield,fields.bpassfield],
                 parang = False, append = True)
         bookkeeping.check_file(calfiles.gainfile)
 
@@ -141,13 +139,15 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             refant = referenceant, solint = 'inf', combine = 'scan,2.5MHz',
             gaintype = 'XYf+QU', minblperant = minbaselines,
             preavg = 200.0,
-            gaintable = [ionofile, calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
-            gainfield = [fields.bpassfield, fields.bpassfield, fields.bpassfield, polcal],
+            gaintable = [calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
+            gainfield = [fields.bpassfield, fields.bpassfield, polcal],
             append = False)
     bookkeeping.check_file(xy0ambpfile)
 
     logger.info("\n Check for x-y phase ambiguity.")
+    logger.info("Polarization qu is ", polqu)
     S = xyamb(xytab=xy0ambpfile, qu=polqu, xyout = xy0pfile)
+    logger.info("smodel = ", S)
 
 
 def main(args,taskvals):
