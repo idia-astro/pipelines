@@ -64,7 +64,6 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     polfield = bookkeeping.polfield_name(visname)
     if polfield == '':
         polfield = fields.secondaryfield
-        polqu = [0,0]
     else:
         polqu = qu_polfield(polfield, visname)
 
@@ -79,13 +78,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     xy0ambpfile = os.path.join(caldir, base+'.xyambcal')
     xy0pfile    = os.path.join(caldir, base+'.xycal')
     xpfile      = os.path.join(caldir, base+'.xfcal')
-    ionofile    = os.path.join(caldir, base+'.iono')
-    teciono    = os.path.join(caldir, 'iono')
-    tecim    = os.path.join(caldir, 'iono.IGS_TEC.im')
 
-
-    tec_maps.create(vis=visname, doplot=False, imname=teciono)
-    gencal(vis=visname, caltable=ionofile, caltype='tecim', infile=tecim)
 
     logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
@@ -134,8 +127,14 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
                 listfile = os.path.join(caldir,'fluxscale_xy_yx.txt'))
         bookkeeping.check_file(calfiles.fluxfile)
 
+    if polfield == fields.secondaryfield:
+        # Cannot resolve XY ambiguity so write into final file directly
+        xyfile = xy0pfile
+    else:
+        xyfile = xy0ambpfile
+
     logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
-    gaincal(vis=visname, caltable = xy0ambpfile, field = polfield,
+    gaincal(vis=visname, caltable = xyfile, field = polfield,
             refant = referenceant, solint = 'inf', combine = 'scan,2.5MHz',
             gaintype = 'XYf+QU', minblperant = minbaselines,
             preavg = 200.0,
@@ -144,10 +143,11 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             append = False)
     bookkeeping.check_file(xy0ambpfile)
 
-    logger.info("\n Check for x-y phase ambiguity.")
-    logger.info("Polarization qu is ", polqu)
-    S = xyamb(xytab=xy0ambpfile, qu=polqu, xyout = xy0pfile)
-    logger.info("smodel = ", S)
+    if polfield != fields.secondaryfield:
+        logger.info("\n Check for x-y phase ambiguity.")
+        logger.info("Polarization qu is ", polqu)
+        S = xyamb(xytab=xy0ambpfile, qu=polqu, xyout = xy0pfile)
+        logger.info("smodel = ", S)
 
 
 def main(args,taskvals):

@@ -28,8 +28,14 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     base = visname.replace('.ms', '')
     xy0ambpfile = os.path.join(caldir, base+'.xyambcal')
     xy0pfile    = os.path.join(caldir, base+'.xycal')
-    calfiles = calfiles._replace(xpolfile=xy0pfile)
-    ionofile    = os.path.join(caldir, base+'.iono')
+
+    if polfield == fields.secondaryfield:
+        # Cannot resolve XY ambiguity so write into final file directly
+        xyfile = xy0pfile
+    else:
+        xyfile = xy0ambpfile
+
+    calfiles = calfiles._replace(xpolfile=xyfile)
 
     logger.info(" applying calibration: primary calibrator")
     applycal(vis=visname, field=fields.fluxfield,
