@@ -141,7 +141,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gaintable = [calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
             gainfield = [fields.bpassfield, fields.bpassfield, polcal],
             append = False)
-    bookkeeping.check_file(xy0ambpfile)
+    bookkeeping.check_file(xyfile)
 
     if polfield != fields.secondaryfield:
         logger.info("\n Check for x-y phase ambiguity.")
