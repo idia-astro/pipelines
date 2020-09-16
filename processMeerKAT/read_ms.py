@@ -226,6 +226,10 @@ def check_spw(config):
 
     update = False
     low,high,unit,dirs = config_parser.parse_spw(config)
+    if type(low) is list:
+        low = low[0]
+    if type(high) is list:
+        high = high[-1]
     nspw = msmd.nspw()
 
     if nspw > 1:
