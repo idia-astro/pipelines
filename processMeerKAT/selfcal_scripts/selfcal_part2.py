@@ -43,7 +43,7 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     else:
         do_gaincal = True
 
-    if nterms[loop] > 1 and deconvolver == 'mtmfs':
+    if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
         bdsfname = imagename + ".image.tt0"
     else:
         bdsfname = imagename + ".image"
