@@ -25,10 +25,26 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def avg_ants(arrlist):
     return [np.mean(arr, axis=-1) for arr in arrlist]
 
+
+def lengthen(edat, inpdat):
+    """
+    Tries to extend, if that fails it appends
+    """
+
+    try:
+        edat.extend(inpdat)
+    except TypeError:
+        edat.append(inpdat)
+
+    return edat
+
+
+
 def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=None, ylim=None):
     # Check plotstr and ant
     if not any([plotstr in ss for ss in ['amp,time', 'phase,time', 'amp,freq', 'phase,freq', 'delay,freq', 'imag,real']]):
         raise ValueError("Invalid plotstr.")
+
 
     tables = []
     cwd = os.getcwd()
@@ -40,7 +56,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
         os.chdir(cwd)
 
     if len(tables) == 0:
-        raise ValueError("No valid caltables with extention {} found.".format(table_ext))
+        logger.warning("No valid caltables with extention {} found.".format(table_ext))
 
     xdat = []
     xdaty = [] # Only used when plotting real
@@ -84,20 +100,20 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
         elif 'time' in xstr.lower():
             tb.open(tt)
             time = np.squeeze(tb.getcol('TIME'))
-            try:
-                xdat.extend(time)
-            except AttributeError:
-                xdat.append(time)
+            xdat = lengthen(xdat, time)
 
             xlabel = 'Time'
 
         elif 'real' in xstr.lower():
             tb.open(tt)
             real = np.squeeze(tb.getcol('CPARAM')).real
-            xdat.extend(real[0])
-            xdaty.extend(real[1])
+            xdat = lengthen(xdat, real[0])
+            xdaty = lengthen(xdaty, real[1])
+            #xdat.extend(real[0])
+            #xdaty.extend(real[1])
             xlabel = 'Real'
         else:
+            # This should never happen
             raise ValueError("Unknown option {}.".format(xstr.lower()))
 
         tb.open(tt)
@@ -106,29 +122,45 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
         else:
             dat = np.squeeze(tb.getcol('CPARAM'))
 
-        datx = dat[0]
-        daty = dat[1]
-        npol = dat.shape[0]
+        if len(dat.shape) == 1:
+            npol = 1
+        else:
+            npol = dat.shape[0]
+
+        if npol == 1:
+            datx = dat
+            daty = np.zeros_like(dat)
+        else:
+            datx = dat[0]
+            daty = dat[-1]
+
         tb.close()
 
+
         if 'amp' in ystr.lower():
-            ydatx.extend(np.abs(datx))
-            ydaty.extend(np.abs(daty))
+            ydatx = lengthen(ydatx, np.abs(datx))
+            ydaty = lengthen(ydaty, np.abs(daty))
+
             ylabel = 'Amplitude'
 
         elif 'phase' in ystr.lower():
-            ydatx.extend(np.rad2deg(np.angle(datx)))
-            ydaty.extend(np.rad2deg(np.angle(daty)))
+            ydatx = lengthen(ydatx, np.rad2deg(np.angle(datx)))
+            ydaty = lengthen(ydaty, np.rad2deg(np.angle(daty)))
+            #ydatx.extend(np.rad2deg(np.angle(datx)))
+            #ydaty.extend(np.rad2deg(np.angle(daty)))
+
             ylabel = 'Phase (deg)'
 
         elif 'imag' in ystr.lower():
-            ydatx.extend(datx.imag)
-            ydaty.extend(daty.imag)
+            ydatx = lengthen(ydatx, datx.imag)
+            ydaty = lengthen(ydaty, daty.imag)
+
             ylabel = 'Imag'
 
         elif 'delay' in ystr.lower():
-            ydatx.extend(datx)
-            ydaty.extend(daty)
+            ydatx = lengthen(ydatx, datx)
+            ydaty = lengthen(ydaty, daty)
+
             ylabel = 'Delay'
         else:
             raise ValueError("Unknown option {}".format(ystr.lower()))
@@ -141,6 +173,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     ydatx = np.asarray(ydatx)
     ydaty = np.asarray(ydaty)
+
 
     if do_field_sel:
         xdat = xdat.reshape(fields.shape)
@@ -184,11 +217,17 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
     fig, ax = plt.subplots()
 
     if 'real' in xstr.lower():
-        ax.scatter(xdat, ydatx, label='X', facecolor='blue', edgecolor='none')
-        ax.scatter(xdaty, ydaty, label='Y', facecolor='orange', edgecolor='none')
+        if npol == 1:
+            ax.scatter(xdat, ydatx, label='Pol Avg', facecolor='blue', edgecolor='none')
+        else:
+            ax.scatter(xdat, ydatx, label='X', facecolor='blue', edgecolor='none')
+            ax.scatter(xdaty, ydaty, label='Y', facecolor='orange', edgecolor='none')
     else:
-        ax.scatter(xdat, ydatx, label='X', facecolor='blue', edgecolor='none')
-        ax.scatter(xdat, ydaty, label='Y', facecolor='orange', edgecolor='none')
+        if npol == 1:
+            ax.scatter(xdat, ydatx, label='Pol Avg', facecolor='blue', edgecolor='none')
+        else:
+            ax.scatter(xdat, ydatx, label='X', facecolor='blue', edgecolor='none')
+            ax.scatter(xdat, ydaty, label='Y', facecolor='orange', edgecolor='none')
 
     title = 'Antenna Average Field {} {}'.format(field_id, title)
     ax.set_title(title)

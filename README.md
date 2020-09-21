@@ -37,4 +37,14 @@ Other convenient scripts are also created that allow you to monitor and (if nece
 
 For help, run `processMeerKAT.py -h`, which provides a brief description of all the command line arguments.
 
+## Using multiple spectral windows (new in V1.1)
+
+Starting with V1.1 of the processMeerKAT pipeline, the default behaviour is to split up the MeerKAT band into 16 spectral windows (SPWs), and process each concurrently. This results in a few major usability changes as outlined below:
+
+1. **Calibration output** : Since the calibration is performed independently per SPW, all the output specific to that SPW is within it's own directory. Output such as the calibration tables, logs, plots etc. per SPW can be found within each SPW directory.
+
+2. **Logs in the top level directory** : Logs in the top level directory (*i.e.,* the directory where the pipeline was launched) correspond to the scripts in the `precal_scripts` and `postcal_scripts` variables in the config file. These scripts are run from the top level before and after calibration respectively. By default these correspond to the scripts to calculate the reference antenna (if enabled), partition the data into SPWs, and concat the individual SPWs back into a single MS/MMS.
+
+More detailed information about SPW splitting is found [here](/docs/processMeerKAT/using-the-pipeline#spw-splitting).
+
 The documentation can be accessed on the [pipelines website](https://idia-pipelines.github.io/docs/processMeerKAT), or on the [Github wiki](https://github.com/idia-astro/pipelines/wiki).
