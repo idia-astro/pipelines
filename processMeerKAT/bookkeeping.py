@@ -116,14 +116,11 @@ def get_selfcal_params():
 
     check_params = params.keys()
     check_params.pop(check_params.index('nloops'))
-    check_params.pop(check_params.index('restart_no'))
+    check_params.pop(check_params.index('loop'))
 
     params['vis'] = taskvals['data']['vis']
     params['refant'] = taskvals['crosscal']['refant']
-    if 'loop' not in params:
-        params['loop'] = 0
-    else:
-        check_params.pop(check_params.index('loop'))
+    params['dopol'] = taskvals['run']['dopol']
 
     for arg in check_params:
 
