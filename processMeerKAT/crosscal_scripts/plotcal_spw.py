@@ -50,6 +50,9 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
     cwd = os.getcwd()
     for dd in dirs:
         tmpdir = os.path.join(dd, caldir)
+        if not os.path.exists(tmpdir):
+            logger.warning("Path {} not found. Skipping.".format(tmpdir))
+
         os.chdir(tmpdir)
         tmp = glob.glob("*.{}".format(table_ext))
         tables.extend([os.path.join(tmpdir, tt) for tt in tmp if os.path.exists(tt)])
@@ -57,6 +60,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     if len(tables) == 0:
         logger.warning("No valid caltables with extention {} found.".format(table_ext))
+        return
 
     xdat = []
     xdaty = [] # Only used when plotting real
@@ -68,6 +72,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
     ystr = plotstr.split(',')[0]
     do_field_sel = False
     field = 0
+
 
     for tt in tables:
         tb.open(tt+'/ANTENNA')
