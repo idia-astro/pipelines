@@ -70,12 +70,21 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                     symlink_psf(imagename,basename % (loop-1))
                     calcpsf = False
 
-        tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
-            imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
-            wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=True,
-            weighting='briggs', robust = robust[loop], niter=niter[loop],
-            threshold=threshold[loop], nterms=nterms[loop], calcpsf=calcpsf,
-            pblimit=-1, mask=pixmask, parallel = True)
+        dotclean = True
+        if nterms > 1 and os.path.exists(imagename + '.image.tt0'):
+            logger.info('Image {} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image.tt0'))
+            dotclean = False
+        if nterms == 1 and os.path.exists(imagename + '.image'):
+            logger.info('Image {} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image'))
+            dotclean = False
+
+        if dotclean:
+            tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
+                imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
+                wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=True,
+                weighting='briggs', robust = robust[loop], niter=niter[loop],
+                threshold=threshold[loop], nterms=nterms[loop], calcpsf=calcpsf,
+                pblimit=-1, mask=pixmask, parallel = True)
 
 
 if __name__ == '__main__':

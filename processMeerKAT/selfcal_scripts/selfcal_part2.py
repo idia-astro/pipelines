@@ -60,6 +60,11 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
         return loop+1
     else:
         if do_gaincal:
+            if os.path.exists(caltable):
+                loop += 1
+                logger.info('Caltable {} exists. Not overwriting, continuing to next loop.'.format(caltable))
+                return loop
+
             predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
                       deconvolver, robust, niter, threshold, nterms, pixmask,loop)
 
