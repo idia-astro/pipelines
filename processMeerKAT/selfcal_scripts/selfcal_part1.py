@@ -70,11 +70,11 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                     calcpsf = False
 
         dotclean = True
-        if nterms > 1 and os.path.exists(imagename + '.image.tt0'):
-            logger.info('Image {} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image.tt0'))
+        if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs' and os.path.exists(imagename + '.image.tt0'):
+            logger.info('Image {0} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image.tt0'))
             dotclean = False
-        if nterms == 1 and os.path.exists(imagename + '.image'):
-            logger.info('Image {} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image'))
+        if (nterms[loop] == 1 or deconvolver[loop] != 'mtmfs') and os.path.exists(imagename + '.image'):
+            logger.info('Image {0} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image'))
             dotclean = False
 
         if dotclean:
