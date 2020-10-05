@@ -65,8 +65,7 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                             extendpols=False, growaround=False, flagneartime=False, flagnearfreq=False,
                             action='apply', flagbackup=True, overwrite=True, writeflags=True)
 
-                #TODO: check with of these are necessary
-                elif gridder[loop] == gridder[loop-1] and robust[loop] == robust[loop-1] and nterms[loop] == nterms[loop-1] and imsize[loop] == imsize[loop-1] and cell[loop] == cell[loop-1] and wprojplanes[loop] == wprojplanes[loop-1]:
+                elif gridder[loop] == gridder[loop-1] and robust[loop] == robust[loop-1] and nterms[loop] == nterms[loop-1] and imsize[loop] == imsize[loop-1] and cell[loop] == cell[loop-1]:
                     symlink_psf(imagename,basename % (loop-1))
                     calcpsf = False
 

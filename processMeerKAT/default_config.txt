@@ -73,5 +73,21 @@ solint = ['1min']
 calmode = 'p'
 flag = False                      # Flag residual column after selfcal?
 
+[image]
+cell = '1.5arcsec'
+robust = -0.5
+imsize = [4096, 4096]
+wprojplanes = 256
+niter = 100000
+threshold = 10e-6                 # S/N value if >= 1.0 and rmsmap != '', otherwise Jy
+multiscale = [0, 5, 10, 15]
+nterms = 2                        # Number of taylor terms
+gridder = 'wproject'
+deconvolver = 'mtmfs'
+restoringbeam = ''
+specmode = 'mfs'
+mask = ''
+rmsmap = ''
+
 [run]                             # Internal variables for pipeline execution
 continue = True

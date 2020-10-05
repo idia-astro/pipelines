@@ -66,10 +66,13 @@ def run_bdsf(vis, nloops, nterms, loop, threshold, imsize):
     img.export_image(outfile=rmsfile, img_type='rms', img_format='casa', clobber=True)
 
     logger.info('Completed {0}.'.format(sys.argv[0]))
-    return loop
+    return loop,rmsfile
 
 
 if __name__ == '__main__':
     args,params = bookkeeping.get_selfcal_params()
-    loop = run_bdsf(params['vis'], params['nloops'], params['nterms'], params['loop'], params['threshold'], params['imsize'])
+    loop,rmsmap = run_bdsf(params['vis'], params['nloops'], params['nterms'], params['loop'], params['threshold'], params['imsize'])
     config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')
+
+    if config_parser.has_section(args['config'], 'image'):
+        config_parser.overwrite_config(args['config'], conf_dict={'rmsmap' : "'{0}'".format(rmsmap)}, conf_sec='image')

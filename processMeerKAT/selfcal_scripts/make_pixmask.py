@@ -81,7 +81,7 @@ def mask_image(vis, nloops, nterms, loop):
         if os.path.exists(im):
             shutil.rmtree(im)
 
-    return loop
+    return loop,pixmask
 
 
 logger = logging.getLogger(__name__)
@@ -89,5 +89,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 if __name__ == '__main__':
 
     args,params = bookkeeping.get_selfcal_params()
-    loop = mask_image(params['vis'], params['nloops'], params['nterms'], params['loop'])
+    loop,pixmask = mask_image(params['vis'], params['nloops'], params['nterms'], params['loop'])
     config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')
+
+    if config_parser.has_section(args['config'], 'image'):
+        config_parser.overwrite_config(args['config'], conf_dict={'mask' : "'{0}'".format(pixmask)}, conf_sec='image')

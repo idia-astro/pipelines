@@ -161,6 +161,18 @@ def get_selfcal_params():
 
     return args,params
 
+def get_imaging_params():
+
+    # Get the name of the config file
+    args = config_parser.parse_args()
+
+    # Parse config file
+    taskvals, config = config_parser.parse_config(args['config'])
+    params = taskvals['image']
+    params['vis'] = taskvals['data']['vis']
+
+    return args,params
+
 def run_script(func):
 
     # Get the name of the config file
