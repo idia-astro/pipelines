@@ -40,9 +40,6 @@ def bookkeeping(visname):
 
     return calfiles, caldir
 
-
-
-
 def get_field_ids(fields):
     """
     Given an input list of source names, finds the associated field
@@ -72,6 +69,24 @@ def get_field_ids(fields):
     return FieldIDs(targetfield, fluxfield, bpassfield, secondaryfield,
             kcorrfield, xdelfield, dpolfield, xpolfield, gainfields, extrafields)
 
+def polfield_name(visname):
+
+    import casac
+    msmd = casac.casac.msmetadata()
+    msmd.open(visname)
+    fieldnames = msmd.fieldnames()
+    msmd.done()
+
+    polfield = ''
+    if any([ff in ["3C286", "1328+307", "1331+305", "J1331+3030"] for ff in fieldnames]):
+        polfield= list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))[0]
+    elif any([ff in ["3C138", "0518+165", "0521+166", "J0521+1638"] for ff in fieldnames]):
+        polfield = list(set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames)))[0]
+    else:
+        logger.warning("No valid polarization field found. Defaulting to use the phase calibrator to solve for XY phase.")
+        logger.warning("The polarization solutions found will likely be wrong. Please check the results carefully.")
+
+    return polfield
 
 def check_file(filepath):
 

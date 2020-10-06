@@ -226,6 +226,10 @@ def check_spw(config):
 
     update = False
     low,high,unit,dirs = config_parser.parse_spw(config)
+    if type(low) is list:
+        low = low[0]
+    if type(high) is list:
+        high = high[-1]
     nspw = msmd.nspw()
 
     if nspw > 1:
@@ -326,7 +330,7 @@ def get_xy_field(visname, fields):
 
     msmd.open(visname)
     fieldnames = msmd.fieldnames()
-    msmd.close()
+    msmd.done()
 
     # Use 3C286 or 3C138 if present in the data
     calibrator_3C286 = set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames))
@@ -340,8 +344,6 @@ def get_xy_field(visname, fields):
         xyfield = fields.dpolfield
 
     return xyfield
-
-
 
 def main():
 

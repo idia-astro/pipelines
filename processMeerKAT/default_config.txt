@@ -17,7 +17,7 @@ partition = 'Main'                # SLURM partition to use
 exclude = ''                      # SLURM nodes to exclude
 time = '12:00:00'
 submit = False
-container = '/idia/software/containers/casa-stable-5.6.2-2.simg'
+container = '/idia/software/containers/casa-stable-5.7.0.simg'
 mpi_wrapper = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
 name = ''
 dependencies = ''
@@ -71,7 +71,7 @@ gridder = 'wproject'
 deconvolver = 'mtmfs'
 solint = ['10min','5min','2min','1min']
 calmode = 'p'
-atrous = True                     # Source find for diffuse emission (see PyBDSF docs)
+atrous = False                     # Source find for diffuse emission (see PyBDSF docs)
 
 [run]                             # Internal variables for pipeline execution
 continue = True

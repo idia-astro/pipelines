@@ -50,6 +50,9 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
     cwd = os.getcwd()
     for dd in dirs:
         tmpdir = os.path.join(dd, caldir)
+        if not os.path.exists(tmpdir):
+            logger.warning("Path {} not found. Skipping.".format(tmpdir))
+
         os.chdir(tmpdir)
         tmp = glob.glob("*.{}".format(table_ext))
         tables.extend([os.path.join(tmpdir, tt) for tt in tmp if os.path.exists(tt)])
@@ -57,6 +60,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     if len(tables) == 0:
         logger.warning("No valid caltables with extention {} found.".format(table_ext))
+        return
 
     xdat = []
     xdaty = [] # Only used when plotting real
@@ -68,6 +72,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
     ystr = plotstr.split(',')[0]
     do_field_sel = False
     field = 0
+
 
     for tt in tables:
         tb.open(tt+'/ANTENNA')
@@ -145,7 +150,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
         elif 'phase' in ystr.lower():
             ydatx = lengthen(ydatx, np.rad2deg(np.angle(datx)))
-            ydaty = lengthen(ydatx, np.rad2deg(np.angle(daty)))
+            ydaty = lengthen(ydaty, np.rad2deg(np.angle(daty)))
             #ydatx.extend(np.rad2deg(np.angle(datx)))
             #ydaty.extend(np.rad2deg(np.angle(daty)))
 
@@ -173,6 +178,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     ydatx = np.asarray(ydatx)
     ydaty = np.asarray(ydaty)
+
 
     if do_field_sel:
         xdat = xdat.reshape(fields.shape)

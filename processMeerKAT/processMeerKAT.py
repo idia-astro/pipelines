@@ -59,7 +59,7 @@ CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','
 SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
-CONTAINER = '/idia/software/containers/casa-stable-5.6.2-2.simg'
+CONTAINER = '/idia/software/containers/casa-stable-5.7.0.simg'
 MPI_WRAPPER = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
 POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
@@ -193,7 +193,7 @@ def parse_args():
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
-    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $(whoami) -s format=account%%30') [default: 'b03-idia-ag'].")
+    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $(whoami) -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
     parser.add_argument("-r","--reservation", metavar="name", required=False, type=str, default='', help="SLURM reservation to use. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -302,7 +302,7 @@ def validate_args(args,config,parser=None):
     if args['account'] not in ['b03-idia-ag','b05-pipelines-ag']:
         from platform import node
         if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
-            accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30 | grep -v 'Account\|--'); do echo -n $f,; done").read()[:-1].split(',')
+            accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30,cluster%15 | grep ilifu-slurm20 | grep -v 'Account\|--' | awk '{print $1}'); do echo -n $f,; done").read()[:-1].split(',')
             if args['account'] not in accounts:
                 msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
                 raise_error(config, msg, parser)
@@ -463,7 +463,10 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
 
     #If requesting all CPUs, user may as well use all memory
     if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
-        params['mem'] = MEM_PER_NODE_GB_LIMIT
+        if params['partition'] == 'HighMem':
+            params['mem'] = MEM_PER_NODE_GB_LIMIT_HIGHMEM
+        else:
+            params['mem'] = MEM_PER_NODE_GB_LIMIT
 
     #Use xvfb for plotting scripts, casacore for validate_input.py, and just python for run_bdsf.py
     plot = ('plot' in script)
@@ -796,7 +799,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
     write_bash_job_script(master, killScript, extn, 'echo scancel ${0}'.format(IDs), 'kill all the jobs', dir=dir, echo=echo)
     do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,CPUTime,MaxRSS,State,ExitCode" \$@ """.format(IDs,15+pad_length)
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
-    do = """echo "for ID in {$%s,}; do files=\$(ls %s/*\$ID* 2>/dev/null | wc -l); if [ \$((files)) != 0 ]; then ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows'; else echo %s/*\$ID* logs don\\'t exist \(yet\); fi; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR,LOG_DIR)
+    do = """echo "for ID in {$%s,}; do files=\$(ls %s/*\$ID* 2>/dev/null | wc -l); if [ \$((files)) != 0 ]; then ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows\|MeasTable::dUTC(Double)'; else echo %s/*\$ID* logs don\\'t exist \(yet\); fi; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do files=\$(ls %s/*\$ID* 2>/dev/null | wc -l); if [ \$((files)) != 0 ]; then logs=\$(ls %s/*\$ID* | sort -V); ls -f \$logs; cat \$(ls -tU \$logs) | grep INFO | head -n 1 | cut -d 'I' -f1; cat \$(ls -tr \$logs) | grep INFO | tail -n 1 | cut -d 'I' -f1; else echo %s/*\$ID* logs don\\'t exist \(yet\); fi; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, timingScript, extn, do, 'display start and end timestamps \(after pipeline has run\)', dir=dir, echo=echo)
