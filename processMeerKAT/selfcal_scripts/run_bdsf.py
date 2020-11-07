@@ -41,7 +41,7 @@ def run_bdsf(vis, nloops, nterms, loop, threshold, imsize):
 
     if not (type(threshold[loop]) is str and 'Jy' in threshold[loop]) and threshold[loop] > 1:
         thresh = threshold[loop]
-    elif len(threshold) > loop and not (type(threshold[loop+1]) is str and 'Jy' in threshold[loop+1]) and threshold[loop+1] > 1:
+    elif len(threshold) > loop-1 and not (type(threshold[loop+1]) is str and 'Jy' in threshold[loop+1]) and threshold[loop+1] > 1:
         thresh = threshold[loop+1]
     else:
         thresh = 10
