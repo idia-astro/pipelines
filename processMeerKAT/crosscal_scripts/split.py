@@ -23,7 +23,7 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
                 if not os.path.exists(outname):
 
                     split(vis=visname, outputvis=outname, datacolumn='corrected',
-                                field=fname, spw=spw, keepflags=False, keepmms=keepmms,
+                                field=fname, spw=spw, keepflags=True, keepmms=keepmms,
                                 width=specavg, timebin=timeavg)
 
                 if subf == fields.targetfield.split(',')[0]:
