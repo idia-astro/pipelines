@@ -245,7 +245,7 @@ def check_spw(config):
         high = int(round(ms_high-0.5))
         update = True
 
-    SPW = '*:{0}~{1}MHz'.format(low,high)
+    SPW = '0:{0}~{1}MHz'.format(low,high)
 
     if update:
         logger.warn('Default SPW outside SPW of input MS ({0}~{1}MHz). Forcing SPW={2}'.format(ms_low,ms_high,SPW))
