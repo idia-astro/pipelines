@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 __version__ = '1.1'
 
@@ -59,8 +59,8 @@ CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','
 SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
-CONTAINER = '/idia/software/containers/casa-stable-5.7.0.simg'
-MPI_WRAPPER = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
+CONTAINER = '/idia/software/containers/casa-6.simg'
+MPI_WRAPPER = 'mpirun'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
 POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
 SCRIPTS = [ ('validate_input.py',False,''),
@@ -302,7 +302,7 @@ def validate_args(args,config,parser=None):
     if args['account'] not in ['b03-idia-ag','b05-pipelines-ag']:
         from platform import node
         if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
-            accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30,cluster%15 | grep ilifu-slurm20 | grep -v 'Account\|--' | awk '{print $1}'); do echo -n $f,; done").read()[:-1].split(',')
+            accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30,cluster%15 | grep ilifu-slurm2021 | grep -v 'Account\|--' | awk '{print $1}'); do echo -n $f,; done").read()[:-1].split(',')
             if args['account'] not in accounts:
                 msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
                 raise_error(config, msg, parser)
@@ -311,7 +311,7 @@ def validate_args(args,config,parser=None):
             raise_error(config, msg, parser)
 
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,casacore=False,logfile=True,plot=False,SPWs='',nspw=1):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=False,casacore=False,logfile=True,plot=False,SPWs='',nspw=1):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -395,7 +395,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
-                container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,casacore=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
+                container=CONTAINER,partition="Main",time="12:00:00",casa_script=False,casacore=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -1001,7 +1001,7 @@ def default_config(arg_dict):
             params += ' -P'
         if arg_dict['verbose']:
             params += ' -v'
-        command = write_command('read_ms.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=True)
+        command = write_command('read_ms.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=False)
         logger.info('Extracting field IDs from MeasurementSet "{0}" using CASA.'.format(MS))
         logger.debug('Using the following command:\n\t{0}'.format(command))
         os.system(command)
@@ -1173,7 +1173,7 @@ def format_args(config,submit,quiet,dependencies):
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
     if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT and nspw > 1:
-        mem = mem // (nspw/2)
+        mem = int(mem // (nspw/2))
 
     dopol = config_parser.get_key(config, 'run', 'dopol')
     if not dopol and ('xy_yx_solve.py' in kwargs['scripts'] or 'xy_yx_apply.py' in kwargs['scripts']):

@@ -8,6 +8,10 @@ import config_parser
 from config_parser import validate_args as va
 import bookkeeping
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+import casampi
+
 def do_pre_flag(visname, fields, badfreqranges, badants):
 
     clip = [0., 50.]

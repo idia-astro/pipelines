@@ -16,6 +16,9 @@ import glob
 PLOT_DIR = 'plots'
 EXTN = 'pdf'
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime

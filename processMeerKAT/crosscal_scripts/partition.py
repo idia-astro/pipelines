@@ -13,6 +13,12 @@ import read_ms
 import processMeerKAT
 import bookkeeping
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+import casampi
+msmd = msmetadata()
+
 def do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms):
     # Get the .ms bit of the filename, case independent
     basename, ext = os.path.splitext(visname)

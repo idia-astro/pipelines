@@ -13,6 +13,10 @@ import processMeerKAT
 
 import logging
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+import casampi
+
 #@bookkeeping.run_script
 def mask_image(vis, nloops, atrous, nterms, restart_no, loop):
     basename = vis.replace('.ms', '') + '_im_%d'

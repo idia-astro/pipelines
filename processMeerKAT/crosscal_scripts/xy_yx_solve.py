@@ -11,6 +11,11 @@ from config_parser import validate_args as va
 from recipes.almapolhelpers import *
 from recipes import tec_maps
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+msmd = msmetadata()
+
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime

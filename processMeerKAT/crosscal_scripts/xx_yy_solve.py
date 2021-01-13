@@ -9,6 +9,9 @@ import config_parser
 import bookkeeping
 from config_parser import validate_args as va
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime

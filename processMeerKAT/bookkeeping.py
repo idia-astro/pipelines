@@ -1,7 +1,7 @@
 #Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import sys
 import traceback
@@ -71,8 +71,8 @@ def get_field_ids(fields):
 
 def polfield_name(visname):
 
-    import casac
-    msmd = casac.casac.msmetadata()
+    from casatools import msmetadata
+    msmd = msmetadata()
     msmd.open(visname)
     fieldnames = msmd.fieldnames()
     msmd.done()

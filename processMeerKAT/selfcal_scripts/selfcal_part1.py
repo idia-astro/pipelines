@@ -9,6 +9,10 @@ import config_parser
 from config_parser import validate_args as va
 import bookkeeping
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+import casampi
+
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime
@@ -54,4 +58,3 @@ if __name__ == '__main__':
 
     args,params = bookkeeping.get_selfcal_params()
     selfcal_part1(**params)
-

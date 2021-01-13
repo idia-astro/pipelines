@@ -11,6 +11,11 @@ import bookkeeping
 import os
 import numpy as np
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+msmd = msmetadata()
+
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime

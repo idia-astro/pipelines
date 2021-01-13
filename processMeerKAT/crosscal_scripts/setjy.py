@@ -3,13 +3,18 @@
 
 import os, sys, shutil
 
-import config_parser
 import bookkeeping
 from config_parser import validate_args as va
 import numpy as np
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime
+
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+import casampi
+msmd = msmetadata()
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)

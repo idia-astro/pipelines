@@ -8,6 +8,12 @@ import config_parser
 import bookkeeping
 from config_parser import validate_args as va
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+import casampi
+msmd = msmetadata()
+
 def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
     outputbase = os.path.splitext(os.path.split(visname)[1])[0]

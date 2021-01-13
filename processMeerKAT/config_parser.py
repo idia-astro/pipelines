@@ -1,10 +1,10 @@
 #Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import argparse
-import ConfigParser
+import configparser
 import ast
 import processMeerKAT
 
@@ -26,7 +26,7 @@ def parse_config(filename):
     should represent task parameters and values respectively.
     """
 
-    config = ConfigParser.SafeConfigParser(allow_no_value=True)
+    config = configparser.SafeConfigParser(allow_no_value=True)
     config.read(filename)
 
     # Build a nested dictionary with tasknames at the top level
@@ -177,4 +177,3 @@ if __name__ == '__main__':
     cliargs = parse_args()
     taskvals,config = parse_config(cliargs.config)
     print(taskvals)
-

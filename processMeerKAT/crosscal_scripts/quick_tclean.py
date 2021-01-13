@@ -9,6 +9,12 @@ from config_parser import validate_args as va
 import bookkeeping
 import glob
 
+from casatasks import *
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+import casampi
+msmd = msmetadata()
+
 def run_tclean(visname, fields, keepmms):
     """
     Run a quick and dirty tclean that will produce an image of the phase cal as well as the target.

@@ -1,7 +1,7 @@
 #Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import sys
 import os
 import numpy as np
@@ -9,13 +9,15 @@ import numpy as np
 import processMeerKAT
 import config_parser
 
+from casatasks import *
+from casatools import *
+
 logger = processMeerKAT.logger
 
 # Get access to the msmd module for read_ms.py
-import casac
-msmd = casac.casac.msmetadata()
-tb = casac.casac.table()
-me = casac.casac.measures()
+msmd = msmetadata()
+tb = table()
+me = measures()
 
 def get_fields(MS):
 
