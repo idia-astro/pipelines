@@ -11,6 +11,7 @@ EXTN = 'pdf'
 
 from casatasks import *
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casaplotms import *
 from casatools import msmetadata
 msmd = msmetadata()
 
