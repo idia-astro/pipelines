@@ -14,7 +14,7 @@ import processMeerKAT
 import bookkeeping
 
 from casatasks import *
-casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}.casa'.format(**os.environ))
+logfile=casalog.logfile()
 from casatools import msmetadata
 import casampi
 msmd = msmetadata()
@@ -41,10 +41,17 @@ def main(args,taskvals):
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool, default=False)
     refant = va(taskvals, 'crosscal', 'refant', str, default='m005')
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
+    nspw = va(taskvals, 'crosscal', 'nspw', int, default='')
     tasks = va(taskvals, 'slurm', 'ntasks_per_node', int)
     preavg = va(taskvals, 'crosscal', 'chanbin', int, default=1)
     include_crosshand = va(taskvals, 'run', 'dopol', bool, default=False)
     createmms = va(taskvals, 'crosscal', 'createmms', bool, default=True)
+
+    if nspw > 1:
+        casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}.casa'.format(**os.environ))
+    else:
+        logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
     msmd.open(visname)
     npol = msmd.ncorrforpol()[0]
@@ -63,4 +70,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

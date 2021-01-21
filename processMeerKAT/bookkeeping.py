@@ -164,7 +164,15 @@ def get_selfcal_params():
 
     return args,params
 
-def run_script(func):
+def rename_logs(logfile=''):
+
+    if logfile != '' and os.path.exists(logfile):
+        if 'SLURM_ARRAY_JOB_ID' in os.environ:
+            os.rename(logfile,'logs/{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}.mpi'.format(**os.environ))
+        else:
+            os.rename(logfile,'logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.mpi'.format(**os.environ))
+
+def run_script(func,logfile=''):
 
     # Get the name of the config file
     args = config_parser.parse_args()
@@ -179,6 +187,7 @@ def run_script(func):
     if continue_run:
         try:
             func(args,taskvals)
+            rename_logs(logfile)
         except Exception as err:
             logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
             logger.error(traceback.format_exc())
@@ -187,8 +196,10 @@ def run_script(func):
                 for SPW in spw.split(','):
                     spw_config = '{0}/{1}'.format(SPW.replace('0:',''),args['config'])
                     config_parser.overwrite_config(spw_config, conf_dict={'continue' : False}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
+            rename_logs(logfile)
             sys.exit(1)
     else:
         logger.error('Exception found in previous pipeline job, which set "continue=False" in [run] section of "{0}". Skipping "{1}".'.format(args['config'],os.path.split(sys.argv[2])[1]))
-        #os.system('./killJobs.sh') # and cancelling remaining jobs (scanel not found since /opt overwritten)
+        #os.system('./killJobs.sh') # and cancelling remaining jobs (scancel not found since /opt overwritten)
+        rename_logs(logfile)
         sys.exit(1)

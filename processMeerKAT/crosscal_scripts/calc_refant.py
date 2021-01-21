@@ -12,6 +12,7 @@ import os
 import numpy as np
 
 from casatasks import *
+logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 from casatools import msmetadata
 msmd = msmetadata()
@@ -107,4 +108,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)
