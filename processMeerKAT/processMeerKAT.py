@@ -57,7 +57,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
 SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','flag']
-IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'mask', 'rmsmap']
+IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-stable-5.7.0.simg'
@@ -312,6 +312,20 @@ def validate_args(args,config,parser=None):
             msg = "Accounting group '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['account'])
             raise_error(config, msg, parser)
 
+    if args['reservation'] != '':
+        from platform import node
+        if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
+            reservations=os.popen("scontrol show reservation | grep ReservationName | awk '{print $1}' | cut -d = -f2").read()[:-1].split('\n')
+            if args['reservation'] not in reservations:
+                msg = "Reservation '{0}' not recognised.".format(args['reservation'])
+                if reservations == ['']:
+                    msg += ' There are no active reservations.'
+                else:
+                     msg += ' Please select one of the following reservations, if applicable: {0}.'.format(reservations)
+                raise_error(config, msg, parser)
+        else:
+            msg = "Reservation '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['reservation'])
+            raise_error(config, msg, parser)
 
 def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=True,casacore=False,logfile=True,plot=False,SPWs='',nspw=1):
 
@@ -867,7 +881,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
     call : str
         srun call with arguments appended."""
 
-    call = 'srun --time={0} --mem={1}GB --partition={2}'.format(time,mem,arg_dict['partition'])
+    call = 'srun --time={0} --mem={1}GB --partition={2} --account={3}'.format(time,mem,arg_dict['partition'],arg_dict['account'])
     if qos:
         call += ' --qos qos-interactive'
     if arg_dict['exclude'] != '':
@@ -1121,7 +1135,7 @@ def format_args(config,submit,quiet,dependencies):
         selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
         bookkeeping.get_selfcal_params()
         if selfcal_kwargs['loop'] > 0:
-            logger.warning("Starting with loop={0}, which is only valid if previous loops were run in this directory.".format(selfcal_kwargs['loop']))
+            logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
 
     if config_parser.has_section(config,'image'):
         imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
@@ -1176,7 +1190,7 @@ def format_args(config,submit,quiet,dependencies):
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
     if not crosscal_kwargs['createmms']:
-        logger.info("You've set 'createmms = False' in '{0}', so forcing 'keepmms = False'. Will use single CPU for every job other than 'quick_tclean.py', if present.".format(config))
+        logger.info("You've set 'createmms = False' in '{0}', so forcing 'keepmms = False'. Will use single CPU for every job other than 'partition.py', 'quick_tclean.py' and 'selfcal_*.py', if present.".format(config))
         config_parser.overwrite_config(config, conf_dict={'keepmms' : False}, conf_sec='crosscal')
         kwargs['threadsafe'] = [False]*len(scripts)
 

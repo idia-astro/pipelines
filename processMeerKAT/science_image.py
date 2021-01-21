@@ -6,7 +6,7 @@ import os
 import config_parser
 import bookkeeping
 
-def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, mask, rmsmap):
+def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     imagename = visbase.replace('.mms', '.science_image') # Images will be produced in $CWD
@@ -16,7 +16,7 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
         threshold *= stats['min'][0]
 
     tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
-        imsize=imsize, cell=cell, stokes='I', gridder=gridder, specmode=specmode,
+        imsize=imsize, cell=cell, stokes=stokes, gridder=gridder, specmode=specmode,
         wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
         weighting='briggs', robust = robust, niter=niter, scales=multiscale,
         threshold=threshold, nterms=nterms, calcpsf=True, mask=mask,

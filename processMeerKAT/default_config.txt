@@ -25,7 +25,7 @@ account = 'b03-idia-ag'
 reservation = ''
 verbose = False
 precal_scripts = [('calc_refant.py',False,''), ('partition.py',True,'')]
-postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, '')]
+postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, ''), ('science_image.py', True, '')]
 scripts = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -86,8 +86,10 @@ gridder = 'wproject'
 deconvolver = 'mtmfs'
 restoringbeam = ''
 specmode = 'mfs'
+stokes = 'I'
 mask = ''
 rmsmap = ''
 
 [run]                             # Internal variables for pipeline execution
 continue = True
+dopol = False
