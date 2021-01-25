@@ -32,10 +32,10 @@ def check_output(fname,files,pattern,out,job='concat',filetype='image'):
         logger.info('Output file "{0}" already exists. Skipping {1}.'.format(out,job))
         return None
     elif len(files) == 0:
-        logger.warn("Didn't find any {0}s with '{1}'".format(filetype,pattern))
+        logger.warning("Didn't find any {0}s with '{1}'".format(filetype,pattern))
         return None
     elif len(files) == 1:
-        logger.warn("Only found 1 {0} with '{1}'. Will copy to this directory.".format(filetype,pattern))
+        logger.warning("Only found 1 {0} with '{1}'. Will copy to this directory.".format(filetype,pattern))
         copytree(files[0], out)
         return None
     return files

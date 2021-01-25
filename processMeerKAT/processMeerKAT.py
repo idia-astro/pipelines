@@ -1112,7 +1112,7 @@ def format_args(config,submit,quiet,dependencies):
 
     #Ensure nspw is integer
     if type(crosscal_kwargs['nspw']) is not int:
-        logger.warn("Argument 'nspw'={0} in '{1}' is not an integer. Will set to integer ({2}).".format(crosscal_kwargs['nspw']),config,int(crosscal_kwargs['nspw']))
+        logger.warning("Argument 'nspw'={0} in '{1}' is not an integer. Will set to integer ({2}).".format(crosscal_kwargs['nspw']),config,int(crosscal_kwargs['nspw']))
         crosscal_kwargs['nspw'] = int(crosscal_kwargs['nspw'])
 
     spw = crosscal_kwargs['spw']
@@ -1120,14 +1120,14 @@ def format_args(config,submit,quiet,dependencies):
     mem = int(kwargs['mem'])
 
     if nspw > 1 and len(kwargs['scripts']) == 0:
-        logger.warn('Setting nspw=1, since no "scripts" parameter in "{0}" is empty, so there\'s nothing run inside SPW directories.'.format(config))
+        logger.warning('Setting nspw=1, since no "scripts" parameter in "{0}" is empty, so there\'s nothing run inside SPW directories.'.format(config))
         config_parser.overwrite_config(config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
         nspw = 1
 
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
         if len(kwargs['precal_scripts']) > 0 or len(kwargs['postcal_scripts']) > 0:
-            logger.warn('Appending "precal_scripts" to beginning of "scripts", and "postcal_scripts" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
+            logger.warning('Appending "precal_scripts" to beginning of "scripts", and "postcal_scripts" to end of "scripts", since nspw=1. Overwritting this in "{0}".'.format(config))
 
             #Drop first instance of calc_refant.py from precal scripts in preference for one in scripts (after flag_round_1.py)
             if 'calc_refant.py' in [i[0] for i in kwargs['precal_scripts']] and 'calc_refant.py' in [i[0] for i in kwargs['scripts']]:
@@ -1177,7 +1177,7 @@ def format_args(config,submit,quiet,dependencies):
 
     dopol = config_parser.get_key(config, 'run', 'dopol')
     if not dopol and ('xy_yx_solve.py' in kwargs['scripts'] or 'xy_yx_apply.py' in kwargs['scripts']):
-        logger.warn("Cross-hand calibration scripts 'xy_yx_*' found in scripts. Forcing dopol=True in '[run]' section of '{0}'.".format(config))
+        logger.warning("Cross-hand calibration scripts 'xy_yx_*' found in scripts. Forcing dopol=True in '[run]' section of '{0}'.".format(config))
         config_parser.overwrite_config(config, conf_dict={'dopol' : True}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
 
     includes_partition = any('partition' in script for script in kwargs['scripts'])
@@ -1216,7 +1216,7 @@ def format_args(config,submit,quiet,dependencies):
     logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
     copyfile(config, TMP_CONFIG)
     if not quiet:
-        logger.warn("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
+        logger.warning("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
     return kwargs
 
@@ -1255,7 +1255,7 @@ def get_spw_bounds(spw):
         high = func(high)
 
         if unit != 'MHz':
-            logger.warn('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
+            logger.warning('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
         # Can only do when using CASA
         # if unit == '':
         #     msmd.open(MS)
@@ -1364,7 +1364,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
             filebase = os.path.split(basename)[1]
             extn = 'mms' if createmms else 'ms'
             vis = '{0}.{1}.{2}'.format(filebase,spw.replace('0:',''),extn)
-            logger.warn("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
+            logger.warning("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
             orig_vis = config_parser.get_key(spw_config, 'data', 'vis')
             config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
             config_parser.overwrite_config(spw_config, conf_dict={'vis' : "'{0}'".format(vis)}, conf_sec='data')
@@ -1400,7 +1400,7 @@ def get_config_kwargs(config,section,expected_keys):
     #Check for any unknown keys and display warning
     unknown_keys = list(set(kwargs) - set(expected_keys))
     if len(unknown_keys) > 0:
-        logger.warn("Unknown keys {0} present in section [{1}] in '{2}'.".format(unknown_keys,section,config))
+        logger.warning("Unknown keys {0} present in section [{1}] in '{2}'.".format(unknown_keys,section,config))
 
     #Check that expected keys are present, otherwise raise KeyError
     missing_keys = list(set(expected_keys) - set(kwargs))
