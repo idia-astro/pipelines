@@ -19,13 +19,13 @@ from casatools import msmetadata
 import casampi
 msmd = msmetadata()
 
-def do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms):
+def do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms, spwname):
     # Get the .ms bit of the filename, case independent
     basename, ext = os.path.splitext(visname)
     filebase = os.path.split(basename)[1]
     extn = 'mms' if createmms else 'ms'
 
-    mvis = '{0}.{1}.{2}'.format(filebase,spw.replace('0:',''),extn)
+    mvis = '{0}.{1}.{2}'.format(filebase,spwname,extn)
     nscan = 1 if not createmms else msmd.nscans()
     chanaverage = True if preavg > 1 else False
     correlation = '' if include_crosshand else 'XX,YY'
@@ -53,6 +53,12 @@ def main(args,taskvals):
         logfile=casalog.logfile()
         casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
+    if ',' in spw:
+        low,high,unit,dirs = config_parser.parse_spw(args['config'])
+        spwname = '{0:.0f}~{1:.0f}MHz'.format(min(low),max(high))
+    else:
+        spwname = spw.replace('0:','')
+
     msmd.open(visname)
     npol = msmd.ncorrforpol()[0]
 
@@ -60,7 +66,7 @@ def main(args,taskvals):
         npol = 2
     CPUs = npol if tasks*npol <= processMeerKAT.CPUS_PER_NODE_LIMIT else 1 #hard-code for number of polarisations
 
-    mvis = do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms)
+    mvis = do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms, spwname)
     mvis = "'{0}'".format(mvis)
     vis = "'{0}'".format(visname)
 

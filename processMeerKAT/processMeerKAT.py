@@ -511,6 +511,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     #SBATCH --time={time}
 
     export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    export btl_base_warn_component_unused=0
 
     {command}"""
 
