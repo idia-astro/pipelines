@@ -26,7 +26,12 @@ def main(args,taskvals):
     parameters look okay
     """
 
-    logger.info('This is version {0} of the pipeline'.format(processMeerKAT.__version__))
+    cwd=os.getcwd()
+    os.chdir(processMeerKAT.SCRIPT_DIR)
+    commit=os.popen('git log --format="%H" -n 1').read()
+    os.chdir(cwd)
+
+    logger.info('This is version {0} of the pipeline - commit ID {1}'.format(processMeerKAT.__version__,commit))
 
     visname = va(taskvals, 'data', 'vis', str)
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)

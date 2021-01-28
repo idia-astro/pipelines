@@ -9,6 +9,7 @@ import matplotlib
 # Agg doesn't need X - matplotlib doesn't work with xvfb
 matplotlib.use('Agg', warn=False)
 import matplotlib.pyplot as plt
+import numpy as np
 
 from config_parser import validate_args as va
 import bookkeeping

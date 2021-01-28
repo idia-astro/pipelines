@@ -8,7 +8,6 @@ import shutil
 import config_parser
 import bookkeeping, read_ms
 from config_parser import validate_args as va
-from recipes.almapolhelpers import *
 
 from casatasks import *
 logfile=casalog.logfile()

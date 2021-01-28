@@ -476,6 +476,8 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     elif 'run_bdsf.py' in script:
         casa_script = False
         casacore = False
+    elif script == 'xy_yx_solve.py':
+        casa_script = True
 
     #Limit number of concurrent jobs for partition so that no more than 200 CPUs used at once
     nconcurrent = int(200 / (params['nodes'] * params['tasks'] * params['cpus']))
@@ -1021,7 +1023,7 @@ def default_config(arg_dict):
 
             if count > 2:
                 if ss[0] == 'xx_yy_solve.py':
-                    arg_dict['scripts'][ind] = ('xy_yx_solve.py',arg_dict['scripts'][ind][1],arg_dict['scripts'][ind][2])
+                    arg_dict['scripts'][ind] = ('xy_yx_solve.py',arg_dict['scripts'][ind][1],'/idia/software/containers/casa-stable-6.1.0-118.simg')
                 if ss[0] == 'xx_yy_apply.py':
                     arg_dict['scripts'][ind] = ('xy_yx_apply.py',arg_dict['scripts'][ind][1],arg_dict['scripts'][ind][2])
 

@@ -8,14 +8,15 @@ import shutil
 import config_parser
 import bookkeeping
 from config_parser import validate_args as va
-from recipes.almapolhelpers import *
-from recipes import tec_maps
+from casarecipes.almapolhelpers import xyamb
+import numpy as np
 
-from casatasks import *
-logfile=casalog.logfile()
-casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
-from casatools import msmetadata
-msmd = msmetadata()
+# from casatasks import *
+# logfile=casalog.logfile()
+# casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+# from casatools import msmetadata
+# msmd = msmetadata()
+logfile=''
 
 import logging
 from time import gmtime
@@ -145,7 +146,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
             gaintype = 'XYf+QU', minblperant = minbaselines,
             preavg = 200.0,
             gaintable = [calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
-            gainfield = [fields.bpassfield, fields.bpassfield, polcal],
+            gainfield = [fields.bpassfield, fields.bpassfield, polfield],
             append = False)
     bookkeeping.check_file(xyfile)
 

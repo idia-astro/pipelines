@@ -9,6 +9,7 @@ import traceback
 import config_parser
 from collections import namedtuple
 import os
+import glob
 
 import logging
 from time import gmtime
@@ -168,9 +169,14 @@ def rename_logs(logfile=''):
 
     if logfile != '' and os.path.exists(logfile):
         if 'SLURM_ARRAY_JOB_ID' in os.environ:
-            os.rename(logfile,'logs/{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}.mpi'.format(**os.environ))
+            IDs = '{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}'.format(**os.environ)
         else:
-            os.rename(logfile,'logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.mpi'.format(**os.environ))
+            IDs = '{SLURM_JOB_NAME}-{SLURM_JOB_ID}'.format(**os.environ)
+
+        os.rename(logfile,'logs/{0}.mpi'.format(IDs))
+        for log in glob.glob('*.last'):
+            os.rename(log,'logs/{0}-{1}.last'.format(os.path.splitext(log)[0],IDs))
+
 
 def run_script(func,logfile=''):
 
