@@ -65,7 +65,6 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     if len(tables) == 0:
         logger.warning("No valid caltables with extention {} found.".format(table_ext))
-        return
 
     xdat = []
     xdaty = [] # Only used when plotting real

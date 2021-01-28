@@ -31,7 +31,7 @@ def do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms, spwna
     correlation = '' if include_crosshand else 'XX,YY'
 
     mstransform(vis=visname, outputvis=mvis, spw=spw, createmms=createmms, datacolumn='DATA', chanaverage=chanaverage, chanbin=preavg,
-                numsubms=nscan, separationaxis='scan', keepflags=False, usewtspectrum=True, nthreads=CPUs, antenna='*&', correlation=correlation)
+                numsubms=nscan, separationaxis='scan', keepflags=True, usewtspectrum=True, nthreads=CPUs, antenna='*&', correlation=correlation)
 
     return mvis
 

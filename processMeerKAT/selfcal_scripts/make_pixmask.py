@@ -18,18 +18,19 @@ logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 import casampi
 
-#@bookkeeping.run_script
-def mask_image(vis, nloops, atrous, nterms, restart_no, loop):
-    basename = vis.replace('.ms', '') + '_im_%d'
-    regionfile = basename % (loop + restart_no) + ".casabox"
-    maskfile = basename % (loop + restart_no) + ".islmask"
-    pixmask = basename % (loop + restart_no) + ".pixmask"
+def mask_image(vis, nloops, nterms, loop):
+
+    visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
+    basename = visbase.replace('.mms', '') + '_im_%d' # Images will be produced in $CWD
+    regionfile = basename % loop + ".casabox"
+    maskfile = basename % loop + ".islmask"
+    pixmask = basename % loop + ".pixmask"
 
     if loop == 0:
-        imagename = basename % (loop + restart_no)
+        imagename = basename % loop
     else:
         # Using the previous image to make curent mask
-        imagename = basename % (loop - 1 + restart_no)
+        imagename = basename % (loop - 1)
 
     # At this point the mask will always exist, since pybdsf is always run before this script.
     # So need to check that if none of .image.tt0 or .image exists, check for _nomask.image or _nomask.image.tt0
@@ -85,7 +86,7 @@ def mask_image(vis, nloops, atrous, nterms, restart_no, loop):
         if os.path.exists(im):
             shutil.rmtree(im)
 
-    return loop
+    return loop,pixmask
 
 
 logger = logging.getLogger(__name__)
@@ -93,5 +94,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 if __name__ == '__main__':
 
     args,params = bookkeeping.get_selfcal_params()
-    loop = mask_image(params['vis'], params['nloops'], params['atrous'], params['nterms'], params['restart_no'], params['loop'])
+    loop,pixmask = mask_image(params['vis'], params['nloops'], params['nterms'], params['loop'])
     config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')
+
+    if config_parser.has_section(args['config'], 'image'):
+        config_parser.overwrite_config(args['config'], conf_dict={'mask' : "'{0}'".format(pixmask)}, conf_sec='image')

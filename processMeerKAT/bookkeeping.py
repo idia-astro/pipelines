@@ -117,14 +117,11 @@ def get_selfcal_params():
 
     check_params = params.keys()
     check_params.pop(check_params.index('nloops'))
-    check_params.pop(check_params.index('restart_no'))
+    check_params.pop(check_params.index('loop'))
 
     params['vis'] = taskvals['data']['vis']
     params['refant'] = taskvals['crosscal']['refant']
-    if 'loop' not in params:
-        params['loop'] = 0
-    else:
-        check_params.pop(check_params.index('loop'))
+    params['dopol'] = taskvals['run']['dopol']
 
     for arg in check_params:
 
@@ -177,6 +174,17 @@ def rename_logs(logfile=''):
         for log in glob.glob('*.last'):
             os.rename(log,'logs/{0}-{1}.last'.format(os.path.splitext(log)[0],IDs))
 
+def get_imaging_params():
+
+    # Get the name of the config file
+    args = config_parser.parse_args()
+
+    # Parse config file
+    taskvals, config = config_parser.parse_config(args['config'])
+    params = taskvals['image']
+    params['vis'] = taskvals['data']['vis']
+
+    return args,params
 
 def run_script(func,logfile=''):
 

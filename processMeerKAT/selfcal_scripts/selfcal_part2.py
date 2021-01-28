@@ -20,41 +20,25 @@ logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
-                      deconvolver, robust, niter, multiscale, threshold, nterms,
-                      regionfile,loop):
-
-    # Rename image products for predict
-    models=glob.glob(imagename + '.model*')
-    images=glob.glob(imagename + '.image*')
-
-    for fname in images+models:
-        name, ext = os.path.splitext(fname)
-        os.rename(fname,name+'.round1'+ext)
-
-    startmodel = sorted(glob.glob(imagename + '.model*'))
+def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes, deconvolver,
+                  robust, niter, threshold, nterms, regionfile, loop):
 
     tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
-            wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=False,
-            weighting='briggs', robust = robust[loop], niter=0, scales=multiscale[loop],
-            threshold=threshold[loop], nterms=nterms[loop], calcpsf=False, calcres=False,
-            startmodel = startmodel, savemodel='modelcolumn', pblimit=-1,
-            mask='', parallel = False)
+            wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop],
+            weighting='briggs', robust = robust[loop], niter=0,
+            threshold=threshold[loop], nterms=nterms[loop], pblimit=-1, mask=regionfile,
+            savemodel='modelcolumn', restart=True, restoration=False, calcpsf=False, calcres=False, parallel = False)
 
-    #Rename image output to previous name
-    for fname in images:
-        name, ext = os.path.splitext(fname)
-        os.rename(name+'.round1'+ext,fname)
+def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter,
+                  threshold, uvrange, nterms, gridder, deconvolver, solint, calmode, flag):
 
-def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, niter, threshold,
-                multiscale, nterms, gridder, deconvolver, solint, calmode, atrous, refant, loop):
-
-    basename = vis.replace('.ms', '') + '_im_%d'
-    imagename = basename % (loop + restart_no)
-    #regionfile = basename % (loop + restart_no) + ".casabox"
-    pixmask = basename % (loop + restart_no) + ".pixmask"
-    caltable = vis.replace('.ms', '') + '.gcal%d' % (loop + restart_no)
+    visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
+    basename = visbase.replace('.mms', '') + '_im_%d' # Images will be produced in $CWD
+    imagename = basename % loop
+    pixmask = basename % loop + ".pixmask"
+    rmsfile = basename % loop + ".rms"
+    caltable = visbase.replace('.mms', '') + '.gcal%d' % loop
     prev_caltables = sorted(glob.glob('*.gcal?'))
 
     if loop == 0 and not os.path.exists(pixmask):
@@ -63,7 +47,7 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
     else:
         do_gaincal = True
 
-    if nterms[loop] > 1:
+    if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
         bdsfname = imagename + ".image.tt0"
     else:
         bdsfname = imagename + ".image"
@@ -71,18 +55,33 @@ def selfcal_part2(vis, nloops, restart_no, cell, robust, imsize, wprojplanes, ni
     fitsname = imagename + '.fits'
     exportfits(imagename = bdsfname, fitsimage=fitsname)
 
+    if not (type(threshold[loop]) is str and 'Jy' in threshold[loop]) and threshold[loop] > 1 and os.path.exists(rmsfile):
+        stats = imstat(imagename=rmsfile)
+        threshold[loop] *= stats['min'][0]
+
     if not os.path.exists(bdsfname):
         logger.error("Image {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(bdsfname,loop))
         return loop+1
     else:
         if do_gaincal:
+            if os.path.exists(caltable):
+                loop += 1
+                logger.info('Caltable {} exists. Not overwriting, continuing to next loop.'.format(caltable))
+                return loop
+
             predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
-                      deconvolver, robust, niter, multiscale, threshold, nterms,
-                      pixmask,loop)
+                      deconvolver, robust, niter, threshold, nterms, pixmask,loop)
 
             solnorm = 'a' in calmode[loop]
-            gaincal(vis=vis, caltable=caltable, selectdata=False, refant = refant, solint=solint[loop], solnorm=solnorm,
-                    normtype='median', gaintype='T', gaintable=prev_caltables, calmode=calmode[loop], append=False, parang=False)
+            normtype='median' #if solnorm else 'mean'
+            gaintype = 'T' if dopol else 'G'
+
+            gaincal(vis=vis, caltable=caltable, selectdata=True, refant = refant, solint=solint[loop], solnorm=solnorm,
+                    normtype=normtype,
+                    gaintype=gaintype,
+                    uvrange=uvrange[loop],
+                    gaintable=prev_caltables,
+                    calmode=calmode[loop], append=False, parang=False)
 
             loop += 1
 

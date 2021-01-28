@@ -56,13 +56,14 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
-SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
+SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','flag']
+IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-6.1.2.7-modular.simg'
 MPI_WRAPPER = 'mpirun'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
-POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
+POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, ''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
 SCRIPTS = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -94,9 +95,11 @@ def check_path(path,update=False):
     path : str
         Path to script or container (if path found and update=True)."""
 
+    newpath = path
+
     #Attempt to find path firstly in CWD, then directory up, then pipeline directories, then bash path.
     if os.path.exists(path) and path[0] != '/':
-        path = '{0}/{1}'.format(os.getcwd(),path)
+        newpath = '{0}/{1}'.format(os.getcwd(),path)
     if not os.path.exists(path) and path != '':
         if os.path.exists('../{0}'.format(path)):
             newpath = '../{0}'.format(path)
@@ -113,8 +116,6 @@ def check_path(path,update=False):
         else:
             #If it still doesn't exist, throw error
             raise IOError('File "{0}" not found.'.format(path))
-    else:
-        newpath = path
 
     if update:
         return newpath
@@ -202,6 +203,7 @@ def parse_args():
     parser.add_argument("-q","--quiet", action="store_true", required=False, default=False, help="Activate quiet mode, with suppressed output [default: False].")
     parser.add_argument("-P","--dopol", action="store_true", required=False, default=False, help="Perform polarization calibration in the pipeline [default: False].")
     parser.add_argument("-2","--do2GC", action="store_true", required=False, default=False, help="Perform (2GC) self-calibration in the pipeline [default: False].")
+    parser.add_argument("-I","--science_image", action="store_true", required=False, default=False, help="Create a science image [default: False].")
     parser.add_argument("-x","--nofields", action="store_true", required=False, default=False, help="Do not read the input MS to extract field IDs [default: False].")
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
@@ -310,6 +312,20 @@ def validate_args(args,config,parser=None):
             msg = "Accounting group '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['account'])
             raise_error(config, msg, parser)
 
+    if args['reservation'] != '':
+        from platform import node
+        if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
+            reservations=os.popen("scontrol show reservation | grep ReservationName | awk '{print $1}' | cut -d = -f2").read()[:-1].split('\n')
+            if args['reservation'] not in reservations:
+                msg = "Reservation '{0}' not recognised.".format(args['reservation'])
+                if reservations == ['']:
+                    msg += ' There are no active reservations.'
+                else:
+                     msg += ' Please select one of the following reservations, if applicable: {0}.'.format(reservations)
+                raise_error(config, msg, parser)
+        else:
+            msg = "Reservation '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['reservation'])
+            raise_error(config, msg, parser)
 
 def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=False,casacore=False,logfile=True,plot=False,SPWs='',nspw=1):
 
@@ -357,9 +373,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     params['plot_call'] = ''
     command = ''
 
-    #If script path doesn't exist and is not in user's bash path, assume it's in the calibration scripts directory
-    if not os.path.exists(script):
-        params['script'] = check_path(script, update=True)
+    params['script'] = check_path(script, update=True)
 
     #If specified by user, call script via CASA, call with xvfb-run, and write output to log file
     if plot:
@@ -451,7 +465,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
 
     #Use multiple CPUs for tclean and paratition scripts
     params['cpus'] = 1
-    if 'tclean' in script or 'selfcal' in script or 'bdsf' in script or 'partition' in script:
+    if 'tclean' in script or 'selfcal' in script or 'bdsf' in script or 'partition' in script or 'image' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
     #hard-code for 2/4 polarisations
     if 'partition' in script:
@@ -494,7 +508,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     params['exclude'] = '\n#SBATCH --exclude={0}'.format(exclude) if exclude != '' else ''
     params['reservation'] = '\n#SBATCH --reservation={0}'.format(reservation) if reservation != '' else ''
 
-    if 'selfcal' in script:
+    if 'selfcal' in script or 'image' in script:
         params['command'] = 'ulimit -n 16384\n' + params['command']
 
     contents = """#!/bin/bash{array}{exclude}{reservation}
@@ -622,6 +636,10 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
+        #Hack to put imaging at end
+        if config_parser.has_section(config,'image') and 'science_image.sbatch' in scripts:
+            scripts.pop(scripts.index('science_image.sbatch'))
+            scripts.append('science_image.sbatch')
 
     if len(scripts) > 0:
         command = "sbatch -d afterany:${IDs//,/:}"
@@ -715,10 +733,14 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Hack to perform correct number of selfcal loops
-    if 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
+    if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
         selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
+        #Hack to put imaging at end
+        if config_parser.has_section(config,'image') and 'science_image.sbatch' in scripts:
+            scripts.pop(scripts.index('science_image.sbatch'))
+            scripts.append('science_image.sbatch')
 
     command = 'sbatch'
 
@@ -862,7 +884,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
     call : str
         srun call with arguments appended."""
 
-    call = 'srun --time={0} --mem={1}GB --partition={2}'.format(time,mem,arg_dict['partition'])
+    call = 'srun --time={0} --mem={1}GB --partition={2} --account={3}'.format(time,mem,arg_dict['partition'],arg_dict['account'])
     if qos:
         call += ' --qos qos-interactive'
     if arg_dict['exclude'] != '':
@@ -979,12 +1001,19 @@ def default_config(arg_dict):
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
     config_parser.overwrite_config(filename, conf_dict={'dopol' : arg_dict['dopol']}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
 
-    if not arg_dict['do2GC']:
-        config_parser.remove_section(filename, 'selfcal')
+    if not arg_dict['do2GC'] or not arg_dict['science_image']:
+        remove_scripts = []
+        if not arg_dict['do2GC']:
+            config_parser.remove_section(filename, 'selfcal')
+            remove_scripts = ['selfcal_part1.py', 'selfcal_part2.py', 'run_bdsf.py', 'make_pixmask.py']
+        if not arg_dict['science_image']:
+            config_parser.remove_section(filename, 'image')
+            remove_scripts += ['science_image.py']
+
         scripts = arg_dict['postcal_scripts']
         i = 0
         while i < len(scripts):
-            if 'selfcal' in scripts[i][0] or 'bdsf' in scripts[i][0] or scripts[i][0] == 'make_pixmask.py':
+            if scripts[i][0] in remove_scripts:
                 scripts.pop(i)
                 i -= 1
             i += 1
@@ -1108,6 +1137,11 @@ def format_args(config,submit,quiet,dependencies):
     if config_parser.has_section(config,'selfcal'):
         selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
         bookkeeping.get_selfcal_params()
+        if selfcal_kwargs['loop'] > 0:
+            logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
+
+    if config_parser.has_section(config,'image'):
+        imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
 
     #Force submit=True if user has requested it during [-R --run]
     if submit:
@@ -1159,7 +1193,7 @@ def format_args(config,submit,quiet,dependencies):
     kwargs['containers'] = [check_path(i[2]) for i in scripts]
 
     if not crosscal_kwargs['createmms']:
-        logger.info("You've set 'createmms = False' in '{0}', so forcing 'keepmms = False'. Will use single CPU for every job other than 'quick_tclean.py', if present.".format(config))
+        logger.info("You've set 'createmms = False' in '{0}', so forcing 'keepmms = False'. Will use single CPU for every job other than 'partition.py', 'quick_tclean.py' and 'selfcal_*.py', if present.".format(config))
         config_parser.overwrite_config(config, conf_dict={'keepmms' : False}, conf_sec='crosscal')
         kwargs['threadsafe'] = [False]*len(scripts)
 

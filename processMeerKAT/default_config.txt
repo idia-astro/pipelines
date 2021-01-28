@@ -25,7 +25,7 @@ account = 'b03-idia-ag'
 reservation = ''
 verbose = False
 precal_scripts = [('calc_refant.py',False,''), ('partition.py',True,'')]
-postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, '')]
+postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, ''), ('science_image.py', True, '')]
 scripts = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -46,8 +46,8 @@ width = 1                         # Number of channels to (further) average afte
 timeavg = '8s'                    # Time interval to average after calibration (during split)
 createmms = True                  # Create MMS (True) or MS (False) for cross-calibration during partition
 keepmms = True                    # Output MMS (True) or MS (False) during split
-spw = '0:880~1680MHz'             # Spectral window / frequencies to extract for MMS
-nspw = 16                         # Number of spectral windows to split into
+spw = '0:880~933MHz,0:960~1010MHz,0:1010~1060MHz,0:1060~1110MHz,0:1110~1163MHz,0:1299~1350MHz,0:1350~1400MHz,0:1400~1450MHz,0:1450~1500MHz,0:1500~1524MHz,0:1630~1680MHz' # Spectral window / frequencies to extract for MMS
+nspw = 11                         # Number of spectral windows to split into
 calcrefant = False                # Calculate reference antenna in program (overwrites 'refant')
 refant = 'm059'                   # Reference antenna name / number
 standard = 'Stevens-Reynolds 2016'# Flux density standard for setjy
@@ -57,21 +57,39 @@ badfreqranges = [ '933~960MHz',   # List of bad frequency ranges (to flag)
                   '1524~1630MHz']
 
 [selfcal]
-nloops = 4                        # Number of clean + bdsf + self-cal loops.
-restart_no = 0                    # If nonzero, adds this number to nloops to name images
-cell = '2.0arcsec'
-robust = -0.5
-imsize = [5120, 5120]
-wprojplanes = 128
-niter = [8000, 11000, 14000, 15000, 200000]
-threshold = [100e-6, 50e-6, 20e-6, 10e-6, 4e-6] # In units of Jy
-multiscale = []
+nloops = 1                        # Number of clean + bdsf + self-cal loops.
+loop = 0                          # If nonzero, adds this number to nloops to name images
+cell = '1.5arcsec'
+robust = -2.0
+imsize = [4096, 4096]
+wprojplanes = 256
+niter = [10000, 50000]
+threshold = ['0.5mJy', 10]        # After loop 0, S/N values if >= 1.0, otherwise Jy
+uvrange = ''                      # uv range cutoff for gaincal
 nterms = 2                        # Number of taylor terms
 gridder = 'wproject'
 deconvolver = 'mtmfs'
-solint = ['10min','5min','2min','1min']
+solint = ['1min']
 calmode = 'p'
-atrous = False                     # Source find for diffuse emission (see PyBDSF docs)
+flag = False                      # Flag residual column after selfcal?
+
+[image]
+cell = '1.5arcsec'
+robust = -0.5
+imsize = [4096, 4096]
+wprojplanes = 256
+niter = 100000
+threshold = 10e-6                 # S/N value if >= 1.0 and rmsmap != '', otherwise Jy
+multiscale = [0, 5, 10, 15]
+nterms = 2                        # Number of taylor terms
+gridder = 'wproject'
+deconvolver = 'mtmfs'
+restoringbeam = ''
+specmode = 'mfs'
+stokes = 'I'
+mask = ''
+rmsmap = ''
 
 [run]                             # Internal variables for pipeline execution
 continue = True
+dopol = False
