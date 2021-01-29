@@ -139,21 +139,6 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     else:
         xyfile = xy0ambpfile
 
-    # Only run fluxscale if bootstrapping
-    if len(fields.gainfields) > 1:
-        logger.info(" starting fluxscale -> %s", calfiles.fluxfile)
-        fluxscale(vis=visname, caltable=calfiles.gainfile,
-                reference=[fields.fluxfield], transfer='',
-                fluxtable=calfiles.fluxfile, append=False, display=False,
-                listfile = os.path.join(caldir,'fluxscale_xy_yx.txt'))
-        bookkeeping.check_file(calfiles.fluxfile)
-
-    if polfield == fields.secondaryfield:
-        # Cannot resolve XY ambiguity so write into final file directly
-        xyfile = xy0pfile
-    else:
-        xyfile = xy0ambpfile
-
     logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
     gaincal(vis=visname, caltable = xyfile, field = polfield,
             refant = referenceant, solint = 'inf', combine = 'scan,2.5MHz',
