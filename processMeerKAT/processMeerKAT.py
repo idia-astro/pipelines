@@ -490,8 +490,6 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     elif 'run_bdsf.py' in script:
         casa_script = False
         casacore = False
-    elif script == 'xy_yx_solve.py':
-        casa_script = True
 
     #Limit number of concurrent jobs for partition so that no more than 200 CPUs used at once
     nconcurrent = int(200 / (params['nodes'] * params['tasks'] * params['cpus']))
@@ -507,6 +505,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         params['array'] = ''
     params['exclude'] = '\n#SBATCH --exclude={0}'.format(exclude) if exclude != '' else ''
     params['reservation'] = '\n#SBATCH --reservation={0}'.format(reservation) if reservation != '' else ''
+    params['casaddons'] = '\nexport PYTHONPATH=$PYTHONPATH:/idia/software/pipelines/casaaddons/' if 'xy_yx_solve' in scripts else ''
 
     if 'selfcal' in script or 'image' in script:
         params['command'] = 'ulimit -n 16384\n' + params['command']
@@ -524,8 +523,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     #SBATCH --partition={partition}
     #SBATCH --time={time}
 
-    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-    export btl_base_warn_component_unused=0
+    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK{casaaddons}
 
     {command}"""
 
@@ -1053,7 +1051,7 @@ def default_config(arg_dict):
 
             if count > 2:
                 if ss[0] == 'xx_yy_solve.py':
-                    arg_dict['scripts'][ind] = ('xy_yx_solve.py',arg_dict['scripts'][ind][1],'/idia/software/containers/casa-stable-6.1.0-118.simg')
+                    arg_dict['scripts'][ind] = ('xy_yx_solve.py',arg_dict['scripts'][ind][1],arg_dict['scripts'][ind][2])
                 if ss[0] == 'xx_yy_apply.py':
                     arg_dict['scripts'][ind] = ('xy_yx_apply.py',arg_dict['scripts'][ind][1],arg_dict['scripts'][ind][2])
 

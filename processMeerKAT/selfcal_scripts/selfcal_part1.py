@@ -95,3 +95,4 @@ if __name__ == '__main__':
 
     args,params = bookkeeping.get_selfcal_params()
     selfcal_part1(**params)
+    bookkeeping.rename_logs(logfile)

@@ -14,9 +14,11 @@ import processMeerKAT
 import logging
 
 from casatasks import *
+from casatools import *
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 import casampi
+ia=image()
 
 def mask_image(vis, nloops, nterms, loop):
 
@@ -99,3 +101,5 @@ if __name__ == '__main__':
 
     if config_parser.has_section(args['config'], 'image'):
         config_parser.overwrite_config(args['config'], conf_dict={'mask' : "'{0}'".format(pixmask)}, conf_sec='image')
+
+    bookkeeping.rename_logs(logfile)

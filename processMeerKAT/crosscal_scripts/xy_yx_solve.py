@@ -11,12 +11,11 @@ from config_parser import validate_args as va
 from casarecipes.almapolhelpers import xyamb
 import numpy as np
 
-# from casatasks import *
-# logfile=casalog.logfile()
-# casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
-# from casatools import msmetadata
-# msmd = msmetadata()
-logfile=''
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+msmd = msmetadata()
 
 import logging
 from time import gmtime

@@ -115,7 +115,7 @@ def get_selfcal_params():
     taskvals, config = config_parser.parse_config(args['config'])
     params = taskvals['selfcal']
 
-    check_params = params.keys()
+    check_params = list(params.keys())
     check_params.pop(check_params.index('nloops'))
     check_params.pop(check_params.index('loop'))
 

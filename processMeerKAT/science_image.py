@@ -6,6 +6,10 @@ import os
 import config_parser
 import bookkeeping
 
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+
 def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
@@ -26,3 +30,4 @@ if __name__ == '__main__':
 
     args,params = bookkeeping.get_imaging_params()
     science_image(**params)
+    bookkeeping.rename_logs(logfile)

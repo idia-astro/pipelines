@@ -93,3 +93,4 @@ if __name__ == '__main__':
     args,params = bookkeeping.get_selfcal_params()
     loop = selfcal_part2(**params)
     config_parser.overwrite_config(args['config'], conf_dict={'loop' : loop},  conf_sec='selfcal')
+    bookkeeping.rename_logs(logfile)
