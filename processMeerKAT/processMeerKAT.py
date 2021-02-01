@@ -505,7 +505,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         params['array'] = ''
     params['exclude'] = '\n#SBATCH --exclude={0}'.format(exclude) if exclude != '' else ''
     params['reservation'] = '\n#SBATCH --reservation={0}'.format(reservation) if reservation != '' else ''
-    params['casaddons'] = '\nexport PYTHONPATH=$PYTHONPATH:/idia/software/pipelines/casaaddons/' if 'xy_yx_solve' in scripts else ''
+    params['casaaddons'] = '\nexport PYTHONPATH=$PYTHONPATH:/idia/software/pipelines/casaaddons/' if 'xy_yx_solve' in script else ''
 
     if 'selfcal' in script or 'image' in script:
         params['command'] = 'ulimit -n 16384\n' + params['command']

@@ -12,12 +12,13 @@ import bookkeeping
 import processMeerKAT
 
 import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 from casatasks import *
 from casatools import *
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
-import casampi
 ia=image()
 
 def mask_image(vis, nloops, nterms, loop):
@@ -90,9 +91,6 @@ def mask_image(vis, nloops, nterms, loop):
 
     return loop,pixmask
 
-
-logger = logging.getLogger(__name__)
-logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 if __name__ == '__main__':
 
     args,params = bookkeeping.get_selfcal_params()
