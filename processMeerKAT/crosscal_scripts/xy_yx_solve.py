@@ -151,9 +151,9 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     if polfield != fields.secondaryfield:
         logger.info("\n Check for x-y phase ambiguity.")
-        logger.info("Polarization qu is ", polqu)
+        logger.info("Polarization qu is " + polqu)
         S = xyamb(xytab=xy0ambpfile, qu=polqu, xyout = xy0pfile)
-        logger.info("smodel = ", S)
+        logger.info("smodel = " + S)
 
 
 def main(args,taskvals):
