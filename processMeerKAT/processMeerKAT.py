@@ -63,7 +63,7 @@ SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_sc
 CONTAINER = '/idia/software/containers/casa-6.1.2.7-modular.simg'
 MPI_WRAPPER = 'mpirun'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
-POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, ''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
+POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
 SCRIPTS = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -630,9 +630,9 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     scripts = postcal_scripts[:]
 
     #Hack to perform correct number of selfcal loops
-    if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
+    if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
         selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
-        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
+        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
         #Hack to put imaging at end
         if config_parser.has_section(config,'image') and 'science_image.sbatch' in scripts:
@@ -731,9 +731,9 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
 
     #Hack to perform correct number of selfcal loops
-    if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts and 'run_bdsf.sbatch' in scripts and 'make_pixmask.sbatch' in scripts:
+    if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
         selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
-        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch','run_bdsf.sbatch','make_pixmask.sbatch']*(selfcal_loops))
+        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
         #Hack to put imaging at end
         if config_parser.has_section(config,'image') and 'science_image.sbatch' in scripts:
@@ -1003,7 +1003,7 @@ def default_config(arg_dict):
         remove_scripts = []
         if not arg_dict['do2GC']:
             config_parser.remove_section(filename, 'selfcal')
-            remove_scripts = ['selfcal_part1.py', 'selfcal_part2.py', 'run_bdsf.py', 'make_pixmask.py']
+            remove_scripts = ['selfcal_part1.py', 'selfcal_part2.py']
         if not arg_dict['science_image']:
             config_parser.remove_section(filename, 'image')
             remove_scripts += ['science_image.py']
