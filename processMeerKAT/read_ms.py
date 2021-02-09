@@ -141,6 +141,11 @@ def check_refant(MS,refant,config,warn=True):
     warn : bool, optional
         Warn the user? If False, raise ValueError."""
 
+    try:
+        refant = int(refant)
+    except ValueError: # It's not an int, but a str
+        pass
+
     msmd.open(MS)
     if type(refant) is str:
         ants = msmd.antennanames()
