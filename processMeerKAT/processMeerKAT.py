@@ -60,7 +60,7 @@ SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','n
 IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
-CONTAINER = '/idia/software/containers/casa-6.1.2.7-modular.simg'
+CONTAINER = '/idia/software/containers/casa-6.simg'
 MPI_WRAPPER = 'mpirun'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
 POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
@@ -75,7 +75,7 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
             ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,'')]
+            ('plot_solutions.py',False,'/idia/software/containers/casa-stable-5.7.2-4.simg')]
 
 
 def check_path(path,update=False):
@@ -327,7 +327,7 @@ def validate_args(args,config,parser=None):
             msg = "Reservation '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['reservation'])
             raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=False,casacore=False,logfile=True,plot=False,SPWs='',nspw=1):
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=False,logfile=True,plot=False,SPWs='',nspw=1):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -345,8 +345,6 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         Path to singularity container used for this job.
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?
-    casacore : bool, optional
-        Is the script that is called within this job a casacore script?
     logfile : bool, optional
         Write the CASA output to a log file? Only used if casa_script==True.
     plot : bool, optional
@@ -381,12 +379,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     if logfile:
         params['casa_log'] = '--logfile {LOG_DIR}/{job}.casa'.format(**params)
     if casa_script:
-        params['casa_call'] = "{plot_call} casa --nologger --nogui {casa_log} -c".format(**params)
-    if casacore:
-        params['singularity_call'] = 'run' #points to python that comes with CASA, including casac
+        params['casa_call'] = "casa --nologger --nogui {casa_log} -c".format(**params)
     else:
-        params['singularity_call'] = 'exec'
-    if not casa_script and not casacore:
         params['casa_call'] = 'python'
 
     if arrayJob:
@@ -397,11 +391,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
         """ % SPWs.replace(',',' ').replace('0:','')
 
-    command += "{mpi_wrapper} singularity {singularity_call} {container} {casa_call} {script} {args}".format(**params)
+    command += "{mpi_wrapper} singularity exec {container} {plot_call} {casa_call} {script} {args}".format(**params)
 
-    #Get rid of annoying msmd output from casacore call
-    if casacore:
-        command += " 2>&1 | grep -v 'msmetadata_cmpt.cc::open\|MSMetaData::_computeScanAndSubScanProperties\|MeasIERS::fillMeas(MeasIERS::Files, Double)\|Position:'"
     if arrayJob:
         command += '\ncd ..\n'
 
@@ -409,7 +400,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
-                container=CONTAINER,partition="Main",time="12:00:00",casa_script=False,casacore=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
+                container=CONTAINER,partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -445,8 +436,6 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         Time limit to use for this job, in the form d-hh:mm:ss.
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?
-    casacore : bool, optional
-        Is the script that is called within this job a casacore script?
     SPWs : str, optional
         Comma-separated list of spw ranges.
     nspw : int, optional
@@ -465,7 +454,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
 
     #Use multiple CPUs for tclean and paratition scripts
     params['cpus'] = 1
-    if 'tclean' in script or 'selfcal' in script or 'bdsf' in script or 'partition' in script or 'image' in script:
+    if 'tclean' in script or 'selfcal' in script or 'partition' in script or 'image' in script:
         params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
     #hard-code for 2/4 polarisations
     if 'partition' in script:
@@ -482,21 +471,17 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         else:
             params['mem'] = MEM_PER_NODE_GB_LIMIT
 
-    #Use xvfb for plotting scripts, casacore for validate_input.py, and just python for run_bdsf.py
+    #Use xvfb for plotting scripts
     plot = ('plot' in script)
-    if script == 'validate_input.py':
-        casa_script = False
-        casacore = True
-    elif 'run_bdsf.py' in script:
-        casa_script = False
-        casacore = False
+    if 'plot_solutions' in script:
+        casa_script = True
 
     #Limit number of concurrent jobs for partition so that no more than 200 CPUs used at once
     nconcurrent = int(200 / (params['nodes'] * params['tasks'] * params['cpus']))
     if nconcurrent > nspw:
         nconcurrent = nspw
 
-    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,nspw=nspw,casacore=casacore)
+    params['command'] = write_command(script,args,name=name,mpi_wrapper=mpi_wrapper,container=container,casa_script=casa_script,plot=plot,SPWs=SPWs,nspw=nspw)
     if 'partition' in script and ',' in SPWs and nspw > 1:
         params['ID'] = '%A_%a'
         params['array'] = '\n#SBATCH --array=0-{0}%{1}'.format(nspw-1,nconcurrent)
@@ -505,7 +490,6 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         params['array'] = ''
     params['exclude'] = '\n#SBATCH --exclude={0}'.format(exclude) if exclude != '' else ''
     params['reservation'] = '\n#SBATCH --reservation={0}'.format(reservation) if reservation != '' else ''
-    params['casaaddons'] = '\nexport PYTHONPATH=$PYTHONPATH:/idia/software/pipelines/casaaddons/' if 'xy_yx_solve' in script else ''
 
     if 'selfcal' in script or 'image' in script:
         params['command'] = 'ulimit -n 16384\n' + params['command']
@@ -523,7 +507,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     #SBATCH --partition={partition}
     #SBATCH --time={time}
 
-    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK{casaaddons}
+    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
     {command}"""
 
@@ -1031,7 +1015,7 @@ def default_config(arg_dict):
             params += ' -P'
         if arg_dict['verbose']:
             params += ' -v'
-        command = write_command('read_ms.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False,casa_script=False,casacore=False)
+        command = write_command('read_ms.py', params, mpi_wrapper=mpi_wrapper, container=arg_dict['container'],logfile=False)
         logger.info('Extracting field IDs from MeasurementSet "{0}" using CASA.'.format(MS))
         logger.debug('Using the following command:\n\t{0}'.format(command))
         os.system(command)
@@ -1243,7 +1227,7 @@ def format_args(config,submit,quiet,dependencies):
     if dependencies != '':
         kwargs['dependencies'] = dependencies
 
-    if len(kwargs['scripts']) == 0:
+    if len(kwargs['scripts']) == 0 and nspw == 1:
         logger.error('Nothing to do. Please insert scripts into "scripts" parameter in "{0}".'.format(config))
         #sys.exit(1)
 

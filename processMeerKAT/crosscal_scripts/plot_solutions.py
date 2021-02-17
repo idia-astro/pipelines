@@ -9,12 +9,13 @@ import glob
 PLOT_DIR = 'plots'
 EXTN = 'pdf'
 
-from casatasks import *
-logfile=casalog.logfile()
-casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
-from casaplotms import *
-from casatools import msmetadata
-msmd = msmetadata()
+# from casatasks import *
+# logfile=casalog.logfile()
+# casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+# from casaplotms import *
+# from casatools import msmetadata
+# msmd = msmetadata()
+logfile=''
 
 def sort_by_antenna(fname):
 
