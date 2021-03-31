@@ -171,6 +171,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA MeasurementSet. Version: {0}'.format(__version__))
 
+    parser.add_argument("--cluster",metavar='name', required=False, type=str, default="ilifu", help="Name of cluster being used [default: ilifu; allowed: galahad, ilifu]")
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
@@ -265,6 +266,10 @@ def validate_args(args,config,parser=None):
         Path to config file.
     parser : class ``argparse.ArgumentParser``, optional
         If this is input, parser error will be raised."""
+
+    if args['cluster'] not in ['ilifu','galahad']:
+        msg = "The selected cluster must be one of [ilifu, galahad]. Pipeline has not been implemented for other clusters yet."
+        raise_error(config, msg, parser)
 
     if parser is None or args['build']:
         if args['MS'] is None and not args['nofields']:
@@ -396,7 +401,6 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
                 container=CONTAINER,partition="Main",time="12:00:00",casa_script=True,casacore=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
-
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
     Arguments:
@@ -495,23 +499,38 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     if 'selfcal' in script:
         params['command'] = 'ulimit -n 16384\n' + params['command']
 
-    contents = """#!/bin/bash{array}{exclude}{reservation}
-    #SBATCH --account={account}
-    #SBATCH --nodes={nodes}
-    #SBATCH --ntasks-per-node={tasks}
-    #SBATCH --cpus-per-task={cpus}
-    #SBATCH --mem={mem}GB
-    #SBATCH --job-name={runname}{name}
-    #SBATCH --distribution=plane={plane}
-    #SBATCH --output={LOG_DIR}/%x-{ID}.out
-    #SBATCH --error={LOG_DIR}/%x-{ID}.err
-    #SBATCH --partition={partition}
-    #SBATCH --time={time}
+    if params['cluster']=='ilifu':
+        contents = """#!/bin/bash{array}{exclude}{reservation}
+        #SBATCH --account={account}
+        #SBATCH --nodes={nodes}
+        #SBATCH --ntasks-per-node={tasks}
+        #SBATCH --cpus-per-task={cpus}
+        #SBATCH --mem={mem}GB
+        #SBATCH --job-name={runname}{name}
+        #SBATCH --distribution=plane={plane}
+        #SBATCH --output={LOG_DIR}/%x-{ID}.out
+        #SBATCH --error={LOG_DIR}/%x-{ID}.err
+        #SBATCH --partition={partition}
+        #SBATCH --time={time}
 
-    export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+        export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-    {command}"""
+        {command}"""
+    elif params['cluster'] == 'galahad':
+        contents="""#!/bin/bash{array}{exclude}{reservation}
+        #SBATCH --nodes={nodes}
+        #SBATCH --threads=16
+        #SBATCH --cpus-per-task=1
+        #SBATCH --mem=1000GB
+        #SBATCH --job-name={runname}{name}
+        #SBATCH --output={LOG_DIR}/%x-{ID}.out
+        #SBATCH --error={LOG_DIR}/%x-{ID}.err
+        #SBATCH --partition={partition}
+        #SBATCH --time={time}
+        #SBATCH -w compute-0-100
 
+        {command}
+        """
     #insert arguments and remove whitespace
     contents = contents.format(**params).replace("    ","")
 
@@ -520,6 +539,9 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     config = open(sbatch,'w')
     config.write(contents)
     config.close()
+
+    if params['cluster'] == 'galahad':
+        print("Galahad sbatch file content formated as:\n{0}".format(contents))
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
@@ -1434,6 +1456,55 @@ def main():
     #Parse command-line arguments, and setup logger
     args = parse_args()
     setup_logger(args.config,args.verbose)
+
+    # Cluster adaptations if required
+    if args.cluser=='galahad':
+        print('Configuring pipeline for use on Galahad ...')
+        args['partition']='WHEEL'
+        args['mem']=1000
+        MEM_PER_NODE_GB_LIMIT_HIGHMEM = 1000
+        MEM_PER_NODE_GB_LIMIT = 1000
+        # Set global limits for current ilifu cluster configuration
+        TOTAL_NODES_LIMIT = 1
+        CPUS_PER_NODE_LIMIT = 16
+        NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
+        MEM_PER_NODE_GB_LIMIT = 1000 #237568 MB
+        MEM_PER_NODE_GB_LIMIT_HIGHMEM = 1300 #491520 MB
+
+        # Set global values for paths and file names
+        THIS_PROG = __file__
+        SCRIPT_DIR = os.path.dirname(THIS_PROG)
+        LOG_DIR = 'logs'
+        CALIB_SCRIPTS_DIR = 'crosscal_scripts'
+        AUX_SCRIPTS_DIR = 'aux_scripts'
+        SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
+        CONFIG = 'default_config.txt'
+        TMP_CONFIG = '.config.tmp'
+        MASTER_SCRIPT = 'submit_pipeline.sh'
+
+        #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
+        FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
+        CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
+        SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
+        SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
+        SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
+        CONTAINER = '/share/nas/mbowles/mightee/casa-stable.simg'
+        MPI_WRAPPER = CONTAINER # Fairly certain this shouldnt work, but it might.
+        PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
+        POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
+        SCRIPTS = [ ('validate_input.py',False,''),
+                    ('flag_round_1.py',True,''),
+                    ('calc_refant.py',False,''),
+                    ('setjy.py',True,''),
+                    ('xx_yy_solve.py',False,''),
+                    ('xx_yy_apply.py',True,''),
+                    ('flag_round_2.py',True,''),
+                    ('xx_yy_solve.py',False,''),
+                    ('xx_yy_apply.py',True,''),
+                    ('split.py',True,''),
+                    ('quick_tclean.py',True,''),
+                    ('plot_solutions.py',False,'')]
+
 
     #Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
