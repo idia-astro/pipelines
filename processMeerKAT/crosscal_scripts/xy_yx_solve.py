@@ -24,7 +24,7 @@ def qu_polfield(polfield, visname):
     """
 
     msmd.open(visname)
-    meanfreq = msmd.meanfreq(0, unit='GHz')
+    meanfreq = msmd.meanfreq(0, unit='MHz')
     msmd.done()
 
     if polfield in ["3C286", "1328+307", "1331+305", "J1331+3030"]:
