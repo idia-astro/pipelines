@@ -1190,6 +1190,10 @@ def format_args(config,submit,quiet,dependencies):
     if 'quick_tclean.py' in kwargs['scripts']:
         kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = True
 
+    #Set threadsafe=True for quick-tclean, as this uses MPI even for an MS
+    if 'selfcal_part1.py' in kwargs['scripts']:
+        kwargs['threadsafe'][kwargs['scripts'].index('selfcal_part1.py')] = True
+
     #Only reduce the memory footprint if we're not using all CPUs on each node
     if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT and nspw > 1:
         mem = int(mem // (nspw/2))

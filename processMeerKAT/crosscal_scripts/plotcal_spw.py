@@ -18,6 +18,8 @@ PLOT_DIR = 'plots'
 EXTN = 'pdf'
 
 from casatasks import *
+from casatools import table
+tb = table()
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
