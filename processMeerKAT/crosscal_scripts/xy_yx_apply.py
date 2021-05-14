@@ -31,9 +31,9 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
     if polfield == fields.secondaryfield:
         # Cannot resolve XY ambiguity so write into final file directly
-        xyfile = xy0pfile
-    else:
         xyfile = xy0ambpfile
+    else:
+        xyfile = xy0pfile
 
     calfiles = calfiles._replace(xpolfile=xyfile)
 

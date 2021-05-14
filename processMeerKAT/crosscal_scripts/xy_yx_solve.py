@@ -24,7 +24,7 @@ def qu_polfield(polfield, visname):
     """
 
     msmd.open(visname)
-    meanfreq = msmd.meanfreq(0, unit='MHz')
+    meanfreq = msmd.meanfreq(0, unit='GHz')
     msmd.done()
 
     if polfield in ["3C286", "1328+307", "1331+305", "J1331+3030"]:
@@ -37,6 +37,10 @@ def qu_polfield(polfield, visname):
         perley_frac = np.array([0.056,0.075,0.084])
         perley_f = np.array([1050,1450,1640])
         pa_polcal = np.array([-14.0,-11.0,-10.0])
+    elif polfield in ["3C48", "0134+329", "0137+331", "J0137+3309"]:
+        perley_frac = np.array([0.003, 0.005, 0.007])
+        perley_f = np.array([1050,1450,1640])
+        pa_polcal = np.array([25, 140, -5])
     else:
         # This should never happen.
         raise ValueError("Invalid polarization field. Exiting.")
@@ -88,7 +92,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
             field = fields.bpassfield, refant = referenceant,
-            minblperant = minbaselines, solnorm = False,  solint = '10min',
+            minblperant = minbaselines, solnorm = False,  solint = 'inf',
             combine = 'scan', bandtype = 'B', fillgaps = 8,
             parang = False, append = False)
     bookkeeping.check_file(calfiles.bpassfile)
@@ -106,7 +110,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     gaincal(vis=visname, caltable = calfiles.gainfile,
             field = fields.gainfields, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'T',
-            solint = 'inf', combine = '', calmode='ap',
+            solint = '10min', combine = '', calmode='ap',
             gaintable=[calfiles.bpassfile,calfiles.dpolfile],
             gainfield=[fields.bpassfield,fields.bpassfield],
             parang = False, append = False)
