@@ -63,7 +63,16 @@ def get_fields(MS):
     fieldIDs['phasecalfield'] = get_field(MS,phasecal_intent,'phasecalfield',extra_fields,default=default)
     fieldIDs['targetfields'] = get_field(MS,'TARGET','targetfields',extra_fields,default=default,multiple=True)
 
-    #Put any extra fields in target fields
+    if 'UNKNOWN' in intents:
+        try:
+            polfields = np.array(msmd.namesforfields(msmd.fieldsforintent('UNKNOWN'))) #bogus MeerKAT mislabelling during conversion to MS
+            for polfield in polfields:
+                if polfield not in extra_fields:
+                    extra_fields.append(polfield)
+        except RuntimeError as e:
+            logger.warning("Intent 'UNKNOWN' present in MS but couldn't find any fields with this intent.")
+
+    #Put any extra fields in extra_fields
     if len(extra_fields) > 0:
         fieldIDs['extrafields'] = "'{0}'".format(','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
 
@@ -95,7 +104,7 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
     fieldIDs : str
         Extracted field ID(s), comma-seperated for multiple fields."""
 
-    fields = msmd.fieldsforintent(intent)
+    fields = np.array(msmd.namesforfields(msmd.fieldsforintent(intent)))
 
     if fields.size == 0:
         logger.warning('Intent "{0}" not found in dataset "{1}". Setting to "{2}"'.format(intent,MS,default))
@@ -120,7 +129,7 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
             logger.warning('Only using field "{0}" for "{1}", which has the most scans ({2}).'.format(maxfield,fieldname,maxscan))
             fieldIDs = "'{0}'".format(maxfield)
 
-            #Put any extra fields with intent CALIBRATE_BANDPASS in target field
+            #Put any extra fields with the same intent in extra fields
             extras = list(set(fields) - set(extra_fields) - set([maxfield]))
             if len(extras) > 0:
                logger.warning('Putting extra fields with intent "{0}" in "extrafields" - {1}'.format(intent,extras))
@@ -366,7 +375,8 @@ def main():
     npol = msmd.ncorrforpol()[0]
     parang = 0
     if 'phasecalfield' in fields:
-        parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
+        calfield = msmd.fieldsforname(fields['phasecalfield'][1:-1])[0] #remove '' from field and convert to int
+        parang = parang_coverage(args.MS, calfield)
 
     if npol < 4:
         logger.warning("Only {0} polarisations present in '{1}'. Any attempted polarisation calibration will fail, so setting dopol=False in [run] section of '{2}'.".format(npol,args.MS,args.config))

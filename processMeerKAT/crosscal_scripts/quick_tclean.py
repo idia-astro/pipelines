@@ -48,8 +48,9 @@ def run_tclean(visname, fields, keepmms):
 
     #Store target names
     targimname = []
-    for tt in fields.targetfield.split(','):
-        fname = msmd.namesforfields(int(tt))[0]
+    for fname in fields.targetfield.split(','):
+        if fname.isdigit():
+            fname = msmd.namesforfields(int(fname))[0]
         tmpname = os.path.splitext(os.path.split(visname)[1])[0] + '_%s.im' % (fname)
         targimname.append(os.path.join(impath, tmpname))
 
@@ -60,7 +61,10 @@ def run_tclean(visname, fields, keepmms):
         else:
             field = fields.targetfield
 
-        fname = msmd.namesforfields(int(field))[0]
+        if field.isdigit():
+            fname = msmd.namesforfields(int(field))[0]
+        else:
+            fname = field
         inname = '%s.%s.%s' % (os.path.splitext(os.path.split(visname)[1])[0], fname, extn)
 
         if len(glob.glob(tt + '*')) == 0:
@@ -75,9 +79,10 @@ def run_tclean(visname, fields, keepmms):
 
 
     #Image all calibrator (and extra) fields and export to fits
-    for subf in fields.gainfields.split(',') + fields.extrafields.split(','):
-        if subf != '':
-            fname = msmd.namesforfields(int(subf))[0]
+    for fname in fields.gainfields.split(',') + fields.extrafields.split(','):
+        if fname != '':
+            if fname.isdigit():
+                fname = msmd.namesforfields(int(fname))[0]
 
             secimname = os.path.splitext(os.path.split(visname)[1])[0]
             inname = '%s.%s.%s' % (secimname, fname, extn)

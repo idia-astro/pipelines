@@ -23,8 +23,9 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
     for field in fields:
         if field != '':
-            for subf in field.split(','):
-                fname = msmd.namesforfields(int(subf))[0]
+            for fname in field.split(','):
+                if fname.isdigit():
+                    fname = msmd.namesforfields(int(fname))[0]
 
                 outname = '%s.%s.%s' % (outputbase, fname, extn)
                 if not os.path.exists(outname):

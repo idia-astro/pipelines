@@ -78,8 +78,9 @@ def do_concat(visname, fields, dirs='*MHz'):
 
     for field in [fields.targetfield,fields.gainfields,fields.extrafields]:
         if field != '':
-            for target in field.split(','):
-                fname = msmd.namesforfields(int(target))[0]
+            for fname in field.split(','):
+                if fname.isdigit():
+                    fname = msmd.namesforfields(int(fname))[0]
 
                 #Concat tt0 images (into continuum cube)
                 suffix = 'images/*{0}*image.tt0'.format(fname)

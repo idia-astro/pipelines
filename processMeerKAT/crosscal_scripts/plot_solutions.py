@@ -125,8 +125,9 @@ def main(args,taskvals):
     extn = 'mms' if keepmms else 'ms'
     for field in fields:
         if field != '':
-            for subf in field.split(','):
-                fname = msmd.namesforfields(int(subf))[0]
+            for fname in field.split(','):
+                if fname.isdigit():
+                    fname = msmd.namesforfields(int(fname))[0]
                 inname = '%s.%s.%s' % (os.path.splitext(visname)[0], fname, extn)
                 if not os.path.exists('{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname)):
                     plotms(vis=inname, xaxis='freq', yaxis='Amp', coloraxis='corr', plotfile='{0}/{1}_freq_amp.png'.format(PLOT_DIR,fname),showgui=False)

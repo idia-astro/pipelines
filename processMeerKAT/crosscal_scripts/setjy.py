@@ -37,7 +37,10 @@ def do_setjy(visname, spw, fields, standard, dopol=False, createmms=True):
     ismms = createmms
 
     msmd.open(visname)
-    fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(",")])
+    fnames = fields.fluxfield.split(",")
+    for fname in fnames:
+        if fname.isdigit():
+            fname = msmd.namesforfields(int(fname))
 
     do_manual = False
     for ff in fluxlist:
