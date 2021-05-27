@@ -34,7 +34,7 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
                                 field=fname, spw=spw, keepflags=True, keepmms=keepmms,
                                 width=specavg, timebin=timeavg)
 
-                if subf == fields.targetfield.split(',')[0]:
+                if fname == fields.targetfield.split(',')[0]:
                     newvis = outname
 
     return newvis
