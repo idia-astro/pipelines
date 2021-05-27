@@ -126,7 +126,7 @@ def do_concat(visname, fields, dirs='*MHz'):
                     logger.info('Concatenating MSs with following command:')
                     logger.info('concat(vis={0}, concatvis={1})'.format(MSs,out))
                     concat(vis=MSs, concatvis=out)
-                    if target == fields.targetfield.split(',')[0]:
+                    if fname == fields.targetfield.split(',')[0]:
                         newvis = out
 
                     if not os.path.exists(out):
@@ -142,7 +142,7 @@ def do_concat(visname, fields, dirs='*MHz'):
                     logger.info('Concatenating MMSs with following command:')
                     logger.info('virtualconcat(vis={0}, concatvis={1})'.format(MMSs,out))
                     virtualconcat(vis=MMSs, concatvis=out)
-                    if target == fields.targetfield.split(',')[0]:
+                    if fname == fields.targetfield.split(',')[0]:
                         newvis = out
 
                     if not os.path.exists(out):
