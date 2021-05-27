@@ -18,8 +18,9 @@ PLOT_DIR = 'plots'
 EXTN = 'pdf'
 
 from casatasks import *
-from casatools import table
+from casatools import table,msmetadata
 tb = table()
+msmd = msmetadata()
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
@@ -261,6 +262,8 @@ def main(args,taskvals):
             os.mkdir(PLOT_DIR)
 
         fields = bookkeeping.get_field_ids(taskvals['fields'])
+        visname = va(taskvals, 'data', 'vis', str)
+        msmd.open(visname)
 
         caldir = 'caltables'
         spwdir = config_parser.parse_spw(args['config'])[3]
@@ -273,61 +276,64 @@ def main(args,taskvals):
             table_ext = 'gcal'
             title='Gain Phase'
             outname = '{}/field_{}_gain_phase'.format(PLOT_DIR,ff)
-            plotcal(plotstr, int(ff), spwdir, caldir, table_ext, title, outname)
+            plotcal(plotstr, int(msmd.fieldsforname(ff)[0]), spwdir, caldir, table_ext, title, outname)
 
             plotstr='amp,time'
             table_ext = 'gcal'
             title='Gain Amp'
             outname = '{}/field_{}_gain_amp'.format(PLOT_DIR,ff)
-            plotcal(plotstr, int(ff), spwdir, caldir, table_ext, title, outname)
+            plotcal(plotstr, int(msmd.fieldsforname(ff)[0]), spwdir, caldir, table_ext, title, outname)
 
         #print("k")
         #plotstr='delay,freq'
         #table_ext = 'kcal'
         #title='Delay'
         #outname = '{}/field_{}_delay'.format(PLOT_DIR,fields.fluxfield)
-        #plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        #plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         #print("kcross")
         #plotstr='delay,freq'
         #table_ext = 'xdel'
         #title='Crosshand Delay'
         #outname = '{}/field_{}_crosshanddelay'.format(PLOT_DIR,fields.fluxfield)
-        #plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        #plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='amp,freq'
         table_ext = 'bcal'
         title='Bandpass Amp'
         outname = '{}/field_{}_bandpass_amp'.format(PLOT_DIR,fields.fluxfield)
-        plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'bcal'
         title='Bandpass Phase'
         outname = '{}/field_{}_bandpass_phase'.format(PLOT_DIR,fields.fluxfield)
-        plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='amp,freq'
         table_ext = 'pcal'
         title='Leakage Amp'
         outname = '{}/field_{}_leakage_amp'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname, None, [0, 0.1])
+        plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname, None, [0, 0.1])
 
         plotstr='phase,freq'
         table_ext = 'pcal'
         title='Leakage Phase'
         outname = '{}/field_{}_leakage_phase'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'xyambcal'
         title='XY Phase'
         outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname)
+
+        msmd.done()
 
     except Exception as err:
         logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
         logger.error(traceback.format_exc())
+        msmd.done()
 
 if __name__ == "__main__":
 
