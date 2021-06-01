@@ -262,7 +262,7 @@ def main(args,taskvals):
             os.mkdir(PLOT_DIR)
 
         fields = bookkeeping.get_field_ids(taskvals['fields'])
-        visname = va(taskvals, 'data', 'vis', str)
+        visname = va(taskvals, 'run', 'crosscal_vis', str)
         msmd.open(visname)
 
         caldir = 'caltables'
