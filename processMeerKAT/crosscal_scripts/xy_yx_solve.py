@@ -92,7 +92,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     logger.info(" starting bandpass -> %s" % calfiles.bpassfile)
     bandpass(vis=visname, caltable = calfiles.bpassfile,
             field = fields.bpassfield, refant = referenceant,
-            minblperant = minbaselines, solnorm = False,  solint = 'inf',
+            minblperant = minbaselines, solnorm = False,  solint = '10min',
             combine = 'scan', bandtype = 'B', fillgaps = 8,
             parang = False, append = False)
     bookkeeping.check_file(calfiles.bpassfile)
@@ -110,7 +110,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
     gaincal(vis=visname, caltable = calfiles.gainfile,
             field = fields.gainfields, refant = referenceant,
             minblperant = minbaselines, solnorm = False,  gaintype = 'T',
-            solint = '10min', combine = '', calmode='ap',
+            solint = 'inf', combine = '', calmode='ap',
             gaintable=[calfiles.bpassfile,calfiles.dpolfile],
             gainfield=[fields.bpassfield,fields.bpassfield],
             parang = False, append = False)
@@ -144,7 +144,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
     gaincal(vis=visname, caltable = xyfile, field = polfield,
-            refant = referenceant, solint = 'inf', combine = 'scan,2.5MHz',
+            refant = referenceant, solint = 'inf', combine = 'scan',
             gaintype = 'XYf+QU', minblperant = minbaselines,
             preavg = 200.0,
             gaintable = [calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
