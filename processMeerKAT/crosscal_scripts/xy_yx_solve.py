@@ -105,7 +105,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     logger.info("starting \'Dflls\' polcal -> %s"  % calfiles.dpolfile)
     polcal(vis=visname, caltable = calfiles.dpolfile, field = fields.bpassfield,
-            refant = '', solint = 'inf', combine = 'scan',
+            refant = '', solint = 'inf,2.5MHz', combine = 'scan',
             poltype = 'Dflls', preavg= 200.0,
             gaintable = [calfiles.bpassfile],
             gainfield = [fields.bpassfield],
@@ -150,7 +150,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     logger.info("\n Starting x-y phase calibration\n -> %s" % xy0ambpfile)
     gaincal(vis=visname, caltable = xyfile, field = polfield,
-            refant = referenceant, solint = 'inf', combine = 'scan',
+            refant = referenceant, solint = 'inf,2.5MHz', combine = 'scan',
             gaintype = 'XYf+QU', minblperant = minbaselines,
             preavg = 200.0,
             gaintable = [calfiles.bpassfile, calfiles.dpolfile, calfiles.gainfile],
