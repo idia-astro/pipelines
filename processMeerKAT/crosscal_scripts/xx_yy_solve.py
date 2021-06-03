@@ -55,7 +55,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
     bookkeeping.check_file(calfiles.gainfile)
 
     # Only run fluxscale if bootstrapping
-    if len(fields.gainfields) > 1:
+    if len(fields.gainfields.split(',')) > 1:
         fluxscale(vis=visname, caltable=calfiles.gainfile,
                 reference=[fields.fluxfield], transfer='',
                 fluxtable=calfiles.fluxfile, append=False, display=False,

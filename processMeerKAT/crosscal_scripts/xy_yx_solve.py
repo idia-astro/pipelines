@@ -137,7 +137,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
 
     flagdata(vis=calfiles.gainfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
     # Only run fluxscale if bootstrapping
-    if len(fields.gainfields) > 1:
+    if len(fields.gainfields.split(',')) > 1:
         logger.info(" starting fluxscale -> %s", calfiles.fluxfile)
         fluxscale(vis=visname, caltable=calfiles.gainfile,
                 reference=[fields.fluxfield], transfer='',

@@ -21,7 +21,7 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 
 def do_parallel_cal_apply(visname, fields, calfiles):
 
-    if len(fields.gainfields) > 1:
+    if len(fields.gainfields.split(',')) > 1:
         fluxfile = calfiles.fluxfile
     else:
         fluxfile = calfiles.gainfile
