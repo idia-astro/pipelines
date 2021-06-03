@@ -165,7 +165,7 @@ def do_cross_cal(visname, fields, calfiles, referenceant, caldir,
         logger.info("\n Check for x-y phase ambiguity.")
         logger.info("Polarization qu is {0}".format(polqu))
         S = xyamb(xytab=xy0ambpfile, qu=polqu, xyout = xy0pfile)
-        #logger.info("smodel = ", S)
+        #logger.info("smodel = {0}".format(S))
         flagdata(vis=xy0pfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
     else:
         flagdata(vis=xyfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
