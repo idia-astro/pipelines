@@ -37,12 +37,6 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
     calfiles = calfiles._replace(xpolfile=xyfile)
 
-    flagdata(vis=calfiles.bpassfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
-    flagdata(vis=calfiles.dpolfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
-    flagdata(vis=calfiles.gainfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
-    flagdata(vis=calfiles.gainfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
-    flagdata(vis=xyfile, datacolumn='CPARAM', mode='rflag', timedevscale=5.0, freqdevscale=5.0, action='apply')
-
     logger.info(" applying calibration: primary calibrator")
     applycal(vis=visname, field=fields.fluxfield,
             selectdata=False, calwt=False, gaintable=[calfiles.bpassfile, fluxfile, calfiles.dpolfile,calfiles.xpolfile],
