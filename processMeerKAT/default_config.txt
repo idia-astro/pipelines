@@ -71,6 +71,8 @@ gridder = 'wproject'
 deconvolver = 'mtmfs'
 solint = ['1min']
 calmode = 'p'
+discard_loop0 = False             # Discard the selfcal solutions for loop 0 (e.g. from quick and dirty image) during subsequent loops
+gaintype = 'G'                    # Use 'T' for polarisation on linear feeds (e.g. MeerKAT)
 flag = False                      # Flag residual column after selfcal?
 
 [image]

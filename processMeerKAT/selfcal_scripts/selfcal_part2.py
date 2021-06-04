@@ -17,17 +17,18 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def predict_model(vis, imagename, imsize, cell, gridder, wprojplanes, deconvolver,
-                  robust, niter, threshold, nterms, regionfile, loop):
+                  robust, niter, threshold, nterms, regionfile, loop, cfcache):
 
     tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
             imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
             wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop],
-            weighting='briggs', robust = robust[loop], niter=0,
-            threshold=threshold[loop], nterms=nterms[loop], pblimit=-1, mask=regionfile,
-            savemodel='modelcolumn', restart=True, restoration=False, calcpsf=False, calcres=False, parallel = False)
+            weighting='briggs', robust = robust[loop], threshold=threshold[loop],
+            nterms=nterms[loop], pblimit=-1, mask=regionfile,# cfcache=cfcache,
+            niter=0, savemodel='modelcolumn', restart=True,
+            restoration=False, calcpsf=False, calcres=False, parallel = False)
 
 def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter,
-                  threshold, uvrange, nterms, gridder, deconvolver, solint, calmode, flag):
+                  threshold, uvrange, nterms, gridder, deconvolver, solint, calmode, discard_loop0, gaintype, flag):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     basename = visbase.replace('.mms', '') + '_im_%d' # Images will be produced in $CWD
@@ -36,6 +37,11 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     rmsfile = basename % loop + ".rms"
     caltable = visbase.replace('.mms', '') + '.gcal%d' % loop
     prev_caltables = sorted(glob.glob('*.gcal?'))
+    caltable0 = visbase.replace('.mms', '') + '.gcal0'
+    cfcache = visbase.replace('.mms', '') + '.cf'
+
+    if discard_loop0 and caltable0 in prev_caltables:
+        prev_caltables.pop(prev_caltables.index(caltable0))
 
     if loop == 0 and not os.path.exists(pixmask):
         imagename += '_nomask'
@@ -66,15 +72,14 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 return loop
 
             predict_model(vis, imagename, imsize, cell, gridder, wprojplanes,
-                      deconvolver, robust, niter, threshold, nterms, pixmask,loop)
+                      deconvolver, robust, niter, threshold, nterms, pixmask,loop,cfcache)
 
             solnorm = 'a' in calmode[loop]
             normtype='median' #if solnorm else 'mean'
-            gaintype = 'T' if dopol else 'G'
 
             gaincal(vis=vis, caltable=caltable, selectdata=True, refant = refant, solint=solint[loop], solnorm=solnorm,
                     normtype=normtype,
-                    gaintype=gaintype,
+                    gaintype=gaintype[loop],
                     uvrange=uvrange[loop],
                     gaintable=prev_caltables,
                     calmode=calmode[loop], append=False, parang=False)
