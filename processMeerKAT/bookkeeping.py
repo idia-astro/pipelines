@@ -118,10 +118,14 @@ def get_selfcal_params():
     check_params = list(params.keys())
     check_params.pop(check_params.index('nloops'))
     check_params.pop(check_params.index('loop'))
+    check_params.pop(check_params.index('discard_loop0'))
 
     params['vis'] = taskvals['data']['vis']
     params['refant'] = taskvals['crosscal']['refant']
     params['dopol'] = taskvals['run']['dopol']
+
+    if params['dopol'] and 'G' in params['gaintype']:
+        logger.warning("dopol is True, but gaintype includes 'G'. Use gaintype='T' for polarisation on linear feeds (e.g. MeerKAT).")
 
     for arg in check_params:
 

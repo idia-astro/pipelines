@@ -28,8 +28,8 @@ def symlink_psf(imagename,prefix):
             name, ext = os.path.splitext(fname)
             os.symlink(fname,'{0}.{1}{2}'.format(imagename,product,ext))
 
-def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter,
-                  threshold, uvrange, nterms, gridder, deconvolver, solint, calmode, flag):
+def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold,
+                  uvrange, nterms, gridder, deconvolver, solint, calmode, discard_loop0, gaintype, flag):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     basename = visbase.replace('.mms', '') + '_im_%d' # Images will be produced in $CWD
@@ -38,6 +38,12 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     rmsfile = basename % loop + ".rms"
     caltable = visbase.replace('.mms', '') + '.gcal%d' % (loop - 1)
     all_caltables = sorted(glob.glob('*.gcal?'))
+    caltable0 = visbase.replace('.mms', '') + '.gcal0'
+    cfcache = visbase.replace('.mms', '') + '.cf'
+
+    if discard_loop0 and caltable0 in all_caltables:
+        all_caltables.pop(all_caltables.index(caltable0))
+
     calcpsf = True
     symlink = False
 
@@ -86,7 +92,7 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
                 imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
                 wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=True,
-                weighting='briggs', robust = robust[loop], niter=niter[loop],
+                weighting='briggs', robust = robust[loop], niter=niter[loop],# cfcache = cfcache,
                 threshold=threshold[loop], nterms=nterms[loop], calcpsf=calcpsf,
                 pblimit=-1, mask=pixmask, parallel = True)
 
