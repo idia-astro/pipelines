@@ -307,6 +307,10 @@ def validate_args(args,config,parser=None):
             accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30,cluster%15 | grep ilifu-slurm2021 | grep -v 'Account\|--' | awk '{print $1}'); do echo -n $f,; done").read()[:-1].split(',')
             if args['account'] not in accounts:
                 msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
+                for account in accounts:
+                    if args['account'] in account:
+                        msg += ' Perhaps you meant accounting group "{0}".'.format(account)
+                        break
                 raise_error(config, msg, parser)
         else:
             msg = "Accounting group '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['account'])
