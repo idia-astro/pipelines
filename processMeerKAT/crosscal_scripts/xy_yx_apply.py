@@ -23,7 +23,10 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 
 def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
-    fluxfile = calfiles.fluxfile
+    if len(fields.gainfields.split(',')) > 1:
+        fluxfile = calfiles.fluxfile
+    else:
+        fluxfile = calfiles.gainfile
 
     polfield = bookkeeping.polfield_name(visname)
     if polfield == '':

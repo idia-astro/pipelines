@@ -63,7 +63,8 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
         bdsfname = imagename + ".image"
 
     fitsname = imagename + '.fits'
-    exportfits(imagename = bdsfname, fitsimage=fitsname)
+    if not os.path.exists(fitsname):
+        exportfits(imagename = bdsfname, fitsimage=fitsname)
 
     if not (type(threshold[loop]) is str and 'Jy' in threshold[loop]) and threshold[loop] > 1 and os.path.exists(rmsfile):
         stats = imstat(imagename=rmsfile)

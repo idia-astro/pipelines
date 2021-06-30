@@ -26,7 +26,9 @@ def symlink_psf(imagename,prefix):
         products = glob.glob('{0}.{1}*'.format(prefix,product))
         for fname in products:
             name, ext = os.path.splitext(fname)
-            os.symlink(fname,'{0}.{1}{2}'.format(imagename,product,ext))
+            symlink = '{0}.{1}{2}'.format(imagename,product,ext)
+            if not os.path.exists(symlink):
+                os.symlink(fname,symlink)
 
 def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold,
                   uvrange, nterms, gridder, deconvolver, solint, calmode, discard_loop0, gaintype, flag):
