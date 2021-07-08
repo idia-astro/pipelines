@@ -626,8 +626,16 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
         selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
-        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
-        scripts.append('selfcal_part1.sbatch')
+        idx = scripts.index('selfcal_part2.sbatch')
+
+        init_scripts = scripts[:idx+1]
+        final_scripts = scripts[idx+1:]
+
+        init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+        init_scripts.append('selfcal_part1.sbatch')
+
+        scripts = init_scripts + final_scripts
+
         #Hack to put imaging at end
         if config_parser.has_section(config,'image') and 'science_image.sbatch' in scripts:
             scripts.pop(scripts.index('science_image.sbatch'))
@@ -685,6 +693,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     else:
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
+
 def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
@@ -727,6 +736,18 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
         selfcal_loops = config_parser.parse_config(config)[0]['selfcal']['nloops']
+
+        idx = scripts.index('selfcal_part2.sbatch')
+
+        init_scripts = scripts[:idx+1]
+        # Append scripts after selfcal_part2.sbatch to the end of the selfcal loops
+        final_scripts = scripts[idx+1:]
+
+        init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+        init_scripts.append('selfcal_part1.sbatch')
+
+        scripts = init_scripts + final_scripts
+
         scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
         scripts.append('selfcal_part1.sbatch')
         #Hack to put imaging at end
