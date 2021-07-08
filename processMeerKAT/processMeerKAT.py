@@ -748,8 +748,8 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
         scripts = init_scripts + final_scripts
 
-        scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
-        scripts.append('selfcal_part1.sbatch')
+        #scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+        #scripts.append('selfcal_part1.sbatch')
         #Hack to put imaging at end
         if config_parser.has_section(config,'image') and 'science_image.sbatch' in scripts:
             scripts.pop(scripts.index('science_image.sbatch'))
