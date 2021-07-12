@@ -205,6 +205,7 @@ def parse_args():
     parser.add_argument("-2","--do2GC", action="store_true", required=False, default=False, help="Perform (2GC) self-calibration in the pipeline [default: False].")
     parser.add_argument("-I","--science_image", action="store_true", required=False, default=False, help="Create a science image [default: False].")
     parser.add_argument("-x","--nofields", action="store_true", required=False, default=False, help="Do not read the input MS to extract field IDs [default: False].")
+    parser.add_argument("-j","--justrun", action="store_true", required=False, default=False, help="Just run the pipeline, don't rebuild each job script if it exists [default: False].")
 
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
     run_args = parser.add_mutually_exclusive_group(required=True)
@@ -404,7 +405,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
 
 
 def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
-                container=CONTAINER,partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation=''):
+                container=CONTAINER,partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation='',justrun=False):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -447,7 +448,9 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     account : str, optional
         SLURM accounting group for sbatch jobs.
     reservation : str, optional
-        SLURM reservation to use."""
+        SLURM reservation to use.
+    justrun : bool, optionall
+        Just run the pipeline without rebuilding each job script (if it exists)."""
 
     if not os.path.exists(LOG_DIR):
         os.mkdir(LOG_DIR)
@@ -526,11 +529,13 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
 
     #write sbatch file
     sbatch = '{0}.sbatch'.format(name)
-    config = open(sbatch,'w')
-    config.write(contents)
-    config.close()
-
-    logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
+    if justrun and os.path.exists(sbatch):
+        logger.debug('sbatch file "{0}" exists. Not overwriting due to [-j --justrun] option.'.format(sbatch))
+    else:
+        config = open(sbatch,'w')
+        config.write(contents)
+        config.close()
+        logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
 def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies='',timestamp='',slurm_kwargs={}):
 
@@ -605,7 +610,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     for i,spw in enumerate(SPWs.split(',')):
         master.write('echo Running pipeline in directory "{0}" for spectral window 0:{0}\n'.format(spw))
         master.write('cd {0}\n'.format(spw))
-        master.write('output=$({0} --config ./{1} --run --submit --quiet'.format(os.path.split(THIS_PROG)[1],config))
+        master.write('output=$({0} --config ./{1} --run --submit --quiet --justrun'.format(os.path.split(THIS_PROG)[1],config))
         if partition:
             master.write(' --dependencies=$partitionID\_{0}'.format(i))
         elif len(precal_scripts) > 0:
@@ -681,6 +686,15 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     #Close master submission script and make executable
     master.close()
     os.chmod(filename, 509)
+
+    #[-R --run] pipeline in each SPW directory to create sbatch files that can be edited
+    #TODO: fix this hackery!
+    SPW_run_file='out.tmp'
+    SPW_run_call = """for f in {%s,}; do if [ -d $f ]; then cd $f; %s --config ./%s --run --quiet; cd ..; else echo Directory $f doesn\\'t exist; fi; done""" % (','.join(SPWs.split(',')),os.path.split(THIS_PROG)[1],config)
+    with open(SPW_run_file,'w') as out:
+        out.write(SPW_run_call)
+    os.system('bash {0}'.format(SPW_run_file))
+    os.remove(SPW_run_file)
 
     #Submit script or output that it will not run
     if submit:
@@ -789,7 +803,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
             logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
     else:
-        logger.info('Master script "{0}" written, but will not run.'.format(filename))
+        logger.info('Master script "{0}" written in "{1}", but will not run.'.format(filename,os.path.split(os.getcwd())[-1]))
 
 def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefix='',pad_length=5, slurm_kwargs={}):
 
@@ -895,8 +909,8 @@ def srun(arg_dict,qos=True,time=10,mem=4):
 
     return call
 
-def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1,
-               partition='Main', time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', timestamp=''):
+def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1, partition='Main',
+               time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', timestamp='', justrun=False):
 
     """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
 
@@ -943,7 +957,9 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
     reservation : str, optional
         SLURM reservation to use.
     timestamp : str, optional
-        Timestamp to put on this run and related runs in SPW directories."""
+        Timestamp to put on this run and related runs in SPW directories.
+    justrun : bool, optionall
+        Just run the pipeline without rebuilding each job script (if it exists)."""
 
     kwargs = locals()
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
@@ -956,10 +972,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
-                        container=containers[i],partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation)
+                        container=containers[i],partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation,justrun=justrun)
         else:
             write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],
-                        partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation)
+                        partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation,justrun=justrun)
 
     #Replace all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
@@ -1106,7 +1122,7 @@ def pop_script(kwargs,script):
         popped = True
     return popped
 
-def format_args(config,submit,quiet,dependencies):
+def format_args(config,submit,quiet,dependencies,justrun):
 
     """Format (and validate) arguments from config file, to be passed into write_jobs() function.
 
@@ -1120,8 +1136,9 @@ def format_args(config,submit,quiet,dependencies):
         Activate quiet mode, with suppressed output?
     dependencies : str
         Comma-separated list of SLURM job dependencies.
-    selfcal : bool
-        Is selfcal being performed?
+    justrun : bool
+        Just run the pipeline without rebuilding each job script (if it exists).
+
 
     Returns:
     --------
@@ -1245,6 +1262,7 @@ def format_args(config,submit,quiet,dependencies):
     kwargs.pop('precal_scripts')
     kwargs.pop('postcal_scripts')
     kwargs['quiet'] = quiet
+    kwargs['justrun'] = justrun
 
     #Force overwrite of dependencies
     if dependencies != '':
@@ -1485,7 +1503,7 @@ def main():
     if args.build:
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies)
+        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.justrun)
         write_jobs(args.config, **kwargs)
 
 if __name__ == "__main__":
