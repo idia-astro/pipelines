@@ -15,7 +15,7 @@ from config_parser import validate_args as va
 import bookkeeping
 import glob
 PLOT_DIR = 'plots'
-EXTN = 'pdf'
+EXTN = 'png'
 
 from casatasks import *
 from casatools import table,msmetadata
@@ -68,6 +68,8 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     if len(tables) == 0:
         logger.warning("No valid caltables with extention {} found.".format(table_ext))
+        logger.warning("Skipping.")
+        return
 
     xdat = []
     xdaty = [] # Only used when plotting real
@@ -259,10 +261,12 @@ def main(args,taskvals):
 
     try:
         if not os.path.exists(PLOT_DIR):
-            os.mkdir(PLOT_DIR)
+            os.makedirs(PLOT_DIR)
 
         fields = bookkeeping.get_field_ids(taskvals['fields'])
         visname = va(taskvals, 'run', 'crosscal_vis', str)
+        polfield = bookkeeping.polfield_name(visname)
+
         msmd.open(visname)
 
         caldir = 'caltables'
@@ -325,8 +329,14 @@ def main(args,taskvals):
         plotstr='phase,freq'
         table_ext = 'xyambcal'
         title='XY Phase'
-        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname)
+        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,polfield)
+        plotcal(plotstr, int(msmd.fieldsforname(polfield)[0]), spwdir, caldir, table_ext, title, outname)
+
+        plotstr='phase,freq'
+        table_ext = 'xycal'
+        title='XY Phase (amb resolved)'
+        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,polfield)
+        plotcal(plotstr, int(msmd.fieldsforname(polfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         msmd.done()
 
