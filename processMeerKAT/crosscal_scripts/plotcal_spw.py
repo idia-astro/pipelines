@@ -317,19 +317,18 @@ def main(args,taskvals):
         plotstr='amp,freq'
         table_ext = 'pcal'
         title='Leakage Amp'
-        outname = '{}/field_{}_leakage_amp'.format(PLOT_DIR,fields.dpolfield)
+        outname = '{}/field_{}_leakage_amp'.format(PLOT_DIR,fields.bpassfield)
         plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname, None, [0, 0.1])
-
         plotstr='phase,freq'
         table_ext = 'pcal'
         title='Leakage Phase'
-        outname = '{}/field_{}_leakage_phase'.format(PLOT_DIR,fields.dpolfield)
+        outname = '{}/field_{}_leakage_phase'.format(PLOT_DIR,fields.bpassfield)
         plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'xyambcal'
         title='XY Phase'
-        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,polfield)
+        outname = '{}/field_{}_xyamb_phase'.format(PLOT_DIR,polfield)
         plotcal(plotstr, int(msmd.fieldsforname(polfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
