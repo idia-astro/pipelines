@@ -10,11 +10,11 @@ import processMeerKAT
 import config_parser
 
 from casatasks import *
-from casatools import *
+from casatools import msmetadata,table,measures
 
 logger = processMeerKAT.logger
 
-# Get access to the msmd module for read_ms.py
+# Get access to the msmd module
 msmd = msmetadata()
 tb = table()
 me = measures()

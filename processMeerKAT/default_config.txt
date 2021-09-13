@@ -23,6 +23,7 @@ name = ''
 dependencies = ''
 account = 'b03-idia-ag'
 reservation = ''
+modules = ['openmpi/2.1.1']
 verbose = False
 precal_scripts = [('calc_refant.py',False,''), ('partition.py',True,'')]
 postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, ''), ('science_image.py', True, '')]
@@ -36,8 +37,7 @@ scripts = [ ('validate_input.py',False,''),
             ('xx_yy_solve.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
-            ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,'')]
+            ('quick_tclean.py',True,'')]
 
 [crosscal]
 minbaselines = 4                  # Minimum number of baselines to use while calibrating

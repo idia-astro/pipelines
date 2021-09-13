@@ -58,7 +58,7 @@ FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','e
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
 SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_loop0','gaintype','flag']
 IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
-SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
+SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation','modules']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-6.simg'
 MPI_WRAPPER = 'mpirun'
@@ -74,8 +74,7 @@ SCRIPTS = [ ('validate_input.py',False,''),
             ('xx_yy_solve.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
-            ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,'/idia/software/containers/casa-stable-5.7.2-4.simg')]
+            ('quick_tclean.py',True,'')]
 
 
 def check_path(path,update=False):
@@ -194,7 +193,7 @@ def parse_args():
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
-    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $(whoami) -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
+    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
     parser.add_argument("-r","--reservation", metavar="name", required=False, type=str, default='', help="SLURM reservation to use. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -305,7 +304,7 @@ def validate_args(args,config,parser=None):
     if args['account'] not in ['b03-idia-ag','b05-pipelines-ag']:
         from platform import node
         if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
-            accounts=os.popen("for f in $(sacctmgr show user $(whoami) -s format=account%30,cluster%15 | grep ilifu-slurm2021 | grep -v 'Account\|--' | awk '{print $1}'); do echo -n $f,; done").read()[:-1].split(',')
+            accounts=os.popen("for f in $(sacctmgr show user $USER --noheader cluster=ilifu-slurm20 -s format=account%30); do echo -n $f,; done").read()[:-1].split(',')
             if args['account'] not in accounts:
                 msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
                 for account in accounts:
@@ -404,8 +403,8 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     return command
 
 
-def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,
-                container=CONTAINER,partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation='',justrun=False):
+def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,
+                partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation='',modules=[],justrun=False):
 
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -449,6 +448,8 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         SLURM accounting group for sbatch jobs.
     reservation : str, optional
         SLURM reservation to use.
+    modules : list, optional
+        Modules to load upon execution of sbatch script.
     justrun : bool, optionall
         Just run the pipeline without rebuilding each job script (if it exists)."""
 
@@ -507,6 +508,12 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     if 'selfcal' in script or 'image' in script:
         params['command'] = 'ulimit -n 16384\n' + params['command']
 
+    params['modules'] = ''
+    if len(modules) > 0:
+        for module in modules:
+            if len(module) > 0:
+                params['modules'] += "module load {0}\n".format(module)
+
     contents = """#!/bin/bash{array}{exclude}{reservation}
     #SBATCH --account={account}
     #SBATCH --nodes={nodes}
@@ -521,6 +528,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
     #SBATCH --time={time}
 
     export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+    {modules}
 
     {command}"""
 
@@ -910,7 +918,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
     return call
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1, partition='Main',
-               time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', timestamp='', justrun=False):
+               time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', modules=[], timestamp='', justrun=False):
 
     """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
 
@@ -956,6 +964,8 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
         SLURM accounting group for sbatch jobs.
     reservation : str, optional
         SLURM reservation to use.
+    modules : list, optional
+        Modules to load upon execution of sbatch script.
     timestamp : str, optional
         Timestamp to put on this run and related runs in SPW directories.
     justrun : bool, optionall
@@ -971,11 +981,11 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
 
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,
-                        container=containers[i],partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation,justrun=justrun)
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,
+                        time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation,modules=modules,justrun=justrun)
         else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],
-                        partition=partition,time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation,justrun=justrun)
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],partition=partition,time=time,name=jobname,
+                        runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation,modules=modules,justrun=justrun)
 
     #Replace all .py with .sbatch
     scripts = [os.path.split(scripts[i])[1].replace('.py','.sbatch') for i in range(len(scripts))]
@@ -1222,13 +1232,10 @@ def format_args(config,submit,quiet,dependencies,justrun):
         if nspw != 1:
             kwargs['threadsafe'][kwargs['num_precal_scripts']:] = [False]*len(kwargs['postcal_scripts'])
 
-    #Set threadsafe=True for quick-tclean, as this uses MPI even for an MS
-    if 'quick_tclean.py' in kwargs['scripts']:
-        kwargs['threadsafe'][kwargs['scripts'].index('quick_tclean.py')] = True
-
-    #Set threadsafe=True for quick-tclean, as this uses MPI even for an MS
-    if 'selfcal_part1.py' in kwargs['scripts']:
-        kwargs['threadsafe'][kwargs['scripts'].index('selfcal_part1.py')] = True
+    #Set threadsafe=True for quick-tclean, selfcal_part1 or science_image as tclean uses MPI even for an MS (TODO: ensure it doesn't crash for flagging step)
+    for threadsafe_script in ['quick_tclean.py','selfcal_part1.py','science_image.py']:
+        if threadsafe_script in kwargs['scripts']:
+            kwargs['threadsafe'][kwargs['scripts'].index(threadsafe_script)] = True
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
     if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT and nspw > 1:

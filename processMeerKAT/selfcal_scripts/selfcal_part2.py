@@ -13,9 +13,11 @@ import processMeerKAT
 
 from casatasks import *
 from casatools import *
+from casatools import image,quanta
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 ia=image()
+qa=quanta()
 
 import bdsf
 import logging
