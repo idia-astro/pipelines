@@ -57,23 +57,24 @@ badfreqranges = [ '933~960MHz',   # List of bad frequency ranges (to flag)
                   '1524~1630MHz']
 
 [selfcal]
-nloops = 1                        # Number of clean + bdsf + self-cal loops.
-loop = 0                          # If nonzero, adds this number to nloops to name images
+nloops = 2                        # Number of clean + bdsf loops.
+loop = 0                          # If nonzero, adds this number to nloops to name images or continue previous run
 cell = '1.5arcsec'
-robust = -2.0
-imsize = [4096, 4096]
-wprojplanes = 256
-niter = [10000, 50000]
-threshold = ['0.5mJy', 10]        # After loop 0, S/N values if >= 1.0, otherwise Jy
-uvrange = ''                      # uv range cutoff for gaincal
+robust = -0.5
+imsize = [6144, 6144]
+wprojplanes = 512
+niter = [10000, 50000, 50000]
+threshold = ['0.5mJy', 10, 10]    # After loop 0, S/N values if >= 1.0, otherwise Jy
 nterms = 2                        # Number of taylor terms
 gridder = 'wproject'
 deconvolver = 'mtmfs'
-solint = ['1min']
-calmode = 'p'
-discard_loop0 = False             # Discard the selfcal solutions for loop 0 (e.g. from quick and dirty image) during subsequent loops
+calmode = ['','p']                # '' to skip solving (will also exclude mask for this loop), 'p' for phase-only and 'ap' for amplitude and phase
+solint = ['','1min']
+uvrange = ''                      # uv range cutoff for gaincal
+flag = True                       # Flag residual column after selfcal?
 gaintype = 'G'                    # Use 'T' for polarisation on linear feeds (e.g. MeerKAT)
-flag = False                      # Flag residual column after selfcal?
+discard_nloops = 0                # Discard this many selfcal solutions (e.g. from quick and dirty image) during subsequent loops (only considers when calmode !='')
+outlier_threshold = 0.0           # S/N values if >= 1.0, otherwise Jy
 
 [image]
 cell = '1.5arcsec'
@@ -91,6 +92,7 @@ specmode = 'mfs'
 stokes = 'I'
 mask = ''
 rmsmap = ''
+outlierfile = ''
 
 [run]                             # Internal variables for pipeline execution
 continue = True

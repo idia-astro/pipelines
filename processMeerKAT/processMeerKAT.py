@@ -57,7 +57,7 @@ MASTER_SCRIPT = 'submit_pipeline.sh'
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
-SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_loop0','gaintype','flag']
+SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_nloops','gaintype','outlier_threshold','flag']
 IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose','modules'] + SLURM_CONFIG_STR_KEYS
@@ -648,7 +648,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         if start_loop == 0 and idx == scripts.index('selfcal_part1.sbatch') + 1:
             init_scripts = scripts[:idx+1]
             final_scripts = scripts[idx+1:]
-            init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+            init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops-1))
             init_scripts.append('selfcal_part1.sbatch')
             scripts = init_scripts + final_scripts
 
@@ -763,7 +763,7 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
         if start_loop == 0 and idx == scripts.index('selfcal_part1.sbatch') + 1:
             init_scripts = scripts[:idx+1]
             final_scripts = scripts[idx+1:]
-            init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops))
+            init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops-1))
             init_scripts.append('selfcal_part1.sbatch')
             scripts = init_scripts + final_scripts
 
