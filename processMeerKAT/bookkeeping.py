@@ -83,6 +83,8 @@ def polfield_name(visname):
         polfield= list(set(["3C286", "1328+307", "1331+305", "J1331+3030"]).intersection(set(fieldnames)))[0]
     elif any([ff in ["3C138", "0518+165", "0521+166", "J0521+1638"] for ff in fieldnames]):
         polfield = list(set(["3C138", "0518+165", "0521+166", "J0521+1638"]).intersection(set(fieldnames)))[0]
+    elif any([ff in ["3C48", "0134+329", "0137+331", "J0137+3309"] for ff in fieldnames]):
+        polfield = list(set(["3C48", "0134+329", "0137+331", "J0137+3309"]).intersection(set(fieldnames)))[0]
     else:
         logger.warning("No valid polarization field found. Defaulting to use the phase calibrator to solve for XY phase.")
         logger.warning("The polarization solutions found will likely be wrong. Please check the results carefully.")
@@ -114,11 +116,7 @@ def get_selfcal_params():
     # Parse config file
     taskvals, config = config_parser.parse_config(args['config'])
     params = taskvals['selfcal']
-
-    check_params = list(params.keys())
-    check_params.pop(check_params.index('nloops'))
-    check_params.pop(check_params.index('loop'))
-    check_params.pop(check_params.index('discard_loop0'))
+    other_params = list(params.keys())
 
     params['vis'] = taskvals['data']['vis']
     params['refant'] = taskvals['crosscal']['refant']
@@ -127,13 +125,27 @@ def get_selfcal_params():
     if params['dopol'] and 'G' in params['gaintype']:
         logger.warning("dopol is True, but gaintype includes 'G'. Use gaintype='T' for polarisation on linear feeds (e.g. MeerKAT).")
 
-    for arg in check_params:
+    single_args = ['nloops','loop','discard_nloops','outlier_threshold'] #need to be 1 long (i.e. not a list)
+    gaincal_args = ['solint','calmode','gaintype','flag'] #need to be nloops long
+    list_args = ['imsize'] #allowed to be lists of lists
 
-        # Multiscale needs to be a list of lists (if specifying multiple scales)
-        # or a simple list (if specifying a single scale). So make sure these two
-        # cases are covered. Likewise for imsize.
+    for arg in single_args:
+        if arg in other_params:
+            other_params.pop(other_params.index(arg))
 
-        if arg in ['multiscale','imsize']:
+    for arg in single_args:
+        if type(params[arg]) is list or type(params[arg]) is str and ',' in params[arg]:
+            logger.error("Parameter '{0}' in '{1}' cannot be a list. It must be a single value.".format(arg,args['config']))
+            exit = True
+
+    for arg in other_params:
+        if type(params[arg]) is str and ',' in params[arg]:
+            logger.error("Parameter '{0}' in '{1}' cannot use comma-seprated values. It must be a list or values, or a single value.".format(arg,args['config']))
+            exit = True
+
+        # These can be a list of lists or a simple list (if specifying a single value).
+        # So make sure these two cases are covered.
+        if arg in list_args:
             # Not a list of lists, so turn it into one of right length
             if type(params[arg]) is list and (len(params[arg]) == 0 or type(params[arg][0]) is not list):
                 params[arg] = [params[arg],] * (params['nloops'] + 1)
@@ -143,28 +155,85 @@ def get_selfcal_params():
             # A list of lists of length 1, so put into list of lists of right length
             elif type(params[arg]) is list and type(params[arg][0]) is list and len(params[arg]) == 1:
                 params[arg] = [params[arg][0],] * (params['nloops'] + 1)
-            if len(params[arg]) != params['nloops'] + 1:
-                logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} but must be a single value or equal to 'nloops' + 1 ({3}).".format(arg,args['config'],len(params[arg]),params['nloops']+1))
-                exit = True
 
-        else:
-            if type(params[arg]) is not list:
-                if arg in ['solint','calmode','gaintype']:
-                    params[arg] = [params[arg]] * (params['nloops'])
-                else:
-                    params[arg] = [params[arg]] * (params['nloops'] + 1)
+        elif type(params[arg]) is not list:
+            if arg in gaincal_args:
+                params[arg] = [params[arg]] * (params['nloops'])
+            else:
+                params[arg] = [params[arg]] * (params['nloops'] + 1)
 
-            if arg in ['solint','calmode','gaintype'] and len(params[arg]) != params['nloops']:
-                logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']))
-                exit = True
-            elif arg not in ['solint','calmode','gaintype'] and len(params[arg]) != params['nloops'] + 1:
-                logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must 'nloops' + 1 ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']+1))
-                exit = True
+    for arg in other_params:
+        #By this point params[arg] will be a list
+        if arg in gaincal_args and len(params[arg]) != params['nloops']:
+            logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']-1))
+            exit = True
+
+        elif arg not in gaincal_args and len(params[arg]) != params['nloops'] + 1:
+            logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' + 1 ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']+2))
+            exit = True
 
     if exit:
         sys.exit(1)
 
     return args,params
+
+def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step):
+
+    visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
+    basename = visbase.replace('.mms', '')
+    imbase = basename + '_im_%d' # Images will be produced in $CWD
+    imagename = imbase % loop
+    outimage = imagename + '.image'
+    pixmask = imagename + ".pixmask"
+    maskfile = imagename + ".islmask"
+    rmsfile = imagename + ".rms"
+    caltable = basename + '.gcal%d' % loop
+    prev_caltables = sorted(glob.glob('*.gcal?'))
+    cfcache = basename + '.cf'
+    thresh = 10
+
+    if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
+        outimage += '.tt0'
+
+    if step != 'tclean' and not os.path.exists(outimage):
+        logger.error("Image '{0}' doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(outimage,loop))
+        sys.exit(1)
+
+    if step in ['tclean','predict']:
+        pixmask = imbase % (loop-1) + '.pixmask'
+        rmsfile = imbase % (loop-1) + '.rms'
+    if step in ['tclean','predict'] and ((loop == 0 and not os.path.exists(pixmask)) or (0 < loop < nloops and calmode[loop] == '')):
+        pixmask = ''
+
+    #Check no missing caltables
+    for i in range(0,loop):
+        if calmode[i] != '' and not os.path.exists(basename + '.gcal%d' % i):
+            logger.error("Calibration table '{0}' doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(basename + '.gcal%d' % i,i))
+            sys.exit(1)
+    for i in range(discard_nloops):
+        prev_caltables.pop(0)
+
+    if outlier_threshold != '' and outlier_threshold != 0 and (loop > 0 or step == 'bdsf' and loop == 0):
+        if step in ['tclean','predict']:
+            outlierfile = 'outliers_loop{0}.txt'.format(loop-1)
+        else:
+            outlierfile = 'outliers_loop{0}.txt'.format(loop)
+    else:
+        outlierfile = ''
+
+    if not (type(threshold[loop]) is str and 'Jy' in threshold[loop]) and threshold[loop] > 1:
+        if step in ['tclean','predict']:
+            if os.path.exists(rmsfile):
+                from casatasks import imstat
+                stats = imstat(imagename=rmsfile)
+                threshold[loop] *= stats['min'][0]
+            else:
+                logger.error("'{0}' doesn't exist. Can't do thresholding at S/N > {1}. Loop 0 must use an absolute threshold value. Check the logs to see why RMS map not created.".format(rmsfile,threshold[loop]))
+                sys.exit(1)
+        elif step == 'bdsf':
+            thresh = threshold[loop]
+
+    return imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile
 
 def rename_logs(logfile=''):
 

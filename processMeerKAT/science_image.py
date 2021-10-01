@@ -10,7 +10,7 @@ from casatasks import *
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
-def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap):
+def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap, outlierfile):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     imagename = visbase.replace('.mms', '.science_image') # Images will be produced in $CWD
@@ -23,7 +23,7 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
         imsize=imsize, cell=cell, stokes=stokes, gridder=gridder, specmode=specmode,
         wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
         weighting='briggs', robust = robust, niter=niter, scales=multiscale,
-        threshold=threshold, nterms=nterms, calcpsf=True, mask=mask,
+        threshold=threshold, nterms=nterms, calcpsf=True, mask=mask, outlierfile=outlierfile,
         pblimit=-1, restoringbeam=restoringbeam, parallel = True)
 
 if __name__ == '__main__':

@@ -26,75 +26,49 @@ def symlink_psf(imagename,prefix):
         products = glob.glob('{0}.{1}*'.format(prefix,product))
         for fname in products:
             name, ext = os.path.splitext(fname)
-            os.symlink(fname,'{0}.{1}{2}'.format(imagename,product,ext))
+            # Will not have e.g. .tt0 if nterms < 2
+            if ext == product:
+                ext = ''
+            symlink = '{0}.{1}{2}'.format(imagename,product,ext)
+            if not os.path.exists(symlink):
+                os.symlink(fname,symlink)
 
 def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold,
-                  uvrange, nterms, gridder, deconvolver, solint, calmode, discard_loop0, gaintype, flag):
+                  uvrange, nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag):
 
-    visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
-    basename = visbase.replace('.mms', '') + '_im_%d' # Images will be produced in $CWD
-    imagename = basename % loop
-    pixmask = basename % loop + ".pixmask"
-    rmsfile = basename % loop + ".rms"
-    caltable = visbase.replace('.mms', '') + '.gcal%d' % (loop - 1)
-    all_caltables = sorted(glob.glob('*.gcal?'))
-    caltable0 = visbase.replace('.mms', '') + '.gcal0'
-    cfcache = visbase.replace('.mms', '') + '.cf'
-
-    if discard_loop0 and caltable0 in all_caltables:
-        all_caltables.pop(all_caltables.index(caltable0))
-
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='tclean')
     calcpsf = True
-    symlink = False
 
-    if loop == 0 and not os.path.exists(pixmask):
-        clearcal(vis=vis, addmodel=True) #Add model column with MPI rather than in selfcal_part2 without MPI
+    #Add model column with MPI rather than in selfcal_part2 without MPI.
+    #Assumes you've split out your corrected data from crosscal
+    if loop == 0:
+        clearcal(vis=vis, addmodel=True)
 
-    if not (type(threshold[loop]) is str and 'Jy' in threshold[loop]) and threshold[loop] > 1 and os.path.exists(rmsfile):
-        stats = imstat(imagename=rmsfile)
-        threshold[loop] *= stats['min'][0]
+    if 1 <= loop <= nloops:
+        if len(prev_caltables) > 0 and calmode[loop-1] != '':
+            applycal(vis=vis, selectdata=False, gaintable=prev_caltables, parang=False, interp='linear,linearflag')
 
-    if loop > 0 and not os.path.exists(caltable):
-        logger.error("Calibration table {0} doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(caltable,loop))
-        sys.exit(1)
+            if flag[loop-1]:
+                flagdata(vis=vis, mode='rflag', datacolumn='RESIDUAL', field='', timecutoff=5.0,
+                        freqcutoff=5.0, timefit='line', freqfit='line', flagdimension='freqtime',
+                        extendflags=False, timedevscale=3.0, freqdevscale=3.0, spectralmax=500,
+                        extendpols=False, growaround=False, flagneartime=False, flagnearfreq=False,
+                        action='apply', flagbackup=True, overwrite=True, writeflags=True)
+
+        if (not flag[loop-1] or len(prev_caltables) == 0) and gridder[loop] == gridder[loop-1] and robust[loop] == robust[loop-1] and nterms[loop] == nterms[loop-1] and imsize[loop] == imsize[loop-1] and cell[loop] == cell[loop-1]:
+            # Assumes it's safe to re-use previous PSF for outliers if position has slightly changed
+            symlink_psf(imagename,imbase % (loop-1))
+            calcpsf = True
+
+    if os.path.exists(outimage):
+        logger.info('Image "{0}" exists. Not overwriting, continuing to next loop.'.format(outimage))
     else:
-        if loop == 0:
-            if not os.path.exists(pixmask):
-                pixmask = ''
-                imagename += '_nomask'
-            else:
-                symlink_psf(imagename,imagename + '_nomask')
-                calcpsf = False
-
-        elif 0 < loop <= (nloops):
-                applycal(vis=vis, selectdata=False, gaintable=all_caltables, parang=False, interp='linear,linearflag')
-
-                if flag[loop]:
-                    flagdata(vis=vis, mode='rflag', datacolumn='RESIDUAL', field='', timecutoff=5.0,
-                            freqcutoff=5.0, timefit='line', freqfit='line', flagdimension='freqtime',
-                            extendflags=False, timedevscale=3.0, freqdevscale=3.0, spectralmax=500,
-                            extendpols=False, growaround=False, flagneartime=False, flagnearfreq=False,
-                            action='apply', flagbackup=True, overwrite=True, writeflags=True)
-
-                elif gridder[loop] == gridder[loop-1] and robust[loop] == robust[loop-1] and nterms[loop] == nterms[loop-1] and imsize[loop] == imsize[loop-1] and cell[loop] == cell[loop-1]:
-                    symlink_psf(imagename,basename % (loop-1))
-                    calcpsf = False
-
-        dotclean = True
-        if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs' and os.path.exists(imagename + '.image.tt0'):
-            logger.info('Image {0} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image.tt0'))
-            dotclean = False
-        if (nterms[loop] == 1 or deconvolver[loop] != 'mtmfs') and os.path.exists(imagename + '.image'):
-            logger.info('Image {0} exists. Not overwriting, continuing to next loop.'.format(imagename + '.image'))
-            dotclean = False
-
-        if dotclean:
-            tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
-                imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
-                wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=True,
-                weighting='briggs', robust = robust[loop], niter=niter[loop],# cfcache = cfcache,
-                threshold=threshold[loop], nterms=nterms[loop], calcpsf=calcpsf,
-                pblimit=-1, mask=pixmask, parallel = True)
+        tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
+            imsize=imsize[loop], cell=cell[loop], stokes='I', gridder=gridder[loop],
+            wprojplanes = wprojplanes[loop], deconvolver = deconvolver[loop], restoration=True,
+            weighting='briggs', robust = robust[loop], niter=niter[loop], outlierfile=outlierfile,
+            threshold=threshold[loop], nterms=nterms[loop], calcpsf=calcpsf, # cfcache = cfcache,
+            pblimit=-1, mask=pixmask, parallel = True)
 
 
 if __name__ == '__main__':

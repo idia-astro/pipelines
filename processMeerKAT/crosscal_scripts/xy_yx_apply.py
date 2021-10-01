@@ -23,7 +23,10 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 
 def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
-    fluxfile = calfiles.fluxfile
+    if len(fields.gainfields.split(',')) > 1:
+        fluxfile = calfiles.fluxfile
+    else:
+        fluxfile = calfiles.gainfile
 
     polfield = bookkeeping.polfield_name(visname)
     if polfield == '':
@@ -33,11 +36,11 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     xy0ambpfile = os.path.join(caldir, base+'.xyambcal')
     xy0pfile    = os.path.join(caldir, base+'.xycal')
 
-    if polfield == fields.secondaryfield:
-        # Cannot resolve XY ambiguity so write into final file directly
-        xyfile = xy0ambpfile
-    else:
-        xyfile = xy0pfile
+    #if polfield == fields.secondaryfield:
+    #    # Cannot resolve XY ambiguity so write into final file directly
+    #    xyfile = xy0ambpfile
+
+    xyfile = xy0pfile
 
     calfiles = calfiles._replace(xpolfile=xyfile)
 
