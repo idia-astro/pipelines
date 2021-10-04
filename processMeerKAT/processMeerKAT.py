@@ -36,46 +36,6 @@ logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s")
 
-#Set global limits for current ilifu cluster configuration
-TOTAL_NODES_LIMIT = 79
-CPUS_PER_NODE_LIMIT = 32
-NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
-MEM_PER_NODE_GB_LIMIT = 232 #237568 MB
-MEM_PER_NODE_GB_LIMIT_HIGHMEM = 480 #491520 MB
-
-#Set global values for paths and file names
-THIS_PROG = __file__
-SCRIPT_DIR = os.path.dirname(THIS_PROG)
-LOG_DIR = 'logs'
-CALIB_SCRIPTS_DIR = 'crosscal_scripts'
-AUX_SCRIPTS_DIR = 'aux_scripts'
-SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
-CONFIG = 'default_config.txt'
-TMP_CONFIG = '.config.tmp'
-MASTER_SCRIPT = 'submit_pipeline.sh'
-
-#Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
-FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
-CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
-SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_nloops','gaintype','outlier_threshold','flag']
-IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
-SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
-SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose','modules'] + SLURM_CONFIG_STR_KEYS
-CONTAINER = '/idia/software/containers/casa-6.3.simg'
-MPI_WRAPPER = 'mpirun'
-PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
-POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
-SCRIPTS = [ ('validate_input.py',False,''),
-            ('flag_round_1.py',True,''),
-            ('calc_refant.py',False,''),
-            ('setjy.py',True,''),
-            ('xx_yy_solve.py',False,''),
-            ('xx_yy_apply.py',True,''),
-            ('flag_round_2.py',True,''),
-            ('xx_yy_solve.py',False,''),
-            ('xx_yy_apply.py',True,''),
-            ('split.py',True,''),
-            ('quick_tclean.py',True,'')]
 
 
 def check_path(path,update=False):
@@ -172,7 +132,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA MeasurementSet. Version: {0}'.format(__version__))
 
-    parser.add_argument("--cluster",metavar='name', required=False, type=str, default="ilifu", help="Name of cluster being used [default: ilifu; allowed: galahad, ilifu]")
+    parser.add_argument("--cluster",metavar='name', required=False, type=str, default="ilifu", help="Name of cluster being used if not ilifu default slurm limits are removed [default: ilifu].")
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
     parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
@@ -271,10 +231,6 @@ def validate_args(args,config,parser=None):
     parser : class ``argparse.ArgumentParser``, optional
         If this is input, parser error will be raised."""
 
-    if args['cluster'] not in ['ilifu','galahad']:
-        msg = "The selected cluster must be one of [ilifu, galahad]. Pipeline has not been implemented for other clusters yet."
-        raise_error(config, msg, parser)
-
     if parser is None or args['build']:
         if args['MS'] is None and not args['nofields']:
             msg = "You must input an MS [-M --MS] to build the config file."
@@ -288,57 +244,62 @@ def validate_args(args,config,parser=None):
         msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
         raise_error(config, msg, parser)
 
-    if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
-        msg = "The number of tasks per node [-t --ntasks-per-node] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks_per_node'])
-        raise_error(config, msg, parser)
+    if args['cluster'] not in SAFE_CLUSTERS:
+        msg = "Specified cluster [--cluster] is not in {0}. You input {1}. Pipeline will rely entirely on the specified config. No upper limits will be set. HPC specific selections within your config which are not actually availble may cause pipeline runs to fail!"
+        logger.warning(msg.format(SAFE_CLUSTERS, args['cluster']))
 
-    if args['nodes'] > TOTAL_NODES_LIMIT:
-        msg = "The number of nodes [-N --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
-        raise_error(config, msg, parser)
-
-    if args['mem'] > MEM_PER_NODE_GB_LIMIT:
-        if args['partition'] != 'HighMem':
-            msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
-            raise_error(config, msg, parser)
-        elif args['mem'] > MEM_PER_NODE_GB_LIMIT_HIGHMEM:
-            msg = "The memory per node [-m --mem] must not exceed {0} (GB) when using 'HighMem' partition. You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT_HIGHMEM,args['mem'])
+    else:
+        if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
+            msg = "The number of tasks per node [-t --ntasks-per-node] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks_per_node'])
             raise_error(config, msg, parser)
 
-    if args['plane'] > args['ntasks_per_node']:
-        msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
-        raise_error(config, msg, parser)
+        if args['nodes'] > TOTAL_NODES_LIMIT:
+            msg = "The number of nodes [-N --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
+            raise_error(config, msg, parser)
 
-    if args['account'] not in ['b03-idia-ag','b05-pipelines-ag']:
-        from platform import node
-        if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
-            accounts=os.popen("for f in $(sacctmgr show user $USER --noheader cluster=ilifu-slurm20 -s format=account%30); do echo -n $f,; done").read()[:-1].split(',')
-            if args['account'] not in accounts:
-                msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
-                for account in accounts:
-                    if args['account'] in account:
-                        msg += ' Perhaps you meant accounting group "{0}".'.format(account)
-                        break
+        if args['mem'] > MEM_PER_NODE_GB_LIMIT:
+            if args['partition'] != 'HighMem':
+                msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
                 raise_error(config, msg, parser)
-        else:
-            msg = "Accounting group '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['account'])
-            raise_error(config, msg, parser)
-
-    if args['reservation'] != '':
-        from platform import node
-        if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
-            reservations=os.popen("scontrol show reservation | grep ReservationName | awk '{print $1}' | cut -d = -f2").read()[:-1].split('\n')
-            if args['reservation'] not in reservations:
-                msg = "Reservation '{0}' not recognised.".format(args['reservation'])
-                if reservations == ['']:
-                    msg += ' There are no active reservations.'
-                else:
-                     msg += ' Please select one of the following reservations, if applicable: {0}.'.format(reservations)
+            elif args['mem'] > MEM_PER_NODE_GB_LIMIT_HIGHMEM:
+                msg = "The memory per node [-m --mem] must not exceed {0} (GB) when using 'HighMem' partition. You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT_HIGHMEM,args['mem'])
                 raise_error(config, msg, parser)
-        else:
-            msg = "Reservation '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['reservation'])
+
+        if args['plane'] > args['ntasks_per_node']:
+            msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
             raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,casa_script=False,logfile=True,plot=False,SPWs='',nspw=1):
+        if args['account'] not in ACCOUNTS:
+            from platform import node
+            if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
+                accounts=os.popen("for f in $(sacctmgr show user $USER --noheader cluster=ilifu-slurm20 -s format=account%30); do echo -n $f,; done").read()[:-1].split(',')
+                if args['account'] not in accounts:
+                    msg = "Accounting group '{0}' not recognised. Please select one of the following from your groups: {1}.".format(args['account'],accounts)
+                    for account in accounts:
+                        if args['account'] in account:
+                            msg += ' Perhaps you meant accounting group "{0}".'.format(account)
+                            break
+                    raise_error(config, msg, parser)
+            else:
+                msg = "Accounting group '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['account'])
+                raise_error(config, msg, parser)
+
+        if args['reservation'] != '':
+            from platform import node
+            if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
+                reservations=os.popen("scontrol show reservation | grep ReservationName | awk '{print $1}' | cut -d = -f2").read()[:-1].split('\n')
+                if args['reservation'] not in reservations:
+                    msg = "Reservation '{0}' not recognised.".format(args['reservation'])
+                    if reservations == ['']:
+                        msg += ' There are no active reservations.'
+                    else:
+                         msg += ' Please select one of the following reservations, if applicable: {0}.'.format(reservations)
+                    raise_error(config, msg, parser)
+            else:
+                msg = "Reservation '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['reservation'])
+                raise_error(config, msg, parser)
+
+def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container='casa.simg',casa_script=False,logfile=True,plot=False,SPWs='',nspw=1):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -410,7 +371,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
     return command
 
 
-def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,container=CONTAINER,
+def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,container='casa.simg',
                 partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation='',modules=[],justrun=False):
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -1527,58 +1488,55 @@ def setup_logger(config,verbose=False):
 
 def main():
 
+    # Define defaults / limits for named HPC facilities
+    THIS_PROG = __file__
+    SCRIPT_DIR = os.path.dirname(THIS_PROG)
+    DEFAULTS_CONFIG_PATH = "DEFAULTS.cfg"
+    CONFIG_DEFAULTS,_ = config_parser.parse_config(
+        "{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH)
+        )
+    KNOWN_CLUSTERS = DEFAULTS.keys()
+
+    # TO DO
+
     #Parse command-line arguments, and setup logger
     args = parse_args()
     setup_logger(args.config,args.verbose)
 
-    # Cluster adaptations if required
-    if args.cluser=='galahad':
-        print('Configuring pipeline for use on Galahad ...')
-        args['partition']='WHEEL'
-        args['mem']=1000
-        MEM_PER_NODE_GB_LIMIT_HIGHMEM = 1000
-        MEM_PER_NODE_GB_LIMIT = 1000
-        # Set global limits for current ilifu cluster configuration
-        TOTAL_NODES_LIMIT = 1
-        CPUS_PER_NODE_LIMIT = 16
-        NTASKS_PER_NODE_LIMIT = CPUS_PER_NODE_LIMIT
-        MEM_PER_NODE_GB_LIMIT = 1000 #237568 MB
-        MEM_PER_NODE_GB_LIMIT_HIGHMEM = 1300 #491520 MB
+    # Select default source
+    if args.cluster in SAFE_CLUSTERS:
+        DEFAULTS = CONFIG_DEFAULTS[args.cluster]
+    else: ### Decide what to do when the cluster is not specified.
+        pass
+    # Set global limits for current ilifu cluster configuration
+    TOTAL_NODES_LIMIT = DEFAULTS['TOTAL_NODES_LIMIT']
+    CPUS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT']
+    NTASKS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT']
+    MEM_PER_NODE_GB_LIMIT = DEFAULTS['MEM_PER_NODE_GB_LIMIT'] #237568 MB
+    MEM_PER_NODE_GB_LIMIT_HIGHMEM = DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'] #491520 MB
+    ACCOUNTS = DEFAULTS['ACCOUNTS']
 
-        # Set global values for paths and file names
-        THIS_PROG = __file__
-        SCRIPT_DIR = os.path.dirname(THIS_PROG)
-        LOG_DIR = 'logs'
-        CALIB_SCRIPTS_DIR = 'crosscal_scripts'
-        AUX_SCRIPTS_DIR = 'aux_scripts'
-        SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
-        CONFIG = 'default_config.txt'
-        TMP_CONFIG = '.config.tmp'
-        MASTER_SCRIPT = 'submit_pipeline.sh'
+    #Set global values for paths and file names
+    LOG_DIR = DEFAULTS['LOG_DIR']
+    CALIB_SCRIPTS_DIR = DEFAULTS['CALIB_SCRIPTS_DIR']
+    AUX_SCRIPTS_DIR = DEFAULTS['AUX_SCRIPTS_DIR']
+    SELFCAL_SCRIPTS_DIR = DEFAULTS['SELFCAL_SCRIPTS_DIR']
+    CONFIG = DEFAULTS['CONFIG']
+    TMP_CONFIG = DEFAULTS['TMP_CONFIG']
+    MASTER_SCRIPT = DEFAULTS['MASTER_SCRIPT']
 
-        #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
-        FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
-        CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
-        SELFCAL_CONFIG_KEYS = ['nloops','restart_no','cell','robust','imsize','wprojplanes','niter','threshold','multiscale','nterms','gridder','deconvolver','solint','calmode','atrous']
-        SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
-        SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose'] + SLURM_CONFIG_STR_KEYS
-        CONTAINER = '/share/nas/mbowles/mightee/casa-stable.simg'
-        MPI_WRAPPER = CONTAINER # Fairly certain this shouldnt work, but it might.
-        PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
-        POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('run_bdsf.py', False, ''),('make_pixmask.py', False, '')] #Scripts run after calibration at top level directory when nspw > 1
-        SCRIPTS = [ ('validate_input.py',False,''),
-                    ('flag_round_1.py',True,''),
-                    ('calc_refant.py',False,''),
-                    ('setjy.py',True,''),
-                    ('xx_yy_solve.py',False,''),
-                    ('xx_yy_apply.py',True,''),
-                    ('flag_round_2.py',True,''),
-                    ('xx_yy_solve.py',False,''),
-                    ('xx_yy_apply.py',True,''),
-                    ('split.py',True,''),
-                    ('quick_tclean.py',True,''),
-                    ('plot_solutions.py',False,'')]
-
+    #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
+    FIELDS_CONFIG_KEYS = DEFAULTS['FIELDS_CONFIG_KEYS']
+    CROSSCAL_CONFIG_KEYS = DEFAULTS['CROSSCAL_CONFIG_KEYS']
+    SELFCAL_CONFIG_KEYS = DEFAULTS['SELFCAL_CONFIG_KEYS']
+    IMAGING_CONFIG_KEYS = DEFAULTS['IMAGING_CONFIG_KEYS']
+    SLURM_CONFIG_STR_KEYS = DEFAULTS['SLURM_CONFIG_KEYS']
+    SLURM_CONFIG_KEYS = DEFAULTS['SLURM_CONFIG_KEYS_BASE'] + SLURM_CONFIG_STR_KEYS
+    CONTAINER = DEFAULTS['CONTAINER']
+    MPI_WRAPPER = DEFAULTS['MPI_WRAPPER']
+    PRECAL_SCRIPTS = DEFAULTS['PRECAL_SCRIPTS']
+    POSTCAL_SCRIPTS = DEFAULTS['POSTCAL_SCRIPTS']
+    SCRIPTS = DEFAULTS['SCRIPTS']
 
     #Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
