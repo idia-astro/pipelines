@@ -1458,7 +1458,7 @@ def main():
     # Define defaults / limits for named HPC facilities
     THIS_PROG = __file__
     SCRIPT_DIR = os.path.dirname(THIS_PROG)
-    DEFAULTS_CONFIG_PATH = "DEFAULTS.cfg"
+    DEFAULTS_CONFIG_PATH = "known_hpc.cfg"
     CONFIG_DEFAULTS,_ = config_parser.parse_config(
         "{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH)
         )
