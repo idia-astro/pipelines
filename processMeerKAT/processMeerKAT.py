@@ -244,9 +244,9 @@ def validate_args(args,config,parser=None):
         msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
         raise_error(config, msg, parser)
 
-    if args['cluster'] not in SAFE_CLUSTERS:
-        msg = "Specified cluster [--cluster] is not in {0}. You input {1}. Pipeline will rely entirely on the specified config. No upper limits will be set. HPC specific selections within your config which are not actually availble may cause pipeline runs to fail!"
-        logger.warning(msg.format(SAFE_CLUSTERS, args['cluster']))
+    if args['cluster'] not in KNOWN_CLUSTERS:
+        msg = "Cluster [--cluster] is not in {0}. You input {1}. Pipeline will rely entirely on the specified config. No upper limits will be set. HPC specific selections within your config which are not actually availble may cause pipeline runs to fail!"
+        logger.warning(msg.format(KNOWN_CLUSTERS, args['cluster']))
 
     else:
         if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
@@ -299,7 +299,7 @@ def validate_args(args,config,parser=None):
                 msg = "Reservation '{0}' not recognised. You're not using a SLURM node, so cannot query your accounts.".format(args['reservation'])
                 raise_error(config, msg, parser)
 
-def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container='casa.simg',casa_script=False,logfile=True,plot=False,SPWs='',nspw=1):
+def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False,logfile=True,plot=False,SPWs='',nspw=1):
 
     """Write bash command to call a script (with args) directly with srun, or within sbatch file, optionally via CASA.
 
@@ -309,12 +309,12 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container='casa
         Path to script called (assumed to exist or be in PATH or calibration scripts directory).
     args : str
         Arguments to pass into script. Use '' for no arguments.
+    mpi_wrapper : str
+        MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
+    container : str
+        Path to singularity container used for this job.
     name : str, optional
         Name of this job, to append to CASA output name.
-    mpi_wrapper : str, optional
-        MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
-    container : str, optional
-        Path to singularity container used for this job.
     casa_script : bool, optional
         Is the script that is called within this job a CASA script?
     logfile : bool, optional
@@ -371,7 +371,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container='casa
     return command
 
 
-def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="job",runname='',plane=1,exclude='',mpi_wrapper=MPI_WRAPPER,container='casa.simg',
+def write_sbatch(script,args,mem,mpi_wrapper,nodes=1,tasks=16,name="job",runname='',plane=1,exclude='',container='casa.simg',
                 partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation='',modules=[],justrun=False):
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -381,14 +381,16 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         Path to script called within sbatch file (assumed to exist or be in PATH or calibration directory).
     args : str
         Arguments passed into script called within this sbatch file. Use '' for no arguments.
+    mem : int
+        The memory in GB (per node) to use for this job.
+    mpi_wrapper : str
+        MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
     time : str, optional
         Time limit on this job.
     nodes : int, optional
         Number of nodes to use for this job.
     tasks : int, optional
         The number of tasks per node to use for this job.
-    mem : int, optional
-        The memory in GB (per node) to use for this job.
     name : str, optional
         Name for this job, used in naming the various output files.
     runname : str, optional
@@ -397,8 +399,6 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
         Distrubute tasks for this job using this block size before moving onto next node.
     exclude : str, optional
         SLURM worker nodes to exclude.
-    mpi_wrapper : str, optional
-        MPI wrapper for this job. e.g. 'srun', 'mpirun', 'mpicasa' (may need to specify path).
     container : str, optional
         Path to singularity container used for this job.
     partition : str, optional
@@ -907,7 +907,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
 
     return call
 
-def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1, partition='Main',
+def write_jobs(config, mpi_wrapper, mem, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, nodes=8, ntasks_per_node=4, plane=1, partition='Main',
                time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', modules=[], timestamp='', justrun=False):
 
     """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
@@ -916,6 +916,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
     ----------
     config : str
         Path to config file.
+    mem : int
+        The memory in GB (per node) to use for this job.
+    mpi_wrapper : str
+        Path to MPI wrapper to use for threadsafe tasks (otherwise srun used).
     scripts : list (of paths), optional
         List of paths to scripts (assumed to be python -- i.e. extension .py) to call within seperate sbatch jobs.
     threadsafe : list (of bools), optional
@@ -924,14 +928,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
         List of paths to singularity containers to use for each script. List assumed to be same length as scripts.
     num_precal_scripts : int, optional
         Number of precal scripts.
-    mpi_wrapper : str, optional
-        Path to MPI wrapper to use for threadsafe tasks (otherwise srun used).
     nodes : int, optional
         Number of nodes to use for this job.
     tasks : int, optional
         The number of tasks per node to use for this job.
-    mem : int, optional
-        The memory in GB (per node) to use for this job.
     plane : int, optional
         Distrubute tasks for this job using this block size before moving onto next node.
     partition : str, optional
@@ -1497,26 +1497,24 @@ def main():
         )
     KNOWN_CLUSTERS = DEFAULTS.keys()
 
-    # TO DO
-
     #Parse command-line arguments, and setup logger
     args = parse_args()
     setup_logger(args.config,args.verbose)
 
     # Select default source
-    if args.cluster in SAFE_CLUSTERS:
+    if args.cluster in KNOWN_CLUSTERS:
         DEFAULTS = CONFIG_DEFAULTS[args.cluster]
     else: ### Decide what to do when the cluster is not specified.
         pass
-    # Set global limits for current ilifu cluster configuration
+    # Set limits for current cluster configuration
     TOTAL_NODES_LIMIT = DEFAULTS['TOTAL_NODES_LIMIT']
     CPUS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT']
     NTASKS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT']
-    MEM_PER_NODE_GB_LIMIT = DEFAULTS['MEM_PER_NODE_GB_LIMIT'] #237568 MB
-    MEM_PER_NODE_GB_LIMIT_HIGHMEM = DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'] #491520 MB
+    MEM_PER_NODE_GB_LIMIT = DEFAULTS['MEM_PER_NODE_GB_LIMIT']
+    MEM_PER_NODE_GB_LIMIT_HIGHMEM = DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM']
     ACCOUNTS = DEFAULTS['ACCOUNTS']
 
-    #Set global values for paths and file names
+    # Set global values for paths and file names
     LOG_DIR = DEFAULTS['LOG_DIR']
     CALIB_SCRIPTS_DIR = DEFAULTS['CALIB_SCRIPTS_DIR']
     AUX_SCRIPTS_DIR = DEFAULTS['AUX_SCRIPTS_DIR']
@@ -1525,7 +1523,7 @@ def main():
     TMP_CONFIG = DEFAULTS['TMP_CONFIG']
     MASTER_SCRIPT = DEFAULTS['MASTER_SCRIPT']
 
-    #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
+    # Set global values for field, crosscal and SLURM arguments copied to config file
     FIELDS_CONFIG_KEYS = DEFAULTS['FIELDS_CONFIG_KEYS']
     CROSSCAL_CONFIG_KEYS = DEFAULTS['CROSSCAL_CONFIG_KEYS']
     SELFCAL_CONFIG_KEYS = DEFAULTS['SELFCAL_CONFIG_KEYS']
@@ -1538,7 +1536,7 @@ def main():
     POSTCAL_SCRIPTS = DEFAULTS['POSTCAL_SCRIPTS']
     SCRIPTS = DEFAULTS['SCRIPTS']
 
-    #Mutually exclusive arguments - display version, build config file or run pipeline
+    # Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
         logger.info('This is version {0}'.format(__version__))
     if args.license:
@@ -1547,7 +1545,7 @@ def main():
         default_config(vars(args))
     if args.run:
         kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.justrun)
-        write_jobs(args.config, **kwargs)
+        write_jobs(args.config, mpi_wrapper=MPI_WRAPPER,**kwargs)
 
 if __name__ == "__main__":
     main()
