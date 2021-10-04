@@ -371,7 +371,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
     return command
 
 
-def write_sbatch(script,args,mem,mpi_wrapper,nodes=1,tasks=16,name="job",runname='',plane=1,exclude='',container='casa.simg',
+def write_sbatch(script,args,mem,mpi_wrapper,contents,nodes=1,tasks=16,name="job",runname='',plane=1,exclude='',container='casa.simg',
                 partition="Main",time="12:00:00",casa_script=False,SPWs='',nspw=1,account='b03-idia-ag',reservation='',modules=[],justrun=False):
     """Write a SLURM sbatch file calling a certain script (and args) with a particular configuration.
 
@@ -480,39 +480,9 @@ def write_sbatch(script,args,mem,mpi_wrapper,nodes=1,tasks=16,name="job",runname
         for module in modules:
             if len(module) > 0:
                 params['modules'] += "module load {0}\n".format(module)
-    if params['cluster']=='ilifu':
-        contents = """#!/bin/bash{array}{exclude}{reservation}
-        #SBATCH --account={account}
-        #SBATCH --nodes={nodes}
-        #SBATCH --ntasks-per-node={tasks}
-        #SBATCH --cpus-per-task={cpus}
-        #SBATCH --mem={mem}GB
-        #SBATCH --job-name={runname}{name}
-        #SBATCH --distribution=plane={plane}
-        #SBATCH --output={LOG_DIR}/%x-{ID}.out
-        #SBATCH --error={LOG_DIR}/%x-{ID}.err
-        #SBATCH --partition={partition}
-        #SBATCH --time={time}
 
-        export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-        {modules}
+    contents = contents+"\nexport OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK\n{modules}\n\n{command}"
 
-        {command}"""
-    elif params['cluster'] == 'galahad':
-        contents="""#!/bin/bash{array}{exclude}{reservation}
-        #SBATCH --nodes={nodes}
-        #SBATCH --threads=16
-        #SBATCH --cpus-per-task=1
-        #SBATCH --mem=1000GB
-        #SBATCH --job-name={runname}{name}
-        #SBATCH --output={LOG_DIR}/%x-{ID}.out
-        #SBATCH --error={LOG_DIR}/%x-{ID}.err
-        #SBATCH --partition={partition}
-        #SBATCH --time={time}
-        #SBATCH -w compute-0-100
-
-        {command}
-        """
     #insert arguments and remove whitespace
     contents = contents.format(**params).replace("    ","")
 
@@ -525,9 +495,6 @@ def write_sbatch(script,args,mem,mpi_wrapper,nodes=1,tasks=16,name="job",runname
         config.write(contents)
         config.close()
         logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
-
-    if params['cluster'] == 'galahad':
-        print("Galahad sbatch file content formated as:\n{0}".format(contents))
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
@@ -907,7 +874,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
 
     return call
 
-def write_jobs(config, mpi_wrapper, mem, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, nodes=8, ntasks_per_node=4, plane=1, partition='Main',
+def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, nodes=8, ntasks_per_node=4, plane=1, partition='Main',
                time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', modules=[], timestamp='', justrun=False):
 
     """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
@@ -971,10 +938,10 @@ def write_jobs(config, mpi_wrapper, mem, scripts=[], threadsafe=[], containers=[
 
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),contents=contents,nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,
                         time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation,modules=modules,justrun=justrun)
         else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],partition=partition,time=time,name=jobname,
+            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),contents=contents,nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],partition=partition,time=time,name=jobname,
                         runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation,modules=modules,justrun=justrun)
 
     #Replace all .py with .sbatch
@@ -1507,34 +1474,37 @@ def main():
     else: ### Decide what to do when the cluster is not specified.
         pass
     # Set limits for current cluster configuration
-    TOTAL_NODES_LIMIT = DEFAULTS['TOTAL_NODES_LIMIT']
-    CPUS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT']
-    NTASKS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT']
-    MEM_PER_NODE_GB_LIMIT = DEFAULTS['MEM_PER_NODE_GB_LIMIT']
-    MEM_PER_NODE_GB_LIMIT_HIGHMEM = DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM']
-    ACCOUNTS = DEFAULTS['ACCOUNTS']
+    TOTAL_NODES_LIMIT = DEFAULTS['TOTAL_NODES_LIMIT'.lower()]
+    CPUS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
+    NTASKS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
+    MEM_PER_NODE_GB_LIMIT = DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]
+    MEM_PER_NODE_GB_LIMIT_HIGHMEM = DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()]
+    ACCOUNTS = DEFAULTS['ACCOUNTS'.lower()]
 
     # Set global values for paths and file names
-    LOG_DIR = DEFAULTS['LOG_DIR']
-    CALIB_SCRIPTS_DIR = DEFAULTS['CALIB_SCRIPTS_DIR']
-    AUX_SCRIPTS_DIR = DEFAULTS['AUX_SCRIPTS_DIR']
-    SELFCAL_SCRIPTS_DIR = DEFAULTS['SELFCAL_SCRIPTS_DIR']
-    CONFIG = DEFAULTS['CONFIG']
-    TMP_CONFIG = DEFAULTS['TMP_CONFIG']
-    MASTER_SCRIPT = DEFAULTS['MASTER_SCRIPT']
+    LOG_DIR = DEFAULTS['LOG_DIR'.lower()]
+    CALIB_SCRIPTS_DIR = DEFAULTS['CALIB_SCRIPTS_DIR'.lower()]
+    AUX_SCRIPTS_DIR = DEFAULTS['AUX_SCRIPTS_DIR'.lower()]
+    SELFCAL_SCRIPTS_DIR = DEFAULTS['SELFCAL_SCRIPTS_DIR'.lower()]
+    CONFIG = DEFAULTS['CONFIG'.lower()]
+    TMP_CONFIG = DEFAULTS['TMP_CONFIG'.lower()]
+    MASTER_SCRIPT = DEFAULTS['MASTER_SCRIPT'.lower()]
 
     # Set global values for field, crosscal and SLURM arguments copied to config file
-    FIELDS_CONFIG_KEYS = DEFAULTS['FIELDS_CONFIG_KEYS']
-    CROSSCAL_CONFIG_KEYS = DEFAULTS['CROSSCAL_CONFIG_KEYS']
-    SELFCAL_CONFIG_KEYS = DEFAULTS['SELFCAL_CONFIG_KEYS']
-    IMAGING_CONFIG_KEYS = DEFAULTS['IMAGING_CONFIG_KEYS']
-    SLURM_CONFIG_STR_KEYS = DEFAULTS['SLURM_CONFIG_KEYS']
-    SLURM_CONFIG_KEYS = DEFAULTS['SLURM_CONFIG_KEYS_BASE'] + SLURM_CONFIG_STR_KEYS
-    CONTAINER = DEFAULTS['CONTAINER']
-    MPI_WRAPPER = DEFAULTS['MPI_WRAPPER']
-    PRECAL_SCRIPTS = DEFAULTS['PRECAL_SCRIPTS']
-    POSTCAL_SCRIPTS = DEFAULTS['POSTCAL_SCRIPTS']
-    SCRIPTS = DEFAULTS['SCRIPTS']
+    FIELDS_CONFIG_KEYS = DEFAULTS['FIELDS_CONFIG_KEYS'.lower()]
+    CROSSCAL_CONFIG_KEYS = DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()]
+    SELFCAL_CONFIG_KEYS = DEFAULTS['SELFCAL_CONFIG_KEYS'.lower()]
+    IMAGING_CONFIG_KEYS = DEFAULTS['IMAGING_CONFIG_KEYS'.lower()]
+    SLURM_CONFIG_STR_KEYS = DEFAULTS['SLURM_CONFIG_KEYS'.lower()]
+    SLURM_CONFIG_KEYS = DEFAULTS['SLURM_CONFIG_KEYS_BASE'.lower()] + SLURM_CONFIG_STR_KEYS
+    CONTAINER = DEFAULTS['CONTAINER'.lower()]
+    MPI_WRAPPER = DEFAULTS['MPI_WRAPPER'.lower()]
+    PRECAL_SCRIPTS = DEFAULTS['PRECAL_SCRIPTS'.lower()]
+    POSTCAL_SCRIPTS = DEFAULTS['POSTCAL_SCRIPTS'.lower()]
+    SCRIPTS = DEFAULTS['SCRIPTS'.lower()]
+
+    # Read in SBATCH file contents
+    contents = DEFAULTS['sbatch_file_base']
 
     # Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
@@ -1545,7 +1515,7 @@ def main():
         default_config(vars(args))
     if args.run:
         kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.justrun)
-        write_jobs(args.config, mpi_wrapper=MPI_WRAPPER,**kwargs)
+        write_jobs(args.config, mpi_wrapper=MPI_WRAPPER, contents=contents,**kwargs)
 
 if __name__ == "__main__":
     main()
