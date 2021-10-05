@@ -65,12 +65,12 @@ def check_path(path,update=False):
             newpath = '../{0}'.format(path)
         elif os.path.exists('{0}/{1}'.format(SCRIPT_DIR,path)):
             newpath = '{0}/{1}'.format(SCRIPT_DIR,path)
-        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)):
-            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,CALIB_SCRIPTS_DIR,path)
-        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)):
-            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,AUX_SCRIPTS_DIR,path)
-        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR,SELFCAL_SCRIPTS_DIR,path)):
-            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR,SELFCAL_SCRIPTS_DIR,path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR, HPC_DEFAULTS['CALIB_SCRIPTS_DIR'.lower()], path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR, HPC_DEFAULTS['CALIB_SCRIPTS_DIR'.lower()], path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR, HPC_DEFAULTS['AUX_SCRIPTS_DIR'.lower()], path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR, HPC_DEFAULTS['AUX_SCRIPTS_DIR'.lower()], path)
+        elif os.path.exists('{0}/{1}/{2}'.format(SCRIPT_DIR, HPC_DEFAULTS['SELFCAL_SCRIPTS_DIR'.lower()], path)):
+            newpath = '{0}/{1}/{2}'.format(SCRIPT_DIR, HPC_DEFAULTS['SELFCAL_SCRIPTS_DIR'.lower()], path)
         elif os.path.exists(check_bash_path(path)):
             newpath = check_bash_path(path)
         else:
@@ -134,25 +134,25 @@ def parse_args():
 
     parser.add_argument("--cluster",metavar='name', required=False, type=str, default="ilifu", help="Name of cluster being used if not ilifu default slurm limits are removed [default: ilifu].")
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
-    parser.add_argument("-C","--config",metavar="path", default=CONFIG, required=False, type=str, help="Relative (not absolute) path to config file.")
+    parser.add_argument("-C","--config",metavar="path", default=HPC_DEFAULTS['CONFIG'.lower()], required=False, type=str, help="Relative (not absolute) path to config file.")
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
-                        help="Use this number of nodes [default: 1; max: {0}].".format(TOTAL_NODES_LIMIT))
+                        help="Use this number of nodes [default: 1; max: {0}].".format(HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()]))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
-                        help="Use this number of tasks (per node) [default: 16; max: {0}].".format(NTASKS_PER_NODE_LIMIT))
+                        help="Use this number of tasks (per node) [default: 16; max: {0}].".format(HPC_DEFAULTS['NTASKS_PER_NODE_LIMIT'.lower()]))
     parser.add_argument("-D","--plane", metavar="num", required=False, type=int, default=1,
                             help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
-    parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=MEM_PER_NODE_GB_LIMIT,
-                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(MEM_PER_NODE_GB_LIMIT))
+    parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()],
+                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]))
     parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="Time limit to use for all jobs, in the form d-hh:mm:ss [default: '12:00:00'].")
-    parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=SCRIPTS,
+    parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['SCRIPTS'.lower()],
                         help="Run pipeline with these scripts, in this order, using these containers (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
-    parser.add_argument("-b","--precal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=PRECAL_SCRIPTS, help="Same as [-S --scripts], but run before calibration.")
-    parser.add_argument("-a","--postcal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=POSTCAL_SCRIPTS, help="Same as [-S --scripts], but run after calibration.")
+    parser.add_argument("-b","--precal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()], help="Same as [-S --scripts], but run before calibration.")
+    parser.add_argument("-a","--postcal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['POSTCAL_SCRIPTS'], help="Same as [-S --scripts], but run after calibration.")
     parser.add_argument("--modules", nargs='*', metavar='module', required=False, default=['openmpi/2.1.1'], help="Load these modules within each sbatch script.")
-    parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=MPI_WRAPPER,
-                        help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(MPI_WRAPPER))
-    parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(CONTAINER))
+    parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=HPC_DEFAULTS['MPI_WRAPPER'.lower()],
+                        help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(HPC_DEFAULTS['MPI_WRAPPER'.lower()]))
+    parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=CONTAINER, help="Use this container when calling scripts [default: '{0}'].".format(HPC_DEFAULTS['CONTAINER'.lower()]))
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
@@ -188,12 +188,12 @@ def parse_args():
             parser.error("Input config file '{0}' not found. Please set [-C --config] or write a new one with [-B --build].".format(args.config))
 
     #if user inputs a list a scripts, remove the default list
-    if len(args.scripts) > len(SCRIPTS):
-        [args.scripts.pop(0) for i in range(len(SCRIPTS))]
-    if len(args.precal_scripts) > len(PRECAL_SCRIPTS):
-        [args.precal_scripts.pop(0) for i in range(len(PRECAL_SCRIPTS))]
-    if len(args.postcal_scripts) > len(POSTCAL_SCRIPTS):
-        [args.postcal_scripts.pop(0) for i in range(len(POSTCAL_SCRIPTS))]
+    if len(args.scripts) > len(HPC_DEFAULTS['SCRIPTS'.lower()]):
+        [args.scripts.pop(0) for i in range(len(HPC_DEFAULTS['SCRIPTS'.lower()]))]
+    if len(args.precal_scripts) > len(HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()]):
+        [args.precal_scripts.pop(0) for i in range(len(HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()]))]
+    if len(args.postcal_scripts) > len(HPC_DEFAULTS['POSTCAL_SCRIPTS'.lower()]):
+        [args.postcal_scripts.pop(0) for i in range(len(HPC_DEFAULTS['POSTCAL_SCRIPTS'.lower()]))]
 
     #validate arguments before returning them
     validate_args(vars(args),args.config,parser=parser)
@@ -244,32 +244,32 @@ def validate_args(args,config,parser=None):
         msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
         raise_error(config, msg, parser)
 
-    if args['cluster'] not in KNOWN_HPC:
+    if args['cluster'] not in HPC_DEFAULTS.keys():
         msg = "Cluster [--cluster] is not in {0}. You input {1}. Pipeline will rely entirely on the specified config. No upper limits will be set. HPC specific selections within your config which are not actually availble may cause pipeline runs to fail!"
-        logger.warning(msg.format(KNOWN_HPC, args['cluster']))
+        logger.warning(msg.format(HPC_DEFAULTS.keys(), args['cluster']))
 
     else:
-        if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
-            msg = "The number of tasks per node [-t --ntasks-per-node] must not exceed {0}. You input {1}.".format(NTASKS_PER_NODE_LIMIT,args['ntasks_per_node'])
+        if args['ntasks_per_node'] > HPC_DEFAULTS['NTASKS_PER_NODE_LIMIT'.lower()]:
+            msg = "The number of tasks per node [-t --ntasks-per-node] must not exceed {0}. You input {1}.".format(HPC_DEFAULTS['NTASKS_PER_NODE_LIMIT'.lower()],args['ntasks_per_node'])
             raise_error(config, msg, parser)
 
-        if args['nodes'] > TOTAL_NODES_LIMIT:
-            msg = "The number of nodes [-N --nodes] per node must not exceed {0}. You input {1}.".format(TOTAL_NODES_LIMIT,args['nodes'])
+        if args['nodes'] > HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()]:
+            msg = "The number of nodes [-N --nodes] per node must not exceed {0}. You input {1}.".format(HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()],args['nodes'])
             raise_error(config, msg, parser)
 
-        if args['mem'] > MEM_PER_NODE_GB_LIMIT:
+        if args['mem'] > HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]:
             if args['partition'] != 'HighMem':
-                msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT,args['mem'])
+                msg = "The memory per node [-m --mem] must not exceed {0} (GB). You input {1} (GB).".format(HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()],args['mem'])
                 raise_error(config, msg, parser)
-            elif args['mem'] > MEM_PER_NODE_GB_LIMIT_HIGHMEM:
-                msg = "The memory per node [-m --mem] must not exceed {0} (GB) when using 'HighMem' partition. You input {1} (GB).".format(MEM_PER_NODE_GB_LIMIT_HIGHMEM,args['mem'])
+            elif args['mem'] > HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()]:
+                msg = "The memory per node [-m --mem] must not exceed {0} (GB) when using 'HighMem' partition. You input {1} (GB).".format(HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()],args['mem'])
                 raise_error(config, msg, parser)
 
         if args['plane'] > args['ntasks_per_node']:
             msg = "The value of [-P --plane] cannot be greater than the tasks per node [-t --ntasks-per-node] ({0}). You input {1}.".format(args['ntasks_per_node'],args['plane'])
             raise_error(config, msg, parser)
 
-        if args['account'] not in ACCOUNTS:
+        if args['account'] not in HPC_DEFAULTS['ACCOUNTS'.lower()]:
             from platform import node
             if 'slurm-login' in node() or 'slwrk' in node() or 'compute' in node():
                 accounts=os.popen("for f in $(sacctmgr show user $USER --noheader cluster=ilifu-slurm20 -s format=account%30); do echo -n $f,; done").read()[:-1].split(',')
@@ -335,7 +335,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
 
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
-    params['LOG_DIR'] = LOG_DIR
+    params['LOG_DIR'] = HPC_DEFAULTS['LOG_DIR'.lower()]
     params['job'] = '${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}' if arrayJob else '${SLURM_JOB_ID}'
     params['job'] = '${SLURM_JOB_NAME}-' + params['job']
     params['casa_call'] = ''
@@ -420,31 +420,31 @@ def write_sbatch(script,args,mem,mpi_wrapper,contents,nodes=1,tasks=16,name="job
     justrun : bool, optionall
         Just run the pipeline without rebuilding each job script (if it exists)."""
 
-    if not os.path.exists(LOG_DIR):
-        os.mkdir(LOG_DIR)
+    if not os.path.exists(HPC_DEFAULTS['LOG_DIR'.lower()]):
+        os.mkdir(HPC_DEFAULTS['LOG_DIR'.lower()])
 
     #Store parameters passed into this function as dictionary, and add to it
     params = locals()
-    params['LOG_DIR'] = LOG_DIR
+    params['LOG_DIR'] = HPC_DEFAULTS['LOG_DIR'.lower()]
 
     #Use multiple CPUs for tclean and paratition scripts
     params['cpus'] = 1
     if 'tclean' in script or 'selfcal' in script or 'partition' in script or 'image' in script:
-        params['cpus'] = int(CPUS_PER_NODE_LIMIT/tasks)
+        params['cpus'] = int(HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]/tasks)
     #hard-code for 2/4 polarisations
     if 'partition' in script:
-        dopol = config_parser.get_key(TMP_CONFIG, 'run', 'dopol')
-        if dopol and 4*tasks < CPUS_PER_NODE_LIMIT:
+        dopol = config_parser.get_key(HPC_DEFAULTS['TMP_CONFIG'.lower()], 'run', 'dopol')
+        if dopol and 4*tasks < HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]:
             params['cpus'] = 4
         elif not dopol and params['cpus'] > 2:
             params['cpus'] = 2
 
     #If requesting all CPUs, user may as well use all memory
-    if params['cpus'] * tasks == CPUS_PER_NODE_LIMIT:
+    if params['cpus'] * tasks == HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]:
         if params['partition'] == 'HighMem':
-            params['mem'] = MEM_PER_NODE_GB_LIMIT_HIGHMEM
+            params['mem'] = HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()]
         else:
-            params['mem'] = MEM_PER_NODE_GB_LIMIT
+            params['mem'] = HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]
 
     #Use xvfb for plotting scripts
     plot = ('plot' in script)
@@ -701,8 +701,8 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     #Copy config file to TMP_CONFIG and inform user
     if verbose:
-        master.write("\necho Copying \'{0}\' to \'{1}\', and using this to run pipeline.\n".format(config,TMP_CONFIG))
-    master.write('cp {0} {1}\n'.format(config, TMP_CONFIG))
+        master.write("\necho Copying \'{0}\' to \'{1}\', and using this to run pipeline.\n".format(config,HPC_DEFAULTS['TMP_CONFIG'.lower()]))
+    master.write('cp {0} {1}\n'.format(config, HPC_DEFAULTS['TMP_CONFIG'.lower()]))
 
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
@@ -800,6 +800,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
     write_bash_job_script(master, killScript, extn, 'echo scancel ${0}'.format(IDs), 'kill all the jobs', dir=dir, echo=echo)
     do = """echo sacct -j ${0} --units=G -o "JobID%-15,JobName%-{1},Partition,Elapsed,NNodes%6,NTasks%6,NCPUS%5,MaxDiskRead,MaxDiskWrite,NodeList%20,TotalCPU,CPUTime,MaxRSS,State,ExitCode" \$@ """.format(IDs,15+pad_length)
     write_bash_job_script(master, summaryScript, extn, do, 'view the progress', dir=dir, echo=echo)
+    LOG_DIR = HPC_DEFAULTS['LOG_DIR'.lower()]
     do = """echo "for ID in {$%s,}; do files=\$(ls %s/*\$ID* 2>/dev/null | wc -l); if [ \$((files)) != 0 ]; then ls %s/*\$ID*; cat %s/*\$ID* | grep -i 'severe\|error' | grep -vi 'mpi\|The selected table has zero rows\|MeasTable::dUTC(Double)'; else echo %s/*\$ID* logs don\\'t exist \(yet\); fi; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR,LOG_DIR)
     write_bash_job_script(master, errorScript, extn, do, 'find errors \(after pipeline has run\)', dir=dir, echo=echo)
     do = """echo "for ID in {$%s,}; do files=\$(ls %s/*\$ID* 2>/dev/null | wc -l); if [ \$((files)) != 0 ]; then logs=\$(ls %s/*\$ID* | sort -V); ls -f \$logs; cat \$(ls -tU \$logs) | grep INFO | head -n 1 | cut -d 'I' -f1; cat \$(ls -tr \$logs) | grep INFO | tail -n 1 | cut -d 'I' -f1; else echo %s/*\$ID* logs don\\'t exist \(yet\); fi; done" """ % (IDs,LOG_DIR,LOG_DIR,LOG_DIR)
@@ -929,7 +930,7 @@ def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], co
         Just run the pipeline without rebuilding each job script (if it exists)."""
 
     kwargs = locals()
-    crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
+    crosscal_kwargs = get_config_kwargs(config, 'crosscal', HPC_DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()])
     pad_length = len(name)
 
     #Write sbatch file for each input python script
@@ -938,10 +939,10 @@ def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], co
 
         #Use input SLURM configuration for threadsafe tasks, otherwise call srun with single node and single thread
         if threadsafe[i]:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),contents=contents,nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,
+            write_sbatch(script,'--config {0}'.format(HPC_DEFAULTS['TMP_CONFIG'.lower()]),contents=contents,nodes=nodes,tasks=ntasks_per_node,mem=mem,plane=plane,exclude=exclude,mpi_wrapper=mpi_wrapper,container=containers[i],partition=partition,
                         time=time,name=jobname,runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],account=account,reservation=reservation,modules=modules,justrun=justrun)
         else:
-            write_sbatch(script,'--config {0}'.format(TMP_CONFIG),contents=contents,nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],partition=partition,time=time,name=jobname,
+            write_sbatch(script,'--config {0}'.format(HPC_DEFAULTS['TMP_CONFIG']),contents=contents,nodes=1,tasks=1,mem=mem,plane=1,mpi_wrapper='srun',container=containers[i],partition=partition,time=time,name=jobname,
                         runname=name,SPWs=crosscal_kwargs['spw'],nspw=crosscal_kwargs['nspw'],exclude=exclude,account=account,reservation=reservation,modules=modules,justrun=justrun)
 
     #Replace all .py with .sbatch
@@ -952,10 +953,10 @@ def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], co
 
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once, precal scripts before this, and postcal scripts after this
-        write_spw_master(MASTER_SCRIPT,config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp,slurm_kwargs=kwargs)
+        write_spw_master(HPC_DEFAULTS['MASTER_SCRIPT'.lower()],config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp,slurm_kwargs=kwargs)
     else:
         #Build master pipeline submission script
-        write_master(MASTER_SCRIPT,config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies,slurm_kwargs=kwargs)
+        write_master(HPC_DEFAULTS['MASTER_SCRIPT'.lower()],config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies,slurm_kwargs=kwargs)
 
 
 def default_config(arg_dict):
@@ -971,11 +972,11 @@ def default_config(arg_dict):
     MS = arg_dict['MS']
 
     #Copy default config to current location
-    copyfile('{0}/{1}'.format(SCRIPT_DIR,CONFIG),filename)
+    copyfile('{0}/{1}'.format(SCRIPT_DIR,HPC_DEFAULTS['CONFIG'.lower()]),filename)
 
     #Add SLURM CL arguments to config file under section [slurm]
-    slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
-    for key in SLURM_CONFIG_STR_KEYS:
+    slurm_dict = get_slurm_dict(arg_dict,HPC_DEFAULTS['SLURM_CONFIG_KEYS'.lower()])
+    for key in HPC_DEFAULTS['SLURM_CONFIG_STR_KEYS'.lower()]:
         if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
 
     #Overwrite CL parameters in config under section [slurm]
@@ -1113,20 +1114,20 @@ def format_args(config,submit,quiet,dependencies,justrun):
         Keyword arguments extracted from [slurm] section of config file, to be passed into write_jobs() function."""
 
     #Ensure all keys exist in these sections
-    kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
+    kwargs = get_config_kwargs(config,'slurm',HPC_DEFAULTS['SLURM_CONFIG_KEYS'.lower()])
     data_kwargs = get_config_kwargs(config,'data',['vis'])
-    get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
-    crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
+    get_config_kwargs(config, 'fields', HPC_DEFAULTS['FIELDS_CONFIG_KEYS'.lower()])
+    crosscal_kwargs = get_config_kwargs(config, 'crosscal', HPC_DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()])
 
     #Check selfcal params
     if config_parser.has_section(config,'selfcal'):
-        selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
+        selfcal_kwargs = get_config_kwargs(config, 'selfcal', HPC_DEFAULTS['SELFCAL_CONFIG_KEYS'.lower()])
         bookkeeping.get_selfcal_params()
         if selfcal_kwargs['loop'] > 0:
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
 
     if config_parser.has_section(config,'image'):
-        imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
+        imaging_kwargs = get_config_kwargs(config, 'image', HPC_DEFAULTS['IMAGING_CONFIG_KEYS'.lower()])
 
     #Force submit=True if user has requested it during [-R --run]
     if submit:
@@ -1159,7 +1160,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
             config_parser.overwrite_config(config, conf_dict={'scripts' : scripts}, conf_sec='slurm')
             config_parser.overwrite_config(config, conf_dict={'precal_scripts' : []}, conf_sec='slurm')
             config_parser.overwrite_config(config, conf_dict={'postcal_scripts' : []}, conf_sec='slurm')
-            kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
+            kwargs = get_config_kwargs(config,'slurm', HPC_DEFAULTS['SLURM_CONFIG_KEYS'.lower()])
         else:
             scripts = kwargs['scripts']
     else:
@@ -1195,7 +1196,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
             kwargs['threadsafe'][kwargs['scripts'].index(threadsafe_script)] = True
 
     #Only reduce the memory footprint if we're not using all CPUs on each node
-    if kwargs['ntasks_per_node'] < NTASKS_PER_NODE_LIMIT and nspw > 1:
+    if kwargs['ntasks_per_node'] < HPC_DEFAULTS['NTASKS_PER_NODE_LIMIT'.lower()] and nspw > 1:
         mem = int(mem // (nspw/2))
 
     dopol = config_parser.get_key(config, 'run', 'dopol')
@@ -1237,8 +1238,8 @@ def format_args(config,submit,quiet,dependencies,justrun):
         #sys.exit(1)
 
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
-    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config,TMP_CONFIG))
-    copyfile(config, TMP_CONFIG)
+    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config, HPC_DEFAULTS['TMP_CONFIG'.lower()]))
+    copyfile(config, HPC_DEFAULTS['TMP_CONFIG'.lower()])
     if not quiet:
         logger.warning("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
@@ -1454,6 +1455,8 @@ def setup_logger(config,verbose=False):
     logger.setLevel(loglevel)
 
 def main():
+    # Define global variables (module level)
+    global THIS_PROG, SCRIPT_DIR, HPC_DEFAULTS
 
     # Define defaults / limits for named HPC facilities
     THIS_PROG = __file__
@@ -1462,50 +1465,17 @@ def main():
     HPC_DEFAULTS,_ = config_parser.parse_config(
         "{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH)
         )
-    KNOWN_HPC = HPC_DEFAULTS.keys()
 
     #Parse command-line arguments, and setup logger
     args = parse_args()
     setup_logger(args.config,args.verbose)
 
     # Select default source
+    KNOWN_HPC = HPC_DEFAULTS.keys()
     if args.cluster in KNOWN_HPC:
         HPC_DEFAULTS = HPC_DEFAULTS[args.cluster]
     else:
         HPC_DEFAULTS = HPC_DEFAULTS['unknown']
-        pass
-    # Set limits for current cluster configuration
-    TOTAL_NODES_LIMIT = HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()]
-    CPUS_PER_NODE_LIMIT = HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
-    NTASKS_PER_NODE_LIMIT = HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
-    MEM_PER_NODE_GB_LIMIT = HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]
-    MEM_PER_NODE_GB_LIMIT_HIGHMEM = HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()]
-    ACCOUNTS = DEFAULTS['ACCOUNTS'.lower()]
-
-    # Set global values for paths and file names
-    LOG_DIR = HPC_DEFAULTS['LOG_DIR'.lower()]
-    CALIB_SCRIPTS_DIR = HPC_DEFAULTS['CALIB_SCRIPTS_DIR'.lower()]
-    AUX_SCRIPTS_DIR = HPC_DEFAULTS['AUX_SCRIPTS_DIR'.lower()]
-    SELFCAL_SCRIPTS_DIR = HPC_DEFAULTS['SELFCAL_SCRIPTS_DIR'.lower()]
-    CONFIG = HPC_DEFAULTS['CONFIG'.lower()]
-    TMP_CONFIG = HPC_DEFAULTS['TMP_CONFIG'.lower()]
-    MASTER_SCRIPT = HPC_DEFAULTS['MASTER_SCRIPT'.lower()]
-
-    # Set global values for field, crosscal and SLURM arguments copied to config file
-    FIELDS_CONFIG_KEYS = HPC_DEFAULTS['FIELDS_CONFIG_KEYS'.lower()]
-    CROSSCAL_CONFIG_KEYS = HPC_DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()]
-    SELFCAL_CONFIG_KEYS = HPC_DEFAULTS['SELFCAL_CONFIG_KEYS'.lower()]
-    IMAGING_CONFIG_KEYS = HPC_DEFAULTS['IMAGING_CONFIG_KEYS'.lower()]
-    SLURM_CONFIG_STR_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS'.lower()]
-    SLURM_CONFIG_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS_BASE'.lower()] + SLURM_CONFIG_STR_KEYS
-    CONTAINER = HPC_DEFAULTS['CONTAINER'.lower()]
-    MPI_WRAPPER = HPC_DEFAULTS['MPI_WRAPPER'.lower()]
-    PRECAL_SCRIPTS = HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()]
-    POSTCAL_SCRIPTS = HPC_DEFAULTS['POSTCAL_SCRIPTS'.lower()]
-    SCRIPTS = HPC_DEFAULTS['SCRIPTS'.lower()]
-
-    # Read in SBATCH file contents
-    contents = HPC_DEFAULTS['sbatch_file_base']
 
     # Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
@@ -1516,7 +1486,7 @@ def main():
         default_config(vars(args))
     if args.run:
         kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.justrun)
-        write_jobs(args.config, mpi_wrapper=MPI_WRAPPER, contents=contents,**kwargs)
+        write_jobs(args.config, mpi_wrapper=MPI_WRAPPER, contents=HPC_DEFAULTS['sbatch_file_base'], **kwargs)
 
 if __name__ == "__main__":
     main()
