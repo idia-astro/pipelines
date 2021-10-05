@@ -244,9 +244,9 @@ def validate_args(args,config,parser=None):
         msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
         raise_error(config, msg, parser)
 
-    if args['cluster'] not in KNOWN_CLUSTERS:
+    if args['cluster'] not in KNOWN_HPC:
         msg = "Cluster [--cluster] is not in {0}. You input {1}. Pipeline will rely entirely on the specified config. No upper limits will be set. HPC specific selections within your config which are not actually availble may cause pipeline runs to fail!"
-        logger.warning(msg.format(KNOWN_CLUSTERS, args['cluster']))
+        logger.warning(msg.format(KNOWN_HPC, args['cluster']))
 
     else:
         if args['ntasks_per_node'] > NTASKS_PER_NODE_LIMIT:
@@ -1459,52 +1459,53 @@ def main():
     THIS_PROG = __file__
     SCRIPT_DIR = os.path.dirname(THIS_PROG)
     DEFAULTS_CONFIG_PATH = "known_hpc.cfg"
-    CONFIG_DEFAULTS,_ = config_parser.parse_config(
+    HPC_DEFAULTS,_ = config_parser.parse_config(
         "{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH)
         )
-    KNOWN_CLUSTERS = DEFAULTS.keys()
+    KNOWN_HPC = HPC_DEFAULTS.keys()
 
     #Parse command-line arguments, and setup logger
     args = parse_args()
     setup_logger(args.config,args.verbose)
 
     # Select default source
-    if args.cluster in KNOWN_CLUSTERS:
-        DEFAULTS = CONFIG_DEFAULTS[args.cluster]
-    else: ### Decide what to do when the cluster is not specified.
+    if args.cluster in KNOWN_HPC:
+        HPC_DEFAULTS = HPC_DEFAULTS[args.cluster]
+    else:
+        HPC_DEFAULTS = HPC_DEFAULTS['unknown']
         pass
     # Set limits for current cluster configuration
-    TOTAL_NODES_LIMIT = DEFAULTS['TOTAL_NODES_LIMIT'.lower()]
-    CPUS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
-    NTASKS_PER_NODE_LIMIT = DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
-    MEM_PER_NODE_GB_LIMIT = DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]
-    MEM_PER_NODE_GB_LIMIT_HIGHMEM = DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()]
+    TOTAL_NODES_LIMIT = HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()]
+    CPUS_PER_NODE_LIMIT = HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
+    NTASKS_PER_NODE_LIMIT = HPC_DEFAULTS['CPUS_PER_NODE_LIMIT'.lower()]
+    MEM_PER_NODE_GB_LIMIT = HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]
+    MEM_PER_NODE_GB_LIMIT_HIGHMEM = HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT_HIGHMEM'.lower()]
     ACCOUNTS = DEFAULTS['ACCOUNTS'.lower()]
 
     # Set global values for paths and file names
-    LOG_DIR = DEFAULTS['LOG_DIR'.lower()]
-    CALIB_SCRIPTS_DIR = DEFAULTS['CALIB_SCRIPTS_DIR'.lower()]
-    AUX_SCRIPTS_DIR = DEFAULTS['AUX_SCRIPTS_DIR'.lower()]
-    SELFCAL_SCRIPTS_DIR = DEFAULTS['SELFCAL_SCRIPTS_DIR'.lower()]
-    CONFIG = DEFAULTS['CONFIG'.lower()]
-    TMP_CONFIG = DEFAULTS['TMP_CONFIG'.lower()]
-    MASTER_SCRIPT = DEFAULTS['MASTER_SCRIPT'.lower()]
+    LOG_DIR = HPC_DEFAULTS['LOG_DIR'.lower()]
+    CALIB_SCRIPTS_DIR = HPC_DEFAULTS['CALIB_SCRIPTS_DIR'.lower()]
+    AUX_SCRIPTS_DIR = HPC_DEFAULTS['AUX_SCRIPTS_DIR'.lower()]
+    SELFCAL_SCRIPTS_DIR = HPC_DEFAULTS['SELFCAL_SCRIPTS_DIR'.lower()]
+    CONFIG = HPC_DEFAULTS['CONFIG'.lower()]
+    TMP_CONFIG = HPC_DEFAULTS['TMP_CONFIG'.lower()]
+    MASTER_SCRIPT = HPC_DEFAULTS['MASTER_SCRIPT'.lower()]
 
     # Set global values for field, crosscal and SLURM arguments copied to config file
-    FIELDS_CONFIG_KEYS = DEFAULTS['FIELDS_CONFIG_KEYS'.lower()]
-    CROSSCAL_CONFIG_KEYS = DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()]
-    SELFCAL_CONFIG_KEYS = DEFAULTS['SELFCAL_CONFIG_KEYS'.lower()]
-    IMAGING_CONFIG_KEYS = DEFAULTS['IMAGING_CONFIG_KEYS'.lower()]
-    SLURM_CONFIG_STR_KEYS = DEFAULTS['SLURM_CONFIG_KEYS'.lower()]
-    SLURM_CONFIG_KEYS = DEFAULTS['SLURM_CONFIG_KEYS_BASE'.lower()] + SLURM_CONFIG_STR_KEYS
-    CONTAINER = DEFAULTS['CONTAINER'.lower()]
-    MPI_WRAPPER = DEFAULTS['MPI_WRAPPER'.lower()]
-    PRECAL_SCRIPTS = DEFAULTS['PRECAL_SCRIPTS'.lower()]
-    POSTCAL_SCRIPTS = DEFAULTS['POSTCAL_SCRIPTS'.lower()]
-    SCRIPTS = DEFAULTS['SCRIPTS'.lower()]
+    FIELDS_CONFIG_KEYS = HPC_DEFAULTS['FIELDS_CONFIG_KEYS'.lower()]
+    CROSSCAL_CONFIG_KEYS = HPC_DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()]
+    SELFCAL_CONFIG_KEYS = HPC_DEFAULTS['SELFCAL_CONFIG_KEYS'.lower()]
+    IMAGING_CONFIG_KEYS = HPC_DEFAULTS['IMAGING_CONFIG_KEYS'.lower()]
+    SLURM_CONFIG_STR_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS'.lower()]
+    SLURM_CONFIG_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS_BASE'.lower()] + SLURM_CONFIG_STR_KEYS
+    CONTAINER = HPC_DEFAULTS['CONTAINER'.lower()]
+    MPI_WRAPPER = HPC_DEFAULTS['MPI_WRAPPER'.lower()]
+    PRECAL_SCRIPTS = HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()]
+    POSTCAL_SCRIPTS = HPC_DEFAULTS['POSTCAL_SCRIPTS'.lower()]
+    SCRIPTS = HPC_DEFAULTS['SCRIPTS'.lower()]
 
     # Read in SBATCH file contents
-    contents = DEFAULTS['sbatch_file_base']
+    contents = HPC_DEFAULTS['sbatch_file_base']
 
     # Mutually exclusive arguments - display version, build config file or run pipeline
     if args.version:
