@@ -64,12 +64,16 @@ def get_fields(MS):
     fieldIDs['targetfields'] = get_field(MS,'TARGET','targetfields',extra_fields,default=default,multiple=True)
 
     if 'UNKNOWN' in intents:
-        try:
-            polfields = np.array(msmd.namesforfields(msmd.fieldsforintent('UNKNOWN'))) #bogus MeerKAT mislabelling during conversion to MS
-            for polfield in polfields:
-                if polfield not in extra_fields:
-                    extra_fields.append(polfield)
-        except RuntimeError as e:
+        if len(msmd.fieldsforintent('UNKNOWN')) > 0:
+            try:
+                polfields = np.array(msmd.namesforfields(msmd.fieldsforintent('UNKNOWN'))) #bogus MeerKAT mislabelling during conversion to MS
+                for polfield in polfields:
+                    logger.warning(f"{polfield} not in extra_fields: {polfield not in extra_fields}")
+                    if polfield not in extra_fields:
+                        extra_fields.append(polfield)
+            except RuntimeError as e:
+                logger.warning("Intent 'UNKNOWN' present in MS but couldn't find any fields with this intent.")
+        else:
             logger.warning("Intent 'UNKNOWN' present in MS but couldn't find any fields with this intent.")
 
     #Put any extra fields in extra_fields
@@ -210,9 +214,9 @@ def check_scans(MS,nodes,tasks,dopol):
             tasks = limit
 
         while nodes * tasks < limit:
-            if nodes < processMeerKAT.TOTAL_NODES_LIMIT:
+            if nodes < HPC_DEFAULTS["TOTAL_NODES_LIMIT".lower()]:
                 nodes += 1
-            elif tasks < processMeerKAT.NTASKS_PER_NODE_LIMIT:
+            elif tasks < HPC_DEFAULTS["NTASKS_PER_NODE_LIMIT".lower()]:
                 tasks += 1
             else:
                 break
@@ -363,8 +367,20 @@ def get_xy_field(visname, fields):
 
 def main():
 
+    # Parse Arguments
     args = processMeerKAT.parse_args()
     processMeerKAT.setup_logger(args.config,args.verbose)
+
+    # Read in known_hpc and HPC_DEFAULTS from configuration file.
+    known_hpc_path = "{0}/{1}".format(os.path.dirname(__file__), "known_hpc.cfg")
+    if os.path.isfile(known_hpc_path):
+        KNOWN_HPCS,_ = config_parser.parse_config(known_hpc_path)
+    else:
+        parser.error("Known HPC config file ({0}) not found.".format(known_hpc_path))
+    global HPC_DEFAULTS
+    HPC_DEFAULTS = KNOWN_HPCS[args.hpc if args.hpc in KNOWN_HPCS.keys() else "unknown"]
+
+    # Open Measurement Set
     msmd.open(args.MS)
 
     dopol = args.dopol
