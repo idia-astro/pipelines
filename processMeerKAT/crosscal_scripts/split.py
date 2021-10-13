@@ -8,6 +8,13 @@ import config_parser
 import bookkeeping
 from config_parser import validate_args as va
 
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+import casampi
+msmd = msmetadata()
+
 def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
     outputbase = os.path.splitext(os.path.split(visname)[1])[0]
@@ -16,17 +23,18 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
     for field in fields:
         if field != '':
-            for subf in field.split(','):
-                fname = msmd.namesforfields(int(subf))[0]
+            for fname in field.split(','):
+                if fname.isdigit():
+                    fname = msmd.namesforfields(int(fname))[0]
 
                 outname = '%s.%s.%s' % (outputbase, fname, extn)
                 if not os.path.exists(outname):
 
                     split(vis=visname, outputvis=outname, datacolumn='corrected',
-                                field=fname, spw=spw, keepflags=False, keepmms=keepmms,
+                                field=fname, spw=spw, keepflags=True, keepmms=keepmms,
                                 width=specavg, timebin=timeavg)
 
-                if subf == fields.targetfield.split(',')[0]:
+                if fname == fields.targetfield.split(',')[0]:
                     newvis = outname
 
     return newvis
@@ -53,4 +61,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

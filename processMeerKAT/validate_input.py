@@ -4,12 +4,15 @@
 import sys
 import os
 
-import config_parser
 from config_parser import validate_args as va
 import processMeerKAT
 import read_ms, bookkeeping
-import casac
-msmd = casac.casac.msmetadata()
+
+from casatools import msmetadata
+from casatasks import casalog
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+msmd = msmetadata()
 
 import logging
 from time import gmtime
@@ -23,7 +26,12 @@ def main(args,taskvals):
     parameters look okay
     """
 
-    logger.info('This is version {0} of the pipeline'.format(processMeerKAT.__version__))
+    cwd=os.getcwd()
+    os.chdir(processMeerKAT.SCRIPT_DIR)
+    commit=os.popen('git log --format="%H" -n 1').read()
+    os.chdir(cwd)
+
+    logger.info('This is version {0} of the pipeline - commit ID {1}'.format(processMeerKAT.__version__,commit))
 
     visname = va(taskvals, 'data', 'vis', str)
     calcrefant = va(taskvals, 'crosscal', 'calcrefant', bool)
@@ -48,4 +56,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

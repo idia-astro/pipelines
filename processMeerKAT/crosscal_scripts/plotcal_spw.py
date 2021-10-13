@@ -9,12 +9,20 @@ import matplotlib
 # Agg doesn't need X - matplotlib doesn't work with xvfb
 matplotlib.use('Agg', warn=False)
 import matplotlib.pyplot as plt
+import numpy as np
 
 from config_parser import validate_args as va
 import bookkeeping
 import glob
 PLOT_DIR = 'plots'
-EXTN = 'pdf'
+EXTN = 'png'
+
+from casatasks import *
+from casatools import table,msmetadata
+tb = table()
+msmd = msmetadata()
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
 import logging
 from time import gmtime
@@ -60,6 +68,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     if len(tables) == 0:
         logger.warning("No valid caltables with extention {} found.".format(table_ext))
+        logger.warning("Skipping.")
         return
 
     xdat = []
@@ -252,9 +261,13 @@ def main(args,taskvals):
 
     try:
         if not os.path.exists(PLOT_DIR):
-            os.mkdir(PLOT_DIR)
+            os.makedirs(PLOT_DIR)
 
         fields = bookkeeping.get_field_ids(taskvals['fields'])
+        visname = va(taskvals, 'run', 'crosscal_vis', str)
+        polfield = bookkeeping.polfield_name(visname)
+
+        msmd.open(visname)
 
         caldir = 'caltables'
         spwdir = config_parser.parse_spw(args['config'])[3]
@@ -267,62 +280,70 @@ def main(args,taskvals):
             table_ext = 'gcal'
             title='Gain Phase'
             outname = '{}/field_{}_gain_phase'.format(PLOT_DIR,ff)
-            plotcal(plotstr, int(ff), spwdir, caldir, table_ext, title, outname)
+            plotcal(plotstr, int(msmd.fieldsforname(ff)[0]), spwdir, caldir, table_ext, title, outname)
 
             plotstr='amp,time'
             table_ext = 'gcal'
             title='Gain Amp'
             outname = '{}/field_{}_gain_amp'.format(PLOT_DIR,ff)
-            plotcal(plotstr, int(ff), spwdir, caldir, table_ext, title, outname)
+            plotcal(plotstr, int(msmd.fieldsforname(ff)[0]), spwdir, caldir, table_ext, title, outname)
 
         #print("k")
         #plotstr='delay,freq'
         #table_ext = 'kcal'
         #title='Delay'
         #outname = '{}/field_{}_delay'.format(PLOT_DIR,fields.fluxfield)
-        #plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        #plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         #print("kcross")
         #plotstr='delay,freq'
         #table_ext = 'xdel'
         #title='Crosshand Delay'
         #outname = '{}/field_{}_crosshanddelay'.format(PLOT_DIR,fields.fluxfield)
-        #plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        #plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='amp,freq'
         table_ext = 'bcal'
         title='Bandpass Amp'
         outname = '{}/field_{}_bandpass_amp'.format(PLOT_DIR,fields.fluxfield)
-        plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'bcal'
         title='Bandpass Phase'
         outname = '{}/field_{}_bandpass_phase'.format(PLOT_DIR,fields.fluxfield)
-        plotcal(plotstr, int(fields.fluxfield), spwdir, caldir, table_ext, title, outname)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.fluxfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='amp,freq'
         table_ext = 'pcal'
         title='Leakage Amp'
-        outname = '{}/field_{}_leakage_amp'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname, None, [0, 0.1])
-
+        outname = '{}/field_{}_leakage_amp'.format(PLOT_DIR,fields.bpassfield)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname, None, [0, 0.1])
         plotstr='phase,freq'
         table_ext = 'pcal'
         title='Leakage Phase'
-        outname = '{}/field_{}_leakage_phase'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname)
+        outname = '{}/field_{}_leakage_phase'.format(PLOT_DIR,fields.bpassfield)
+        plotcal(plotstr, int(msmd.fieldsforname(fields.dpolfield)[0]), spwdir, caldir, table_ext, title, outname)
 
         plotstr='phase,freq'
         table_ext = 'xyambcal'
         title='XY Phase'
-        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,fields.dpolfield)
-        plotcal(plotstr, int(fields.dpolfield), spwdir, caldir, table_ext, title, outname)
+        outname = '{}/field_{}_xyamb_phase'.format(PLOT_DIR,polfield)
+        plotcal(plotstr, int(msmd.fieldsforname(polfield)[0]), spwdir, caldir, table_ext, title, outname)
+
+        plotstr='phase,freq'
+        table_ext = 'xycal'
+        title='XY Phase (amb resolved)'
+        outname = '{}/field_{}_xy_phase'.format(PLOT_DIR,polfield)
+        plotcal(plotstr, int(msmd.fieldsforname(polfield)[0]), spwdir, caldir, table_ext, title, outname)
+
+        msmd.done()
 
     except Exception as err:
         logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
         logger.error(traceback.format_exc())
+        msmd.done()
 
 if __name__ == "__main__":
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)
