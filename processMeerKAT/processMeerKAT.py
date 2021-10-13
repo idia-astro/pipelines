@@ -130,14 +130,25 @@ def parse_args():
         else:
             return check_path(val)
 
+    # Define global variables
+    global THIS_PROG, SCRIPT_DIR, HPC_DEFAULTS, HPC
+    THIS_PROG = os.path.realpath(__file__)
+    SCRIPT_DIR = os.path.dirname(THIS_PROG)
+    DEFAULTS_CONFIG_PATH = "known_hpc.cfg"
+    known_hpc_path = "{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH)
+    if os.path.isfile(known_hpc_path):
+        KNOWN_HPCS,_ = config_parser.parse_config(known_hpc_path)
+    else:
+        parser.error("Known HPC config file ({0}) not found.".format(known_hpc_path))
+
+    # Begin parsing
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA MeasurementSet. Version: {0}'.format(__version__))
 
     parser.add_argument("--hpc",metavar='name', required=False, type=str, default="ilifu", help="Name of hpc facility being used if not known to the config (processMeerKAT/known_hpc.cfg) slurm limits are functionally removed [default: ilifu].")
-    # Read in default values according to --cluster parameter
+    # Read in parser default values according to --cluster parameter
     args, unknown = parser.parse_known_args()
-    global HPC_DEFAULTS, HPC
-    HPC = args.hpc if args.hpc in HPC_DEFAULTS.keys() else "unknown"
-    HPC_DEFAULTS = HPC_DEFAULTS[HPC]
+    HPC = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() else "unknown"
+    HPC_DEFAULTS = KNOWN_HPCS[HPC]
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
     parser.add_argument("-C","--config",metavar="path", default=HPC_DEFAULTS['CONFIG'.lower()], required=False, type=str, help="Relative (not absolute) path to config file.")
@@ -149,20 +160,20 @@ def parse_args():
                             help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
     parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()],
                         help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]))
-    parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default="Main", help="SLURM partition to use [default: 'Main'].")
+    parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default=HPC_DEFAULTS['PARTITION'.lower()], help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="Time limit to use for all jobs, in the form d-hh:mm:ss [default: '12:00:00'].")
     parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['SCRIPTS'.lower()],
                         help="Run pipeline with these scripts, in this order, using these containers (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
     parser.add_argument("-b","--precal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()], help="Same as [-S --scripts], but run before calibration.")
     parser.add_argument("-a","--postcal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['POSTCAL_SCRIPTS'.lower()], help="Same as [-S --scripts], but run after calibration.")
-    parser.add_argument("--modules", nargs='*', metavar='module', required=False, default=['openmpi/2.1.1'], help="Load these modules within each sbatch script.")
+    parser.add_argument("--modules", nargs='*', metavar='module', required=False, default=HPC_DEFAULTS['MODULES'.lower()], help="Load these modules within each sbatch script.")
     parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=HPC_DEFAULTS['MPI_WRAPPER'.lower()],
                         help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(HPC_DEFAULTS['MPI_WRAPPER'.lower()]))
     parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=HPC_DEFAULTS['CONTAINER'.lower()], help="Use this container when calling scripts [default: '{0}'].".format(HPC_DEFAULTS['CONTAINER'.lower()]))
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
-    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
+    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default=HPC_DEFAULTS['ACCOUNTS'.lower()][0], help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
     parser.add_argument("-r","--reservation", metavar="name", required=False, type=str, default='', help="SLURM reservation to use. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -347,6 +358,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
     params['casa_call'] = ''
     params['casa_log'] = '--nologfile'
     params['plot_call'] = ''
+    params['path_binding'] = "{}".format(HPC_DEFAULTS['path_binding'])
     command = ''
 
     params['script'] = check_path(script, update=True)
@@ -369,7 +381,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
 
         """ % SPWs.replace(',',' ').replace('0:','')
 
-    command += "{mpi_wrapper} singularity exec {container} {plot_call} {casa_call} {script} {args}".format(**params)
+    command += "{mpi_wrapper} singularity exec {path_binding}{container} {plot_call} {casa_call} {script} {args}".format(**params)
 
     if arrayJob:
         command += '\ncd ..\n'
@@ -571,7 +583,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     master.write('\n#Add time as extn to this pipeline run, to give unique filenames')
     master.write("\nDATE={0}\n".format(timestamp))
     master.write('mkdir -p {0}\n'.format(dir))
-    master.write('mkdir -p {0}\n\n'.format(LOG_DIR))
+    master.write('mkdir -p {0}\n\n'.format(HPC_DEFAULTS['LOG_DIR'.lower()]))
     extn = '_$DATE.sh'
 
     for i,spw in enumerate(SPWs.split(',')):
@@ -671,7 +683,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         logger.info('Master script "{0}" written, but will not run.'.format(filename))
 
 
-def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
+def write_master(filename,config,args,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
 
     """Write master pipeline submission script, calling various sbatch files, and writing ancillary job scripts.
 
@@ -871,9 +883,11 @@ def srun(arg_dict,qos=True,time=10,mem=4):
     call : str
         srun call with arguments appended."""
 
-    call = 'srun --time={0} --mem={1}GB --partition={2} --account={3}'.format(time,mem,arg_dict['partition'],arg_dict['account'])
+    call = 'srun --time={0} --mem={1}GB --partition={2}'.format(time,mem,arg_dict['partition'])
+    if arg_dict['account']!='':
+        call += ' --account={0}'.format(arg_dict['account'])
     if qos:
-        call += ' --qos qos-interactive'
+        call += ' --qos {0}'.format(HPC_DEFAULTS['qos'])
     if arg_dict['exclude'] != '':
         call += ' --exclude={0}'.format(arg_dict['exclude'])
     if arg_dict['reservation'] != '':
@@ -881,7 +895,7 @@ def srun(arg_dict,qos=True,time=10,mem=4):
 
     return call
 
-def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, nodes=8, ntasks_per_node=4, plane=1, partition='Main',
+def write_jobs(config, args, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, nodes=8, ntasks_per_node=4, plane=1, partition='Main',
                time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', modules=[], timestamp='', justrun=False):
 
     """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
@@ -890,6 +904,8 @@ def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], co
     ----------
     config : str
         Path to config file.
+    args : obj
+        Arguments passed to orgiginal command line call of processMeerKAT.py as read by argparse
     mem : int
         The memory in GB (per node) to use for this job.
     mpi_wrapper : str
@@ -959,10 +975,10 @@ def write_jobs(config, mpi_wrapper, mem, contents, scripts=[], threadsafe=[], co
 
     if crosscal_kwargs['nspw'] > 1:
         #Build master master script, calling each of the separate SPWs at once, precal scripts before this, and postcal scripts after this
-        write_spw_master(HPC_DEFAULTS['MASTER_SCRIPT'.lower()],config,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp,slurm_kwargs=kwargs)
+        write_spw_master(HPC_DEFAULTS['MASTER_SCRIPT'.lower()],config,args,SPWs=crosscal_kwargs['spw'],precal_scripts=precal_scripts,postcal_scripts=postcal_scripts,submit=submit,pad_length=pad_length,dependencies=dependencies,timestamp=timestamp,slurm_kwargs=kwargs)
     else:
         #Build master pipeline submission script
-        write_master(HPC_DEFAULTS['MASTER_SCRIPT'.lower()],config,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies,slurm_kwargs=kwargs)
+        write_master(HPC_DEFAULTS['MASTER_SCRIPT'.lower()],config,args,scripts=scripts,submit=submit,pad_length=pad_length,verbose=verbose,echo=echo,dependencies=dependencies,slurm_kwargs=kwargs)
 
 
 def default_config(arg_dict):
@@ -1121,7 +1137,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
         Keyword arguments extracted from [slurm] section of config file, to be passed into write_jobs() function."""
 
     #Ensure all keys exist in these sections
-    SLURM_CONFIG_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS_BASE']+HPC_DEFAULTS['SLURM_CONFIG_STR_KEYS']
+    SLURM_CONFIG_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS_BASE'.lower()]+HPC_DEFAULTS['SLURM_CONFIG_STR_KEYS'.lower()]
     kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
     data_kwargs = get_config_kwargs(config,'data',['vis'])
     get_config_kwargs(config, 'fields', HPC_DEFAULTS['FIELDS_CONFIG_KEYS'.lower()])
@@ -1464,16 +1480,9 @@ def setup_logger(config,verbose=False):
     logger.setLevel(loglevel)
 
 def main():
-    # Define global variables
-    global THIS_PROG, SCRIPT_DIR, HPC_DEFAULTS
-
-    # Define defaults / limits for named HPC facilities
-    THIS_PROG = __file__
-    SCRIPT_DIR = os.path.dirname(THIS_PROG)
-    DEFAULTS_CONFIG_PATH = "known_hpc.cfg"
-    HPC_DEFAULTS,_ = config_parser.parse_config("{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH))
-
-    #Parse command-line arguments, and setup logger
+    # Parse command-line arguments, and setup logger
+    # This also creates the global variables:
+    # THIS_PROG, SCRIPT_DIR, HPC_DEFAULTS, HPC
     args = parse_args()
     setup_logger(args.config,args.verbose)
 
