@@ -516,7 +516,7 @@ def write_sbatch(script,args,mem,mpi_wrapper,contents,nodes=1,tasks=16,name="job
 
     logger.debug('Wrote sbatch file "{0}"'.format(sbatch))
 
-def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies='',timestamp='',slurm_kwargs={}):
+def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,submit,dir='jobScripts',pad_length=5,dependencies='',timestamp='',slurm_kwargs={}):
 
     """Write master master script, which separately calls each of the master scripts in each SPW directory.
 
@@ -524,6 +524,8 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         Name of master pipeline submission script.
     config : str
         Path to config file.
+    args : obj
+        Arguments passed to orgiginal command line call of processMeerKAT.py as read by argparse
     SPWs : str
         Comma-separated list of spw ranges.
     precal_scripts : list, optional
@@ -667,9 +669,53 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     os.chmod(filename, 509)
 
     #[-R --run] pipeline in each SPW directory to create sbatch files that can be edited
-    #TODO: fix this hackery!
     SPW_run_file='out.tmp'
-    SPW_run_call = """for f in {%s,}; do if [ -d $f ]; then cd $f; %s --config ./%s --run --quiet; cd ..; else echo Directory $f doesn\\'t exist; fi; done""" % (','.join(SPWs.split(',')),os.path.split(THIS_PROG)[1],config)
+    # Copy argument call parameters made on processMeerKAT.py for this run with minor adjustments
+    arguments = sys.argv[1:]
+    for idx, element in enumerate(arguments):
+        if element in ["-n", "--name"]:
+            print(element, arguments[idx:])
+            if idx+1 < len(arguments):
+                arguments[idx+1] += "_$f"
+        elif element in ["-c", "--config"]:
+            if idx+1 < len(arguments):
+                arguments[idx+1] = ".config.tmp"
+        else:
+            pass
+
+    argument_calls = " ".join(arguments)
+    if ("-v" or "--verbose") not in argument_calls:
+        argument_calls += " --quiet"
+
+    # Create script to start processMeerKAT.py for each SPW whilst maintaining args.
+    SPW_run_file='out.tmp'
+    SPW_run_call = """
+        #!/bin/bash
+        spws=({spw_array})
+        for f in ${{spws[@]}}
+         do if [ -d $f ]
+          then
+          cd $f
+          source {source}
+          {program} {argument_calls}
+          cd {PARENT_DIR}
+         else
+          echo Directory $f does not exist
+         fi
+        done
+    """.replace("    ","")
+
+    SPW_run_call = "".join(SPW_run_call).format(
+        spw_array  = " ".join(SPWs.split(',')),
+        source     = os.path.dirname(SCRIPT_DIR)+'/setup.sh',
+        program    = os.path.split(THIS_PROG)[1],
+        PARENT_DIR = os.path.abspath(os.getcwd()),
+        argument_calls = argument_calls,
+    )
+    if args.verbose:
+        logger.info("Explicilty running pipeline on each SPW:{0}".format(SPW_run_call))
+
+    #processMeerKAT.py run for each SPW
     with open(SPW_run_file,'w') as out:
         out.write(SPW_run_call)
     os.system('bash {0}'.format(SPW_run_file))
@@ -1494,8 +1540,8 @@ def main():
     if args.build:
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.justrun)
-        write_jobs(args.config, mpi_wrapper=MPI_WRAPPER, contents=HPC_DEFAULTS['sbatch_file_base'], **kwargs)
+        kwargs = format_args(args.config, args.submit, args.quiet,args. dependencies, args.justrun)
+        write_jobs(args.config, args, contents=HPC_DEFAULTS['submission_file_base'], **kwargs)
 
 if __name__ == "__main__":
     main()
