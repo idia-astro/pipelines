@@ -195,14 +195,14 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
         outimage += '.tt0'
 
-    if step != 'tclean' and not os.path.exists(outimage):
+    if step not in ['tclean','sky'] and not os.path.exists(outimage):
         logger.error("Image '{0}' doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(outimage,loop))
         sys.exit(1)
 
     if step in ['tclean','predict']:
         pixmask = imbase % (loop-1) + '.pixmask'
         rmsfile = imbase % (loop-1) + '.rms'
-    if step in ['tclean','predict'] and ((loop == 0 and not os.path.exists(pixmask)) or (0 < loop < nloops and calmode[loop] == '')):
+    if step in ['tclean','predict','sky'] and ((loop == 0 and not os.path.exists(pixmask)) or (0 < loop < nloops and calmode[loop] == '')):
         pixmask = ''
 
     #Check no missing caltables
@@ -213,11 +213,11 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     for i in range(discard_nloops):
         prev_caltables.pop(0)
 
-    if outlier_threshold != '' and outlier_threshold != 0 and (loop > 0 or step == 'bdsf' and loop == 0):
-        if step in ['tclean','predict']:
-            outlierfile = 'outliers_loop{0}.txt'.format(loop-1)
-        else:
+    if outlier_threshold != '' and outlier_threshold != 0: # and (loop > 0 or step in ['sky','bdsf'] and loop == 0):
+        if step in ['tclean','predict','sky']:
             outlierfile = 'outliers_loop{0}.txt'.format(loop)
+        else:
+            outlierfile = 'outliers_loop{0}.txt'.format(loop+1)
     else:
         outlierfile = ''
 
@@ -274,7 +274,7 @@ def run_script(func,logfile=''):
     if continue_run:
         try:
             func(args,taskvals)
-            rename_logs(logfile)
+            #rename_logs(logfile)
         except Exception as err:
             logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
             logger.error(traceback.format_exc())

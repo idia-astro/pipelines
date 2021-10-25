@@ -61,7 +61,7 @@ SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','n
 IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose','modules'] + SLURM_CONFIG_STR_KEYS
-CONTAINER = '/idia/software/containers/casa-6.3.simg'
+CONTAINER = '/idia/software/containers/casa-6-2021-10-12.simg'
 MPI_WRAPPER = 'mpirun'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
 POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
@@ -857,7 +857,7 @@ def write_all_bash_jobs_scripts(master,extn,IDs,dir='jobScripts',echo=True,prefi
     # Create copy so original is unmodified
     cleanup_kwargs = deepcopy(slurm_kwargs)
     cleanup_kwargs['partition'] = 'Devel'
-    do = """echo "echo Removing the following: \$(ls -d *ms); %s rm -r *ms" """ % srun(cleanup_kwargs, qos=True, time=10, mem=1)
+    do = """echo "echo Removing the following: \$(ls -d *ms); %s rm -r *ms" """ % srun(cleanup_kwargs, qos=True, time=10, mem=0)
     write_bash_job_script(master, cleanupScript, extn, do, 'remove MSs/MMSs from this directory \(after pipeline has run\)', dir=dir, echo=echo)
 
 def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=True,prefix=''):
@@ -1167,16 +1167,6 @@ def format_args(config,submit,quiet,dependencies,justrun):
     get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
-    #Check selfcal params
-    if config_parser.has_section(config,'selfcal'):
-        selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
-        bookkeeping.get_selfcal_params()
-        if selfcal_kwargs['loop'] > 0:
-            logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
-
-    if config_parser.has_section(config,'image'):
-        imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
-
     #Force submit=True if user has requested it during [-R --run]
     if submit:
         kwargs['submit'] = True
@@ -1194,6 +1184,26 @@ def format_args(config,submit,quiet,dependencies,justrun):
         logger.warning('Setting nspw=1, since no "scripts" parameter in "{0}" is empty, so there\'s nothing run inside SPW directories.'.format(config))
         config_parser.overwrite_config(config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
         nspw = 1
+
+    #Check selfcal params
+    if config_parser.has_section(config,'selfcal'):
+        selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
+        params = bookkeeping.get_selfcal_params()
+        if selfcal_kwargs['loop'] > 0:
+            logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
+        #Find RACS outliers
+        elif (nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']]) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+                logger.info('Populating sky model for selfcal using outlier_threshold={0}'.format(selfcal_kwargs['outlier_threshold']))
+                logger.info('Querying Rapid ASAKP Continuum Survey (RACS) catalog within 2 degrees of target phase centre. Please allow a moment for this.')
+                sky_model_kwargs = deepcopy(kwargs)
+                sky_model_kwargs['partition'] = 'Devel'
+                mpi_wrapper = srun(sky_model_kwargs, qos=True, time=2, mem=0)
+                command = write_command('set_sky_model.py', '', mpi_wrapper=mpi_wrapper, container=kwargs['container'],logfile=False)
+                logger.debug('Running following command:\n\t{0}'.format(command))
+                os.system(command)
+
+    if config_parser.has_section(config,'image'):
+        imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
 
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:

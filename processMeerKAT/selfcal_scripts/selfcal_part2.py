@@ -17,11 +17,12 @@ from astropy.io import fits
 from astropy.wcs import WCS
 
 from casatasks import *
-from casatools import image,quanta
+from casatools import image,quanta,msmetadata
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 ia=image()
 qa=quanta()
+msmd=msmetadata()
 
 import bdsf
 import logging
@@ -91,37 +92,84 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
         img.export_image(outfile=rmsfile, img_type='rms', img_format='casa', clobber=True)
 
 def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange,
-                  nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag):
+                  nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, step):
 
     local = locals()
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='bdsf')
+    local.pop('step')
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step=step)
     cat = imagename + ".catalog.fits"
     outlierfile_all = 'outliers.txt'
     fitsname = imagename + '.fits'
     outlier_imsize = 128
-    outlier_snr = 50
+    outlier_snr = 5
+    sky_model_radius = 2 #degrees
 
-    pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
+    #Store before potentially updating to mJy
+    orig_threshold = outlier_threshold
+
+    #Take sky positions from RACS
+    if step == 'sky' and outlier_threshold != '' and outlier_threshold != 0:
+        from astroquery.utils.tap.core import TapPlus
+        from astropy.table import vstack
+
+        #Open MS and extract first target centre; use first sub-MS for speed if MMS
+        if os.path.exists('{0}/SUBMSS'.format(vis)):
+            tmpvis = glob.glob('{0}/SUBMSS/*'.format(vis))[0]
+        else:
+            tmpvis = vis
+        msmd.open(tmpvis)
+        dir=msmd.sourcedirs()[str(msmd.fieldsforintent('TARGET')[0])]
+        ra=qa.convert(dir['m0'],'deg')['value']
+        dec=qa.convert(dir['m1'],'deg')['value']
+        if ra < 0:
+            ra += 360
+        phasecenter=SkyCoord(ra=ra,dec=dec,unit='deg,deg')
+        msmd.done()
+
+        cat = 'RACS_local.fits'
+        fluxcol = 'total_flux_source'
+        efluxcol = 'e_total_flux_source'
+        racol = 'ra'
+        deccol = 'dec'
+        outlier_threshold *= 1e3 #convert from mJy to Jy
+
+        #Extract RACS positions within sky_model_radius
+        casdatap = TapPlus(url="https://casda.csiro.au/casda_vo_tools/tap")
+        query = "SELECT * FROM  AS110.racs_dr1_sources_galacticcut_v2021_08_v01 where 1=CONTAINS(POINT('ICRS', ra, dec),CIRCLE('ICRS',{0},{1},{2}))".format(ra,dec,sky_model_radius)
+        job = casdatap.launch_job_async(query)
+        galcut = job.get_results()
+        job = casdatap.launch_job_async(query.replace('cut','region'))
+        galregion = job.get_results()
+        RACS = vstack([galcut,galregion],join_type='exact')
+        RACS.write(cat,overwrite=True)
+        index = loop
+    else:
+        pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
+        fluxcol = 'Total_flux'
+        efluxcol = 'E_Total_flux'
+        racol = 'RA'
+        deccol = 'Dec'
+        index = loop+1
 
     if outlier_threshold != '' and outlier_threshold != 0:
-        # Write initial outlier file (over entire initial image) if it doesn't already exist
-        if loop == 0 and not os.path.exists(outlierfile_all):
+        # Write initial outlier file
+        if step == 'sky':
             tab=fits.open(cat)
             data = tab[1].data
             tab.close()
 
-            if outlier_threshold > 1.0:
-                metric = data['Total_flux']/data['E_Total_flux']
+            if orig_threshold > 1.0:
+                metric = data[fluxcol]/data[efluxcol]
             else:
-                metric = data['Total_flux']
+                metric = data[fluxcol]
 
             outliers=data[metric > outlier_threshold]
             out = open(outlierfile_all,'w')
-            mask = 'mask={0}'.format(pixmask) if pixmask != '' else ''
+            mask = 'mask={0}'.format(pixmask)# if pixmask != '' else ''
 
-            for i,pos in enumerate(outliers):
-                SkyPos = SkyCoord(ra=pos['RA'],dec=pos['Dec'],unit='deg,deg')
-                phasecenter = 'J2000 {0}'.format(SkyPos.to_string('hmsdms'))
+            for i,row in enumerate(outliers):
+                SkyPos = SkyCoord(ra=row[racol],dec=row[deccol],unit='deg,deg')
+                position = 'J2000 {0}'.format(SkyPos.to_string('hmsdms'))
                 out.write("""
                 imagename={0}_outlier{1}
                 imsize=[{2},{2}]
@@ -129,44 +177,56 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 phasecenter={3}
                 nterms=3
                 gridder=standard
-                {4}\n""".format(imbase%(loop+1),i,outlier_imsize,phasecenter,mask))
+                {4}\n""".format(imbase%(index),i,outlier_imsize,position,mask))
 
             out.close()
 
-        if os.path.exists(outlierfile_all):
-            logger.info("All 'outliers' within field written to '{0}'.".format(outlierfile_all))
-        else:
-            logger.error("Outlier file '{0}' doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(outlierfile_all,loop))
-            sys.exit(1)
+            if os.path.exists(outlierfile_all):
+                logger.info("All 'outliers' within field written to '{0}' based on catalog '{1}'.".format(outlierfile_all,os.path.split(cat)[1]))
+            else:
+                logger.error("Outlier file '{0}' doesn't exist, so sky model build went wrong. Will terminate process.".format(outlierfile_all))
+                sys.exit(1)
 
         #Write outlier file specific to this loop
         outliers=open(outlierfile_all).read()
         out = open(outlierfile,'w')
 
-        img = fits.open(fitsname)
-        head = img[0].header
-        img.close()
+        if os.path.exists(fitsname):
+            img = fits.open(fitsname)
+            head = img[0].header
+            img.close()
+            index = loop+1
+        elif step == 'sky':
+            img=fits.PrimaryHDU()
+            head = img.header
+            head['CUNIT1']='deg'
+            head['CUNIT2']='deg'
+            head['CTYPE1']='RA---SIN'
+            head['CTYPE2']='DEC--SIN'
+            head['CRVAL1']=ra
+            head['CRVAL2']=dec
+            index = loop
 
-        #Update header to reflect next loop, and pop degenerate axes
-        imsize=params['imsize'][loop+1]
-        cell=params['cell'][loop+1]
+        #Update header to reflect image, and pop degenerate axes
+        imsize=imsize[index]
+        cell=cell[index]
         if type(imsize) is not list:
             imsize = [imsize, imsize]
         if type(cell) is not list:
             cell = [cell, cell]
 
-        head['NAXIS1']=imsize[0]
-        head['NAXIS2']=imsize[1]
+        head['NAXIS1'] = imsize[0]
+        head['NAXIS2'] = imsize[1]
         head['CRPIX1'] = int(imsize[0]/2 + 1)
         head['CRPIX2'] = int(imsize[1]/2 + 1)
 
         xdelt = qa.convert(cell[0],'deg')['value']
         ydelt = qa.convert(cell[1],'deg')['value']
-        if head['CDELT1'] < 0:
-            head['CDELT1'] = -xdelt
-        else:
+        if 'CDELT1' in head.keys() and head['CDELT1'] > 0:
             head['CDELT1'] = xdelt
-        if head['CDELT2'] < 0:
+        else:
+            head['CDELT1'] = -xdelt
+        if 'CDELT2' in head.keys() and head['CDELT2'] < 0:
             head['CDELT2'] = -ydelt
         else:
             head['CDELT2'] = ydelt
@@ -180,15 +240,17 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
         r=re.compile(r'phasecenter=J2000 (?P<ra>.*?) (?P<dec>.*?)\n')
         positions=[m.groupdict() for m in r.finditer(outliers)]
         outlier_bases = re.findall(r'imagename=(.*)\n',outliers)
+        num_outliers = 0
 
         #Only write positions for this loop outside imaging area
         for i,position in enumerate(positions):
             pos=SkyCoord(**position)
             if not w.footprint_contains(pos):
-                mask= ''
+                num_outliers += 1
+                mask = 'mask={0}'.format(pixmask)
                 phasecenter = 'J2000 {0}'.format(pos.to_string('hmsdms'))
-                
-                if loop > 0:
+
+                if step == 'bdsf':
                     base = outlier_bases[i]
                     im = base + '.image'
                     outlier_cat = base + ".catalog.fits"
@@ -227,10 +289,6 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                         logger.warning("PyBDSF catalogue '{0}' not created. Using old position and mask.".format(outlier_cat))
                         mask = 'mask={0}'.format(pixmask)
 
-                elif pixmask != '':
-                    #Use original mask
-                    mask = 'mask={0}'.format(pixmask)
-
                 out.write("""
                 imagename={0}_outlier{1}
                 imsize=[{2},{2}]
@@ -238,7 +296,10 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 phasecenter={3}
                 nterms=3
                 gridder=standard
-                {4}\n""".format(imbase%(loop+1),i,outlier_imsize,phasecenter,mask))
+                {4}\n""".format(imbase%(index),i,outlier_imsize,phasecenter,mask))
+
+            else:
+                logger.info('Excluding "{0}", as it lies within the image footprint.'.format(outlier_bases[i]))
 
         out.close()
 
@@ -247,6 +308,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
         else:
             logger.error("Outlier file '{0}' doesn't exist, so self-calibration loop {1} failed. Will terminate selfcal process.".format(outlierfile,loop))
             sys.exit(1)
+
+        if num_outliers > 10:
+            logger.warning('The number of outliers written to "{0}" is > 10. As this will take some time to image, you may want to set a higher outlier_threshold than {1}, and/or increase your imsize beyond {2}.'.format(outlierfile,orig_threshold,imsize))
 
     return rmsfile,outlierfile
 
@@ -301,7 +365,7 @@ if __name__ == '__main__':
     loop = params['loop']
 
     selfcal_part2(**params)
-    rmsmap,outlierfile = find_outliers(**params)
+    rmsmap,outlierfile = find_outliers(**params,step='bdsf')
     pixmask = mask_image(**params)
 
     loop += 1

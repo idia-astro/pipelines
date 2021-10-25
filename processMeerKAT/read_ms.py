@@ -64,13 +64,18 @@ def get_fields(MS):
     fieldIDs['targetfields'] = get_field(MS,'TARGET','targetfields',extra_fields,default=default,multiple=True)
 
     if 'UNKNOWN' in intents:
-        try:
-            polfields = np.array(msmd.namesforfields(msmd.fieldsforintent('UNKNOWN'))) #bogus MeerKAT mislabelling during conversion to MS
-            for polfield in polfields:
-                if polfield not in extra_fields:
-                    extra_fields.append(polfield)
-        except RuntimeError as e:
-            logger.warning("Intent 'UNKNOWN' present in MS but couldn't find any fields with this intent.")
+        err_msg = "Intent 'UNKNOWN' present in MS but couldn't find any fields with this intent. Please append any extra field manually."
+        if len(msmd.fieldsforintent('UNKNOWN')) > 0:
+            try:
+                polfields = np.array(msmd.namesforfields(msmd.fieldsforintent('UNKNOWN'))) #bogus MeerKAT mislabelling during conversion to MS
+                for polfield in polfields:
+                    if polfield not in extra_fields:
+                        extra_fields.append(polfield)
+            except RuntimeError as e:
+                logger.warning(err_msg)
+        else:
+            logger.warning(err_msg)
+
 
     #Put any extra fields in extra_fields
     if len(extra_fields) > 0:
