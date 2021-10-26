@@ -1192,7 +1192,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
         if selfcal_kwargs['loop'] > 0:
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
         #Find RACS outliers
-        elif (nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']]) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+        elif ((nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']])) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
                 logger.info('Populating sky model for selfcal using outlier_threshold={0}'.format(selfcal_kwargs['outlier_threshold']))
                 logger.info('Querying Rapid ASAKP Continuum Survey (RACS) catalog within 2 degrees of target phase centre. Please allow a moment for this.')
                 sky_model_kwargs = deepcopy(kwargs)
