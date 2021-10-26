@@ -104,6 +104,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     outlier_snr = 5
     sky_model_radius = 2 #degrees
 
+    if step != 'sky':
+        pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
+
     #Store before potentially updating to mJy
     orig_threshold = outlier_threshold
 
@@ -146,13 +149,11 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             RACS.write(cat,overwrite=True)
             index = loop
         else:
-            pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
             fluxcol = 'Total_flux'
             efluxcol = 'E_Total_flux'
             racol = 'RA'
             deccol = 'Dec'
             index = loop+1
-
 
         # Write initial outlier file
         if step == 'sky':
