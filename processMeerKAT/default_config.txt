@@ -17,7 +17,7 @@ partition = 'Main'                # SLURM partition to use
 exclude = ''                      # SLURM nodes to exclude
 time = '12:00:00'
 submit = False
-container = '/idia/software/containers/casa-6.3.simg'
+container = '/idia/software/containers/casa-6-2021-10-12.simg'
 mpi_wrapper = 'mpirun'
 name = ''
 dependencies = ''
@@ -26,7 +26,7 @@ reservation = ''
 modules = ['openmpi/2.1.1']
 verbose = False
 precal_scripts = [('calc_refant.py',False,''), ('partition.py',True,'')]
-postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, ''), ('science_image.py', True, '')]
+postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('science_image.py', True, '')]
 scripts = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),

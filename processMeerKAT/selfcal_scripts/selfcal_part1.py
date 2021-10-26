@@ -4,6 +4,7 @@
 import sys
 import glob
 import os
+import re
 
 import config_parser
 from config_parser import validate_args as va
@@ -20,18 +21,25 @@ logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
-def symlink_psf(imagename,prefix):
+def symlink_psf(imagenames,loop):
 
-    for product in ['psf','sumwt']:
-        products = glob.glob('{0}.{1}*'.format(prefix,product))
-        for fname in products:
-            name, ext = os.path.splitext(fname)
-            # Will not have e.g. .tt0 if nterms < 2
-            if ext == product:
-                ext = ''
-            symlink = '{0}.{1}{2}'.format(imagename,product,ext)
-            if not os.path.exists(symlink):
-                os.symlink(fname,symlink)
+    for imagename in imagenames:
+        prefix = imagename.replace('im_{0}'.format(loop),'im_{0}'.format(loop-1))
+        for product in ['psf','sumwt']:
+            products = glob.glob('{0}.{1}*'.format(prefix,product))
+            #If outlier's PSF missing, abandon symlinking attempt and return calcpsf=True
+            if len(products) == 0:
+                return True
+            for fname in products:
+                name, ext = os.path.splitext(fname)
+                # Will not have e.g. .tt0 if nterms < 2
+                if ext == product:
+                    ext = ''
+                symlink = '{0}.{1}{2}'.format(imagename,product,ext)
+                if not os.path.exists(symlink):
+                    os.symlink(fname,symlink)
+
+    return False
 
 def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold,
                   uvrange, nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag):
@@ -57,8 +65,10 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
         if (not flag[loop-1] or len(prev_caltables) == 0) and gridder[loop] == gridder[loop-1] and robust[loop] == robust[loop-1] and nterms[loop] == nterms[loop-1] and imsize[loop] == imsize[loop-1] and cell[loop] == cell[loop-1]:
             # Assumes it's safe to re-use previous PSF for outliers if position has slightly changed
-            symlink_psf(imagename,imbase % (loop-1))
-            calcpsf = True
+            imagenames = [imagename]
+            if outlierfile != '':
+                imagenames += re.findall(r'imagename=(.*)\n',open(outlierfile).read())
+            calcpsf = symlink_psf(imagenames,loop)
 
     if os.path.exists(outimage):
         logger.info('Image "{0}" exists. Not overwriting, continuing to next loop.'.format(outimage))
