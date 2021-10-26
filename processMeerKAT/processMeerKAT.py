@@ -1198,7 +1198,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
                 sky_model_kwargs = deepcopy(kwargs)
                 sky_model_kwargs['partition'] = 'Devel'
                 mpi_wrapper = srun(sky_model_kwargs, qos=True, time=2, mem=0)
-                command = write_command('set_sky_model.py', '', mpi_wrapper=mpi_wrapper, container=kwargs['container'],logfile=False)
+                command = write_command('set_sky_model.py', '-C {0}'.format(config), mpi_wrapper=mpi_wrapper, container=kwargs['container'],logfile=False)
                 logger.debug('Running following command:\n\t{0}'.format(command))
                 os.system(command)
 
