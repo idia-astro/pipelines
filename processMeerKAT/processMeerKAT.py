@@ -374,6 +374,22 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
         params['casa_call'] = 'python'
 
     if arrayJob:
+        # Maintain argument calls for individual SPW runs ### Adapted from `write_spw_master` function.
+        argv = sys.argv[1:]
+        for idx, element in enumerate(argv):
+            # Extend name to include SPW array job is operating on:
+            if element in ["-n", "--name"]:
+                if idx+1 < len(argv):
+                    argv[idx+1] += "_${SLURM_ARRAY_JOB_ID}"
+            # Remove config name. Config is passed into `args` parameter.
+            elif element in ["-c", "--config"]:
+                argv[idx] = ""
+                if idx+1 < len(argv):
+                    argv[idx+1] = ""
+            else:
+                pass
+        params['argument_calls'] = " ".join(argv)
+        # Iterate over individual SPW folders
         command += """#Iterate over SPWs in job array, launching one after the other
         SPWs="%s"
         arr=($SPWs)
@@ -381,7 +397,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
 
         """ % SPWs.replace(',',' ').replace('0:','')
 
-    command += "{mpi_wrapper} singularity exec {path_binding}{container} {plot_call} {casa_call} {script} {args}".format(**params)
+    command += "{mpi_wrapper} singularity exec {path_binding}{container} {plot_call} {casa_call} {script} {args}{argument_calls}".format(**params)
 
     if arrayJob:
         command += '\ncd ..\n'
@@ -588,10 +604,29 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
     master.write('mkdir -p {0}\n\n'.format(HPC_DEFAULTS['LOG_DIR'.lower()]))
     extn = '_$DATE.sh'
 
+    # Maintain argument calls for individual SPW runs ### Adapted from `write_spw_master` function.
+    argv = sys.argv[1:]
+    ignore = ["--run", "-R", ]
+    for idx, element in enumerate(argv):
+        # Extend name to include SPW array job is operating on:
+        if element in ["-n", "--name"]:
+            if idx+1 < len(argv):
+                argv[idx+1] += "_${SLURM_ARRAY_JOB_ID}"
+        # Remove config name. Config is passed into `args` parameter.
+        elif element in ["-c", "--config"]:
+            argv[idx] = ""
+            if idx+1 < len(argv):
+                argv[idx+1] = ""
+        else:
+            pass
+    argument_calls = " ".join(argv)
+    if ("-v" or "--verbose") not in argument_calls:
+        argument_calls += " --quiet"
+
     for i,spw in enumerate(SPWs.split(',')):
         master.write('echo Running pipeline in directory "{0}" for spectral window 0:{0}\n'.format(spw))
         master.write('cd {0}\n'.format(spw))
-        master.write('output=$({0} --config ./{1} --run --submit --quiet --justrun'.format(os.path.split(THIS_PROG)[1],config))
+        master.write('output=$({0} --config ./{config} --run --submit --justrun {argument_calls}'.format(os.path.split(THIS_PROG)[1], config=config, argument_calls=argument_calls))
         if partition:
             master.write(' --dependencies=$partitionID\_{0}'.format(i))
         elif len(precal_scripts) > 0:
@@ -1548,9 +1583,10 @@ def main():
     if args.license:
         logger.info(license)
     if args.build:
+        # Write default config according to building parameters.
         default_config(vars(args))
     if args.run:
-        kwargs = format_args(args.config, args.submit, args.quiet,args. dependencies, args.justrun)
+        kwargs = format_args(args.config, args.submit, args.quiet, args.dependencies, args.justrun)
         write_jobs(args.config, args, contents=HPC_DEFAULTS['submission_file_base'], **kwargs)
 
 if __name__ == "__main__":
