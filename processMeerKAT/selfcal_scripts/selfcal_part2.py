@@ -15,6 +15,7 @@ import processMeerKAT
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.units import Quantity
 
 from casatasks import *
 from casatools import image,quanta,msmetadata
@@ -104,54 +105,68 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     outlier_snr = 5
     sky_model_radius = 2 #degrees
 
+    if step != 'sky':
+        pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
+
     #Store before potentially updating to mJy
     orig_threshold = outlier_threshold
 
-    #Take sky positions from RACS
-    if step == 'sky' and outlier_threshold != '' and outlier_threshold != 0:
-        from astroquery.utils.tap.core import TapPlus
-        from astropy.table import vstack
-
-        #Open MS and extract first target centre; use first sub-MS for speed if MMS
-        if os.path.exists('{0}/SUBMSS'.format(vis)):
-            tmpvis = glob.glob('{0}/SUBMSS/*'.format(vis))[0]
-        else:
-            tmpvis = vis
-        msmd.open(tmpvis)
-        dir=msmd.sourcedirs()[str(msmd.fieldsforintent('TARGET')[0])]
-        ra=qa.convert(dir['m0'],'deg')['value']
-        dec=qa.convert(dir['m1'],'deg')['value']
-        if ra < 0:
-            ra += 360
-        phasecenter=SkyCoord(ra=ra,dec=dec,unit='deg,deg')
-        msmd.done()
-
-        cat = 'RACS_local.fits'
-        fluxcol = 'total_flux_source'
-        efluxcol = 'e_total_flux_source'
-        racol = 'ra'
-        deccol = 'dec'
-        outlier_threshold *= 1e3 #convert from mJy to Jy
-
-        #Extract RACS positions within sky_model_radius
-        casdatap = TapPlus(url="https://casda.csiro.au/casda_vo_tools/tap")
-        query = "SELECT * FROM  AS110.racs_dr1_sources_galacticcut_v2021_08_v01 where 1=CONTAINS(POINT('ICRS', ra, dec),CIRCLE('ICRS',{0},{1},{2}))".format(ra,dec,sky_model_radius)
-        job = casdatap.launch_job_async(query)
-        galcut = job.get_results()
-        job = casdatap.launch_job_async(query.replace('cut','region'))
-        galregion = job.get_results()
-        RACS = vstack([galcut,galregion],join_type='exact')
-        RACS.write(cat,overwrite=True)
-        index = loop
-    else:
-        pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
-        fluxcol = 'Total_flux'
-        efluxcol = 'E_Total_flux'
-        racol = 'RA'
-        deccol = 'Dec'
-        index = loop+1
-
     if outlier_threshold != '' and outlier_threshold != 0:
+
+        #Take sky positions from RACS
+        if step == 'sky':
+            from astroquery.utils.tap.core import TapPlus
+            from astropy.table import vstack
+
+            #Open MS and extract first target centre; use first sub-MS for speed if MMS
+            if os.path.exists('{0}/SUBMSS'.format(vis)):
+                tmpvis = glob.glob('{0}/SUBMSS/*'.format(vis))[0]
+            else:
+                tmpvis = vis
+            msmd.open(tmpvis)
+            dir=msmd.sourcedirs()[str(msmd.fieldsforintent('TARGET')[0])]
+            ra=qa.convert(dir['m0'],'deg')['value']
+            dec=qa.convert(dir['m1'],'deg')['value']
+            if ra < 0:
+                ra += 360
+            phasecenter=SkyCoord(ra=ra,dec=dec,unit='deg,deg')
+            msmd.done()
+
+            cat = 'RACS_local.fits'
+            fluxcol = 'total_flux_source'
+            efluxcol = 'e_total_flux_source'
+            racol = 'ra'
+            deccol = 'dec'
+            outlier_threshold *= 1e3 #convert from mJy to Jy
+
+            #Extract RACS positions within sky_model_radius
+            try:
+                casdatap = TapPlus(url="https://casda.csiro.au/casda_vo_tools/tap")
+                query = "SELECT * FROM  AS110.racs_dr1_sources_galacticcut_v2021_08_v01 where 1=CONTAINS(POINT('ICRS', ra, dec),CIRCLE('ICRS',{0},{1},{2}))".format(ra,dec,sky_model_radius)
+                job = casdatap.launch_job_async(query)
+                galcut = job.get_results()
+                job = casdatap.launch_job_async(query.replace('cut','region'))
+                galregion = job.get_results()
+                RACS = vstack([galcut,galregion],join_type='exact')
+                RACS.write(cat,overwrite=True)
+            except:
+                RACS = '{0}/RACS.fits.gz'.format(processMeerKAT.SCRIPT_DIR)
+                tmp = fits.open(RACS)
+                all_positions = SkyCoord(ra=tmp[1].data[racol],dec=tmp[1].data[deccol],unit='deg,deg')
+                tmp[1].data = tmp[1].data[phasecenter.separation(all_positions) < Quantity(sky_model_radius,'deg')]
+                tmp.writeto(cat,overwrite=True)
+                tmp.close()
+                del all_positions #Don't store millions of positions beyond here
+
+            index = loop
+
+        else:
+            fluxcol = 'Total_flux'
+            efluxcol = 'E_Total_flux'
+            racol = 'RA'
+            deccol = 'Dec'
+            index = loop+1
+
         # Write initial outlier file
         if step == 'sky':
             tab=fits.open(cat)
