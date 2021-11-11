@@ -467,7 +467,7 @@ def write_sbatch(script,args,mem,mpi_wrapper,contents,nodes=1,tasks=16,name="job
         SLURM reservation to use.
     modules : list, optional
         Modules to load upon execution of sbatch script.
-    justrun : bool, optionall
+    justrun : bool, optional
         Just run the pipeline without rebuilding each job script (if it exists)."""
 
     if not os.path.exists(HPC_DEFAULTS['LOG_DIR'.lower()]):
