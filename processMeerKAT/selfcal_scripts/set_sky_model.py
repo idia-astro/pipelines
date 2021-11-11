@@ -1,7 +1,13 @@
 #Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
+import sys
 import os
+
+# Adapt PYTHONPATH to include processMeerKAT
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 import bookkeeping
 from selfcal_scripts.selfcal_part2 import find_outliers
 from casatasks import casalog

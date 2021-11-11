@@ -4,6 +4,10 @@
 import sys
 import os
 
+# Adapt PYTHONPATH to include processMeerKAT
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 import config_parser
 from config_parser import validate_args as va
 import bookkeeping
