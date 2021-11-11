@@ -155,6 +155,18 @@ def parse_args():
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
     parser.add_argument("-C","--config",metavar="path", default=HPC_DEFAULTS['CONFIG'.lower()], required=False, type=str, help="Relative (not absolute) path to config file.")
+
+    # Extract hpc name used during build and warn if not the same as CLI hpc
+    config_dict, config = config_parser.parse_config(args.config)
+    if config.has_option('run', 'hpc'):
+        config_hpc_name = config['run']['hpc']
+    else:
+        config_hpc_name = HPC_NAME
+    if HPC_NAME != config_hpc_name:
+        msg = "Entered hpc ({HPC_NAME}) is not the same as was used to build this pipeline instance! '{config_hpc_name}' was used. Pipeline may not function as expected. Please consider rebuilding pipeline with correct hpc selection."
+        logger.warning(msg.format(HPC_NAME=HPC_NAME, config_hpc_name=config_hpc_name))
+
+    # Parse in remaining arguments
     parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
                         help="Use this number of nodes [default: 1; max: {0}].".format(HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()]))
     parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
@@ -1090,9 +1102,11 @@ def default_config(arg_dict):
     #Overwrite CL parameters in config under section [slurm]
     config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
 
-    #Add MS to config file under section [data] and dopol under section [run]
+    #Add MS to config file under section [data]
     config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
-    config_parser.overwrite_config(filename, conf_dict={'dopol' : arg_dict['dopol']}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
+    # Add dopol and hpc under section [run]
+    run_dict = {'dopol' : arg_dict['dopol'], 'hpc' : "'{}'".format(arg_dict['hpc'])}
+    config_parser.overwrite_config(filename, conf_dict=run_dict, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
 
     if not arg_dict['do2GC'] or not arg_dict['science_image']:
         remove_scripts = []
