@@ -32,10 +32,13 @@ from copy import deepcopy
 import logging
 from time import gmtime
 from datetime import datetime
+
 logging.Formatter.converter = gmtime
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s")
 
+THIS_PROG = os.path.realpath(__file__)
+SCRIPT_DIR = os.path.dirname(THIS_PROG)
 
 
 def check_path(path,update=False):
@@ -131,24 +134,24 @@ def parse_args():
             return check_path(val)
 
     # Define global variables
-    global THIS_PROG, SCRIPT_DIR, HPC_DEFAULTS, HPC
-    THIS_PROG = os.path.realpath(__file__)
-    SCRIPT_DIR = os.path.dirname(THIS_PROG)
+    global HPC_DEFAULTS, HPC_NAME, HPC_CONFIG
+
     DEFAULTS_CONFIG_PATH = "known_hpc.cfg"
     known_hpc_path = "{0}/{1}".format(SCRIPT_DIR, DEFAULTS_CONFIG_PATH)
+
     if os.path.isfile(known_hpc_path):
-        KNOWN_HPCS,_ = config_parser.parse_config(known_hpc_path)
+        KNOWN_HPCS, HPC_CONFIG = config_parser.parse_config(known_hpc_path)
     else:
         parser.error("Known HPC config file ({0}) not found.".format(known_hpc_path))
 
     # Begin parsing
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA MeasurementSet. Version: {0}'.format(__version__))
 
-    parser.add_argument("--hpc",metavar='name', required=False, type=str, default="ilifu", help="Name of hpc facility being used if not known to the config (processMeerKAT/known_hpc.cfg) slurm limits are functionally removed [default: ilifu].")
+    parser.add_argument("--hpc",metavar='name', required=False, type=str, default="ilifu", help="Name of hpc facility being used. If not known to processMeerKAT/known_hpc.cfg slurm limits are functionally removed [default: ilifu].")
     # Read in parser default values according to --cluster parameter
     args, unknown = parser.parse_known_args()
-    HPC = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() else "unknown"
-    HPC_DEFAULTS = KNOWN_HPCS[HPC]
+    HPC_NAME = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() else "unknown"
+    HPC_DEFAULTS = KNOWN_HPCS[HPC_NAME]
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
     parser.add_argument("-C","--config",metavar="path", default=HPC_DEFAULTS['CONFIG'.lower()], required=False, type=str, help="Relative (not absolute) path to config file.")
@@ -261,7 +264,7 @@ def validate_args(args,config,parser=None):
         msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
         raise_error(config, msg, parser)
 
-    if HPC=="unknown":
+    if HPC_NAME=="unknown":
         msg = "HPC facility [--hpc] is not in 'known_hpc.cfg', reverting to 'unknown' HPC. You input {0}. Pipeline will rely entirely on the specified arguemnts. No upper limits will be set. HPC specific selections within your config may cause pipeline runs to fail!"
         logger.warning(msg.format(args['hpc']))
 
@@ -1574,7 +1577,7 @@ def setup_logger(config,verbose=False):
 def main():
     # Parse command-line arguments, and setup logger
     # This also creates the global variables:
-    # THIS_PROG, SCRIPT_DIR, HPC_DEFAULTS, HPC
+    # HPC_DEFAULTS, HPC_NAME, HPC_CONFIG
     args = parse_args()
     setup_logger(args.config,args.verbose)
 
