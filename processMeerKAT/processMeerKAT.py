@@ -359,6 +359,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
     params['casa_log'] = '--nologfile'
     params['plot_call'] = ''
     params['path_binding'] = "{}".format(HPC_DEFAULTS['path_binding'])
+    params['argument_calls'] = ''
     command = ''
 
     params['script'] = check_path(script, update=True)
@@ -388,7 +389,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
                     argv[idx+1] = ""
             else:
                 pass
-        params['argument_calls'] = " ".join(argv)
+        params['argument_calls'] = " "+" ".join(argv)
         # Iterate over individual SPW folders
         command += """#Iterate over SPWs in job array, launching one after the other
         SPWs="%s"
