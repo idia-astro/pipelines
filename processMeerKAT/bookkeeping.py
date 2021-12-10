@@ -180,7 +180,16 @@ def get_selfcal_params():
 def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
-    basename = visbase.replace('.mms', '')
+    #Assume first target will be in the visname later (relevant for writing outliers.txt at beginning of pipeline)
+    if '.ms' in visbase:
+        from casatools import msmetadata
+        msmd = msmetadata()
+        msmd.open(vis)
+        basename = visbase.replace('.ms','.{0}'.format(msmd.namesforfields(msmd.fieldsforintent('TARGET'))[0]))
+        msmd.done()
+    else:
+        basename = visbase.replace('.mms', '')
+
     imbase = basename + '_im_%d' # Images will be produced in $CWD
     imagename = imbase % loop
     outimage = imagename + '.image'

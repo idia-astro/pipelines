@@ -190,9 +190,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 imsize=[{2},{2}]
                 cell=[1.0arcsec,1.0arcsec]
                 phasecenter={3}
-                nterms=3
+                nterms={4}
                 gridder=standard
-                {4}\n""".format(imbase%(index),i,outlier_imsize,position,mask))
+                {5}\n""".format(imbase%(index),i,outlier_imsize,position,nterms[loop],mask))
 
             out.close()
 
@@ -203,6 +203,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 sys.exit(1)
 
         #Write outlier file specific to this loop
+        if not os.path.exists(outlierfile_all) and os.path.exists('../{0}'.format(outlierfile_all)):
+            logger.warning('Using outliers from ../{0}'.format(outlierfile_all))
+            outlierfile_all = '../{0}'.format(outlierfile_all)
         outliers=open(outlierfile_all).read()
         out = open(outlierfile,'w')
 
@@ -309,9 +312,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 imsize=[{2},{2}]
                 cell=[1.0arcsec,1.0arcsec]
                 phasecenter={3}
-                nterms=3
+                nterms={4}
                 gridder=standard
-                {4}\n""".format(imbase%(index),i,outlier_imsize,phasecenter,mask))
+                {5}\n""".format(imbase%(index),i,outlier_imsize,phasecenter,nterms[loop],mask))
 
             else:
                 logger.info('Excluding "{0}", as it lies within the image footprint.'.format(outlier_bases[i]))
