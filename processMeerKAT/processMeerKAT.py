@@ -1265,7 +1265,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
 
     #Check selfcal params
     if config_parser.has_section(config,'selfcal'):
-        selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
+        selfcal_kwargs = get_config_kwargs(config, 'selfcal', HPC_DEFAULTS['SELFCAL_CONFIG_KEYS'.lower()])
         params = bookkeeping.get_selfcal_params()
         if selfcal_kwargs['loop'] > 0:
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
@@ -1281,7 +1281,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
                 os.system(command)
 
     if config_parser.has_section(config,'image'):
-        imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
+        imaging_kwargs = get_config_kwargs(config, 'image', HPC_DEFAULTS['IMAGING_CONFIG_KEYS'.lower()])
 
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
