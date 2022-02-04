@@ -639,7 +639,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
         else:
             pass
     argument_calls = " ".join(argv)
-    if ("-v" or "--verbose") not in argument_calls:
+    if not any((arg in argument_calls for arg in ("-v", "--verbose"))):
         argument_calls += " --quiet"
 
     for i,spw in enumerate(SPWs.split(',')):
@@ -738,7 +738,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
             pass
 
     argument_calls = " ".join(arguments)
-    if ("-v" or "--verbose") not in argument_calls:
+    if not any((arg in argument_calls for arg in ("-v", "--verbose"))):
         argument_calls += " --quiet"
 
     # Create script to start processMeerKAT.py for each SPW whilst maintaining args.
