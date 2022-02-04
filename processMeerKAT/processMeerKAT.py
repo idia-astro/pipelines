@@ -401,7 +401,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
                 if idx+1 < len(argv):
                     argv[idx+1] += "_${SLURM_ARRAY_JOB_ID}"
             # Remove config name. Config is passed into `args` parameter.
-            elif element in ["-c", "--config"]:
+            elif element in ["-C", "--config"]:
                 argv[idx] = ""
                 if idx+1 < len(argv):
                     argv[idx+1] = ""
@@ -632,7 +632,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
             if idx+1 < len(argv):
                 argv[idx+1] += "_${SLURM_ARRAY_JOB_ID}"
         # Remove config name. Config is passed into `args` parameter.
-        elif element in ["-c", "--config"]:
+        elif element in ["-C", "--config"]:
             argv[idx] = ""
             if idx+1 < len(argv):
                 argv[idx+1] = ""
@@ -731,7 +731,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
             print(element, arguments[idx:])
             if idx+1 < len(arguments):
                 arguments[idx+1] += "_$f"
-        elif element in ["-c", "--config"]:
+        elif element in ["-C", "--config"]:
             if idx+1 < len(arguments):
                 arguments[idx+1] = ".config.tmp"
         else:
@@ -1375,8 +1375,11 @@ def format_args(config,submit,quiet,dependencies,justrun):
         #sys.exit(1)
 
     #If everything up until here has passed, we can copy config file to TMP_CONFIG (in case user runs sbatch manually) and inform user
-    logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config, HPC_DEFAULTS['TMP_CONFIG'.lower()]))
-    copyfile(config, HPC_DEFAULTS['TMP_CONFIG'.lower()])
+    # Skip if config is temporary
+    if config == HPC_DEFAULTS['TMP_CONFIG'.lower()]:
+        logger.debug("Not copying '{0}' to '{1}'. They're the same file.".format(config, HPC_DEFAULTS['TMP_CONFIG'.lower()]))
+    else:
+        logger.debug("Copying '{0}' to '{1}', and using this to run pipeline.".format(config, HPC_DEFAULTS['TMP_CONFIG'.lower()]))
     if not quiet:
         logger.warning("Changing [slurm] section in your config will have no effect unless you [-R --run] again.")
 
