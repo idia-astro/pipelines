@@ -202,7 +202,7 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 logger.error("Outlier file '{0}' doesn't exist, so sky model build went wrong. Will terminate process.".format(outlierfile_all))
                 sys.exit(1)
 
-        #Write outlier file specific to this loop
+        #Write outlier file specific to this loop, looking up from SPW directory where relevant
         if not os.path.exists(outlierfile_all) and os.path.exists('../{0}'.format(outlierfile_all)):
             logger.warning('Using outliers from ../{0}'.format(outlierfile_all))
             outlierfile_all = '../{0}'.format(outlierfile_all)
@@ -253,6 +253,10 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
         for axis in ['NAXIS3','NAXIS4']:
             if axis in head.keys():
                 head.pop(head.index(axis))
+
+        #Shrink image by 1% to include outliers on edge of main images
+        head['NAXIS1'] = int(head['NAXIS1']*0.99)
+        head['NAXIS2'] = int(head['NAXIS2']*0.99)
 
         w = WCS(head)
         r=re.compile(r'phasecenter=J2000 (?P<ra>.*?) (?P<dec>.*?)\n')

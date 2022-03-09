@@ -79,10 +79,10 @@ outlier_threshold = 0.0           # S/N values if >= 1.0, otherwise Jy
 [image]
 cell = '1.5arcsec'
 robust = -0.5
-imsize = [4096, 4096]
-wprojplanes = 256
-niter = 100000
-threshold = 10e-6                 # S/N value if >= 1.0 and rmsmap != '', otherwise Jy
+imsize = [6144, 6144]
+wprojplanes = 512
+niter = 50000
+threshold = 10                    # S/N value if >= 1.0 and rmsmap != '', otherwise Jy
 multiscale = [0, 5, 10, 15]
 nterms = 2                        # Number of taylor terms
 gridder = 'wproject'

@@ -283,7 +283,7 @@ def run_script(func,logfile=''):
     if continue_run:
         try:
             func(args,taskvals)
-            #rename_logs(logfile)
+            rename_logs(logfile)
         except Exception as err:
             logger.error('Exception found in the pipeline of type {0}: {1}'.format(type(err),err))
             logger.error(traceback.format_exc())
