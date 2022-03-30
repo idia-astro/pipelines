@@ -47,6 +47,10 @@ def qu_polfield(polfield, visname):
         perley_frac = np.array([0.003, 0.005, 0.007])
         perley_f = np.array([1050,1450,1640])
         pa_polcal = np.array([25, 140, -5])
+    elif polfield == "J1130-1449": #Manual model from Russ Taylor, taken from MeerKAT polarisation calibrator project
+        perley_frac = np.array([0.038, 0.050, 0.056])
+        perley_f = np.array(1050, 1450, 1640])
+        pa_polcal = np.array([145, 66, 45])
     else:
         # This should never happen.
         raise ValueError("Invalid polarization field. Exiting.")
