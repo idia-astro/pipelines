@@ -6,6 +6,7 @@ import glob
 import shutil
 import os
 import re
+import numpy as np
 
 import config_parser
 from config_parser import validate_args as va
@@ -79,7 +80,7 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
 
     # Write out island mask and FITS catalog
     img.export_image(outfile=maskfile, img_type='island_mask', img_format='casa', clobber=True)
-    img.write_catalog(outfile=cat, format='fits', clobber=True, catalog_type='srl')
+    img.write_catalog(outfile=cat, format='fits', clobber=True, catalog_type='gaul')
 
     if write_all:
         regionfile = imbase % loop + ".casabox"
@@ -87,7 +88,7 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
 
         #Write out catalogs
         img.write_catalog(outfile=regionfile, format='casabox', clobber=True, catalog_type='srl')
-        img.write_catalog(outfile=ascii, format='ascii', clobber=True, catalog_type='srl')
+        img.write_catalog(outfile=ascii, format='ascii', clobber=True, catalog_type='gaul')
 
         # Write out RMS image
         img.export_image(outfile=rmsfile, img_type='rms', img_format='casa', clobber=True)
@@ -137,7 +138,7 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             efluxcol = 'e_total_flux_source'
             racol = 'ra'
             deccol = 'dec'
-            outlier_threshold *= 1e3 #convert from mJy to Jy
+            outlier_threshold *= 1e3 #convert from Jy to mJy
 
             #Extract RACS positions within sky_model_radius
             try:
@@ -299,13 +300,17 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
                     mask = 'mask={0}'.format(outlier_pixmask)
 
-                    #If catalog written, take new PyBDSF position closest to previous position
+                    #If catalog written, take new PyBDSF position as brightest Gaussian component, or otherwise, closest to previous position
+                    brightest = True
                     if os.path.exists(outlier_cat):
                         tab=fits.open(outlier_cat)
                         data = tab[1].data
                         tab.close()
                         cat_positions = SkyCoord(ra=data['RA'],dec=data['Dec'],unit='deg,deg')
-                        row,_,_ = pos.match_to_catalog_sky(cat_positions)
+                        if brightest:
+                            row = np.where(data['Total_flux'] == np.max(data['Total_flux']))[0][0]
+                        else:
+                            row,_,_ = pos.match_to_catalog_sky(cat_positions)
                         phasecenter = 'J2000 {0}'.format(cat_positions[row].to_string('hmsdms'))
                     else:
                         logger.warning("PyBDSF catalogue '{0}' not created. Using old position and mask.".format(outlier_cat))
