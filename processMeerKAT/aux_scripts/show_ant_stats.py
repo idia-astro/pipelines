@@ -14,7 +14,7 @@ bins = 20
 if len(args) > 1:
     if sys.argv[1] == '-h':
         print('Usage: {0} filename bins'.format(os.path.split(sys.argv[0])[1]))
-    else:
+    elif sys.argv[1] != '--config':
         fname = sys.argv[1]
         bins = int(sys.argv[2])
 
