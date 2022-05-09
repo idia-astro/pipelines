@@ -15,11 +15,12 @@ from casatools import msmetadata
 import casampi
 msmd = msmetadata()
 
-def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
+def split_vis(visname, spw, fields, specavg, timeavg, keepmms, badants):
 
     outputbase = os.path.splitext(os.path.split(visname)[1])[0]
     extn = 'mms' if keepmms else 'ms'
     newvis = visname
+    antenna = '!{0}'.format(','.join(map(str,badants))) if len(badants) > 0 else ''
 
     for field in fields:
         if field != '':
@@ -32,7 +33,7 @@ def split_vis(visname, spw, fields, specavg, timeavg, keepmms):
 
                     split(vis=visname, outputvis=outname, datacolumn='corrected',
                                 field=fname, spw=spw, keepflags=True, keepmms=keepmms,
-                                width=specavg, timebin=timeavg)
+                                width=specavg, timebin=timeavg, antenna=antenna)
 
                 if fname == fields.targetfield.split(',')[0]:
                     newvis = outname
@@ -47,13 +48,14 @@ def main(args,taskvals):
     fields = bookkeeping.get_field_ids(taskvals['fields'])
 
     spw = va(taskvals, 'crosscal', 'spw', str, default='')
+    badants = taskvals['crosscal'].pop('badants')
 
     specavg = va(taskvals, 'crosscal', 'width', int, default=1)
     timeavg = va(taskvals, 'crosscal', 'timeavg', str, default='8s')
     keepmms = va(taskvals, 'crosscal', 'keepmms', bool)
 
     msmd.open(visname)
-    newvis = split_vis(visname, spw, fields, specavg, timeavg, keepmms)
+    newvis = split_vis(visname, spw, fields, specavg, timeavg, keepmms, badants)
 
     config_parser.overwrite_config(args['config'], conf_dict={'vis' : "'{0}'".format(newvis)}, conf_sec='data')
     config_parser.overwrite_config(args['config'], conf_dict={'crosscal_vis': "'{0}'".format(visname)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
