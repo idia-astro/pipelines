@@ -93,8 +93,8 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
         # Write out RMS image
         img.export_image(outfile=rmsfile, img_type='rms', img_format='casa', clobber=True)
 
-def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange,
-                  nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, step):
+def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange, nterms,
+                  gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, step, targetfields=None):
 
     local = locals()
     local.pop('step')
@@ -125,7 +125,21 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             else:
                 tmpvis = vis
             msmd.open(tmpvis)
-            dir=msmd.sourcedirs()[str(msmd.fieldsforintent('TARGET')[0])]
+
+            #Force taking first target field
+            if type(targetfields) is str and ',' in targetfields:
+                targetfield = targetfields.split(',')[0]
+                msg = 'Multiple target fields input ("{0}"), but only one position can be used to identify outliers (for outlier imaging). Using "{1}".'
+                logger.warning(msg.format(targetfields,targetfield))
+            else:
+                targetfield = targetfields
+            #Make sure it's an integer
+            try:
+                targetfield = int(targetfield)
+            except ValueError: # It's not an int, but a str
+                targetfield = msmd.fieldsforname(targetfield)[0]
+
+            dir=msmd.sourcedirs()[str(targetfield)]
             ra=qa.convert(dir['m0'],'deg')['value']
             dec=qa.convert(dir['m1'],'deg')['value']
             if ra < 0:
