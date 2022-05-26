@@ -181,16 +181,32 @@ def get_selfcal_params():
 
 def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step):
 
+    from casatools import msmetadata
+    msmd = msmetadata()
+    msmd.open(vis)
+
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
-    #Assume first target will be in the visname later (relevant for writing outliers.txt at beginning of pipeline)
+    targetfields = config_parser.get_key(config_parser.parse_args()['config'], 'fields', 'targetfields')
+
+    #Force taking first target field (relevant for writing outliers.txt at beginning of pipeline)
+    if type(targetfields) is str and ',' in targetfields:
+        targetfield = targetfields.split(',')[0]
+        msg = 'Multiple target fields input ("{0}"), but only one position can be used to identify outliers (for outlier imaging). Using "{1}".'
+        logger.warning(msg.format(targetfields,targetfield))
+    else:
+        targetfield = targetfields
+    #Make sure it's an integer
+    try:
+        targetfield = int(targetfield)
+    except ValueError: # It's not an int, but a str
+        targetfield = msmd.fieldsforname(targetfield)[0]
+
     if '.ms' in visbase:
-        from casatools import msmetadata
-        msmd = msmetadata()
-        msmd.open(vis)
-        basename = visbase.replace('.ms','.{0}'.format(msmd.namesforfields(msmd.fieldsforintent('TARGET'))[0]))
-        msmd.done()
+        basename = visbase.replace('.ms','.{0}'.format(msmd.namesforfields(targetfield)[0]))
     else:
         basename = visbase.replace('.mms', '')
+
+    msmd.done()
 
     imbase = basename + '_im_%d' # Images will be produced in $CWD
     imagename = imbase % loop
@@ -244,7 +260,7 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
         elif step == 'bdsf':
             thresh = threshold[loop]
 
-    return imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile
+    return imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,targetfield
 
 def rename_logs(logfile=''):
 

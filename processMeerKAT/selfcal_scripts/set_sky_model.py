@@ -13,6 +13,5 @@ casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.envir
 if __name__ == '__main__':
 
     args,params = bookkeeping.get_selfcal_params()
-    targetfields = config_parser.parse_config(args['config'])[0]['fields']['targetfields']
-    find_outliers(**params,step='sky',targetfields=targetfields)
+    find_outliers(**params,step='sky')
     bookkeeping.rename_logs(logfile)

@@ -36,7 +36,7 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange,
                   nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag):
 
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='predict')
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='predict')
 
     if calmode[loop] != '':
         if os.path.exists(caltable):
@@ -94,11 +94,11 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
         img.export_image(outfile=rmsfile, img_type='rms', img_format='casa', clobber=True)
 
 def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange, nterms,
-                  gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, step, targetfields=None):
+                  gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, step):
 
     local = locals()
     local.pop('step')
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step=step)
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,targetfield = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step)
     cat = imagename + ".catalog.fits"
     outlierfile_all = 'outliers.txt'
     fitsname = imagename + '.fits'
@@ -125,20 +125,6 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             else:
                 tmpvis = vis
             msmd.open(tmpvis)
-
-            #Force taking first target field
-            if type(targetfields) is str and ',' in targetfields:
-                targetfield = targetfields.split(',')[0]
-                msg = 'Multiple target fields input ("{0}"), but only one position can be used to identify outliers (for outlier imaging). Using "{1}".'
-                logger.warning(msg.format(targetfields,targetfield))
-            else:
-                targetfield = targetfields
-            #Make sure it's an integer
-            try:
-                targetfield = int(targetfield)
-            except ValueError: # It's not an int, but a str
-                targetfield = msmd.fieldsforname(targetfield)[0]
-
             dir=msmd.sourcedirs()[str(targetfield)]
             ra=qa.convert(dir['m0'],'deg')['value']
             dec=qa.convert(dir['m1'],'deg')['value']
@@ -358,7 +344,7 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 def mask_image(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange, nterms, gridder,
                   deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, outlier_base='', outlier_image=''):
 
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='mask')
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='mask')
 
     if outlier_base != '':
         maskfile = outlier_base + '.islmask'
