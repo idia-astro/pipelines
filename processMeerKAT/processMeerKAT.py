@@ -53,11 +53,12 @@ SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
 CONFIG = 'default_config.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
+SPW_PREFIX = '*:'
 
 #Set global values for field, crosscal and SLURM arguments copied to config file, and some of their default values
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
-SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_nloops','gaintype','outlier_threshold','flag']
+SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_nloops','gaintype','outlier_threshold','flag','outlier_radius']
 IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap','outlierfile', 'pbthreshold']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose','modules'] + SLURM_CONFIG_STR_KEYS
@@ -195,7 +196,7 @@ def parse_args():
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
-    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
+    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default='b03-idia-ag', help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30') [default: 'b03-idia-ag'].")
     parser.add_argument("-r","--reservation", metavar="name", required=False, type=str, default='', help="SLURM reservation to use. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -395,7 +396,7 @@ def write_command(script,args,name='job',mpi_wrapper=MPI_WRAPPER,container=CONTA
         arr=($SPWs)
         cd ${arr[SLURM_ARRAY_TASK_ID]}
 
-        """ % SPWs.replace(',',' ').replace('0:','')
+        """ % SPWs.replace(',',' ').replace(SPW_PREFIX,'')
 
     command += "{mpi_wrapper} singularity exec {container} {plot_call} {casa_call} {script} {args}".format(**params)
 
@@ -576,7 +577,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
-    SPWs = SPWs.replace('0:','')
+    SPWs = SPWs.replace(SPW_PREFIX,'')
     toplevel = len(precal_scripts + postcal_scripts) > 0
 
     scripts = precal_scripts[:]
@@ -618,7 +619,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
     extn = '_$DATE.sh'
 
     for i,spw in enumerate(SPWs.split(',')):
-        master.write('echo Running pipeline in directory "{0}" for spectral window 0:{0}\n'.format(spw))
+        master.write('echo Running pipeline in directory "{1}" for spectral window {0}{1}\n'.format(SPW_PREFIX, spw))
         master.write('cd {0}\n'.format(spw))
         master.write('output=$({0} --config ./{1} --run --submit --quiet --justrun'.format(os.path.split(THIS_PROG)[1],config))
         if partition:
@@ -1164,7 +1165,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
     #Ensure all keys exist in these sections
     kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
     data_kwargs = get_config_kwargs(config,'data',['vis'])
-    get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
+    field_kwargs = get_config_kwargs(config, 'fields', FIELDS_CONFIG_KEYS)
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
 
     #Force submit=True if user has requested it during [-R --run]
@@ -1193,8 +1194,12 @@ def format_args(config,submit,quiet,dependencies,justrun):
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
         #Find RACS outliers
         elif ((nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']])) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+                if selfcal_kwargs['outlier_radius'] != '' and selfcal_kwargs['outlier_radius'] != 0.0:
+                    txt = 'within {0} degrees'.format(selfcal_kwargs['outlier_radius'])
+                else:
+                    txt = 'within calculated search radius'
                 logger.info('Populating sky model for selfcal using outlier_threshold={0}'.format(selfcal_kwargs['outlier_threshold']))
-                logger.info('Querying Rapid ASAKP Continuum Survey (RACS) catalog within 2 degrees of target phase centre. Please allow a moment for this.')
+                logger.info('Querying Rapid ASAKP Continuum Survey (RACS) catalog around the target phase centre to identify outliers {0}. Please allow a moment for this.'.format(txt))
                 sky_model_kwargs = deepcopy(kwargs)
                 sky_model_kwargs['partition'] = 'Devel'
                 mpi_wrapper = srun(sky_model_kwargs, qos=True, time=2, mem=0)
@@ -1268,7 +1273,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
         #Write timestamp to this pipeline run
         kwargs['timestamp'] = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(kwargs['timestamp'])}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
-        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition, createmms = crosscal_kwargs['createmms'])
+        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition, createmms = crosscal_kwargs['createmms'], fields=field_kwargs)
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
 
     #Pop script to calculate reference antenna if calcrefant=False. Assume it won't be in postcal scripts
@@ -1339,21 +1344,13 @@ def get_spw_bounds(spw):
 
         if unit != 'MHz':
             logger.warning('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
-        # Can only do when using CASA
-        # if unit == '':
-        #     msmd.open(MS)
-        #     low_MHz = msmd.chanfreqs(0)[low] / 1e6
-        #     high_MHz = msmd.chanfreqs(0)[high] / 1e6
-        #     msmd.done()
-        # else:
-        #     low_MHz=qa.convertfreq('{0}{1}'.format(low,unit),'MHz')['value']
-        #     high_MHz=qa.convertfreq('{0}{1}'.format(high,unit),'MHz')['value']
+
     else:
         return None
 
     return low,high,unit,func
 
-def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remove=True):
+def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remove=True,fields={}):
 
     """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
 
@@ -1377,6 +1374,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
         Create MMS as output?
     remove : bool, optional
         Remove SPWs completely encompassed by bad frequency ranges?
+    fields : dict, optional
+        Field names, so we can do some visname renaming hackery!
 
     Returns:
     --------
@@ -1393,7 +1392,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
 
         #Remove SPWs entirely encompassed by bad frequency ranges (only for MHz unit)
         for i in range(len(lo)):
-            SPWs.append('0:{0}~{1}{2}'.format(func(lo[i]),func(hi[i]),unit))
+            SPWs.append('{0}{1}~{2}{3}'.format(SPW_PREFIX, func(lo[i]),func(hi[i]),unit))
 
     elif ',' in spw:
         SPWs = spw.split(',')
@@ -1412,9 +1411,9 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
         low,high = get_spw_bounds(SPWs[i])[0:2]
         if unit == 'MHz' and remove:
             for freq in badfreqranges:
-                bad_low,bad_high = get_spw_bounds('0:{0}'.format(freq))[0:2]
+                bad_low,bad_high = get_spw_bounds('{0}{1}'.format(SPW_PREFIX,freq))[0:2]
                 if low >= bad_low and high <= bad_high:
-                    logger.info("Won't process spw '0:{0}~{1}{2}', since it's completely encompassed by bad frequency range '{3}'.".format(low,high,unit,freq))
+                    logger.info("Won't process spw '{0}{1}~{2}{3}', since it's completely encompassed by bad frequency range '{3}'.".format(SPW_PREFIX,low,high,unit,freq))
                     badfreq = True
                     break
         if badfreq:
@@ -1429,9 +1428,9 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
     #Create each spw as directory and place config in there
     logger.info("Making {0} directories for SPWs ({1}) and copying '{2}' to each of them.".format(nspw,SPWs,config))
     for spw in SPWs:
-        spw_config = '{0}/{1}'.format(spw.replace('0:',''),config)
-        if not os.path.exists(spw.replace('0:','')):
-            os.mkdir(spw.replace('0:',''))
+        spw_config = '{0}/{1}'.format(spw.replace(SPW_PREFIX,''),config)
+        if not os.path.exists(spw.replace(SPW_PREFIX,'')):
+            os.mkdir(spw.replace(SPW_PREFIX,''))
         copyfile(config, spw_config)
         config_parser.overwrite_config(spw_config, conf_dict={'spw' : "'{0}'".format(spw)}, conf_sec='crosscal')
         config_parser.overwrite_config(spw_config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
@@ -1446,7 +1445,14 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
             basename, ext = os.path.splitext(MS.rstrip('/ '))
             filebase = os.path.split(basename)[1]
             extn = 'mms' if createmms else 'ms'
-            vis = '{0}.{1}.{2}'.format(filebase,spw.replace('0:',''),extn)
+
+            #Hack to rename vis if setting as specific field (e.g. as target field when running selfcal)
+            prefix,suffix = os.path.splitext(filebase)
+            if suffix[1:] != '' and suffix[1:] in fields.values():
+                extn = '{0}.{1}'.format(suffix[1:],extn)
+                filebase = prefix
+
+            vis = '{0}.{1}.{2}'.format(filebase,spw.replace(SPW_PREFIX,''),extn)
             logger.warning("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
             orig_vis = config_parser.get_key(spw_config, 'data', 'vis')
             config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')

@@ -10,6 +10,7 @@ import config_parser
 from collections import namedtuple
 import os
 import glob
+import re
 
 import logging
 from time import gmtime
@@ -127,7 +128,7 @@ def get_selfcal_params():
     if params['dopol'] and 'G' in params['gaintype']:
         logger.warning("dopol is True, but gaintype includes 'G'. Use gaintype='T' for polarisation on linear feeds (e.g. MeerKAT).")
 
-    single_args = ['nloops','loop','discard_nloops','outlier_threshold'] #need to be 1 long (i.e. not a list)
+    single_args = ['nloops','loop','discard_nloops','outlier_threshold','outlier_radius'] #need to be 1 long (i.e. not a list)
     gaincal_args = ['solint','calmode','gaintype','flag'] #need to be nloops long
     list_args = ['imsize'] #allowed to be lists of lists
 
@@ -179,11 +180,19 @@ def get_selfcal_params():
 
     return args,params
 
-def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step):
+def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step):
 
-    from casatools import msmetadata
+    from casatools import msmetadata,quanta
+    from read_ms import check_spw
     msmd = msmetadata()
-    msmd.open(vis)
+    qa = quanta()
+
+    if os.path.exists('{0}/SUBMSS'.format(vis)):
+        tmpvis = glob.glob('{0}/SUBMSS/*'.format(vis))[0]
+    else:
+        tmpvis = vis
+
+    msmd.open(tmpvis)
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     targetfields = config_parser.get_key(config_parser.parse_args()['config'], 'fields', 'targetfields')
@@ -201,12 +210,10 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     except ValueError: # It's not an int, but a str
         targetfield = msmd.fieldsforname(targetfield)[0]
 
-    if '.ms' in visbase:
+    if '.ms' in visbase and str(targetfield) not in visbase:
         basename = visbase.replace('.ms','.{0}'.format(msmd.namesforfields(targetfield)[0]))
     else:
         basename = visbase.replace('.mms', '')
-
-    msmd.done()
 
     imbase = basename + '_im_%d' # Images will be produced in $CWD
     imagename = imbase % loop
@@ -245,8 +252,22 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
             outlierfile = 'outliers_loop{0}.txt'.format(loop)
         else:
             outlierfile = 'outliers_loop{0}.txt'.format(loop+1)
+
+        #Derive sky model radius for outliers, assuming channel 0 (of SPW 0) is lowest frequency and therefore largest FWHM
+        if outlier_radius == 0.0 or outlier_radius == '':
+            SPW = check_spw(config_parser.parse_args()['config'],msmd)
+            low_freq = float(SPW.replace('*:','').split('~')[0]) * 1e6 #MHz to Hz
+            rads=1.025*qa.constants(v='c')['value']/low_freq/ msmd.antennadiameter()['0']['value']
+            FWHM=qa.convert(qa.quantity(rads,'rad'),'deg')['value']
+            sky_model_radius = 1.5*FWHM #degrees
+            logger.warning('Using calculated search radius of {0:.1f} degrees.'.format(sky_model_radius))
+        else:
+            logger.info('Using preset search radius of {0} degrees'.format(outlier_radius))
+            sky_model_radius = outlier_radius
     else:
         outlierfile = ''
+
+    msmd.done()
 
     if not (type(threshold[loop]) is str and 'Jy' in threshold[loop]) and threshold[loop] > 1:
         if step in ['tclean','predict']:
@@ -260,7 +281,7 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
         elif step == 'bdsf':
             thresh = threshold[loop]
 
-    return imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,targetfield
+    return imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,targetfield,sky_model_radius
 
 def rename_logs(logfile=''):
 
@@ -283,6 +304,18 @@ def get_imaging_params():
     taskvals, config = config_parser.parse_config(args['config'])
     params = taskvals['image']
     params['vis'] = taskvals['data']['vis']
+    params['keepmms'] = taskvals['crosscal']['keepmms']
+
+    #Rename the masks that were already used
+    if params['outlierfile'] != '' and os.path.exists(params['outlierfile']):
+        outliers=open(params['outlierfile']).read()
+        outlier_bases = re.findall(r'imagename=(.*)\n',outliers)
+        for name in outlier_bases:
+            mask = '{0}.mask'.format(name)
+            if os.path.exists(mask):
+                newname = '{0}.old'.format(mask)
+                logger.info('Re-using old mask for "{0}". Renaming "{1}" to "{2}" to avoid mask conflict.'.format(name,mask,newname))
+                os.rename(mask,newname)
 
     return args,params
 
@@ -308,7 +341,7 @@ def run_script(func,logfile=''):
             config_parser.overwrite_config(args['config'], conf_dict={'continue' : False}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
             if nspw > 1:
                 for SPW in spw.split(','):
-                    spw_config = '{0}/{1}'.format(SPW.replace('0:',''),args['config'])
+                    spw_config = '{0}/{1}'.format(SPW.replace('*:',''),args['config'])
                     config_parser.overwrite_config(spw_config, conf_dict={'continue' : False}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
             rename_logs(logfile)
             sys.exit(1)

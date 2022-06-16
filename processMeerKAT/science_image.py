@@ -94,10 +94,11 @@ def do_pb_corr(inpimage, pbthreshold=0):
     ia.close()
 
 
-def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap, outlierfile, pbthreshold):
+def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap, outlierfile, keepmms, pbthreshold):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
-    imagename = visbase.replace('.mms', '.science_image') # Images will be produced in $CWD
+    extn = '.ms' if keepmms==False else '.mms'
+    imagename = visbase.replace(extn, '.science_image') # Images will be produced in $CWD
 
     if not (type(threshold) is str and 'Jy' in threshold) and threshold > 1 and os.path.exists(rmsmap):
         stats = imstat(imagename=rmsmap)
