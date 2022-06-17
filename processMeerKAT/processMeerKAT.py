@@ -712,7 +712,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
     else:
-        logger.info('Master script "{0}" written, but will not run.'.format(filename))
+        logger.info('Master script "{0}" written in CWD, but will not run.'.format(filename))
 
 
 def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
