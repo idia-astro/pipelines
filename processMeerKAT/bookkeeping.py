@@ -266,6 +266,7 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
             sky_model_radius = outlier_radius
     else:
         outlierfile = ''
+        sky_model_radius = 0.0
 
     msmd.done()
 
