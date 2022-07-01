@@ -1,3 +1,6 @@
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
+#See processMeerKAT.py for license details.
+
 #!/usr/bin/env python3
 
 import os

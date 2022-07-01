@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-__version__ = '1.1'
+__version__ = '2.0'
 
 license = """
     Process MeerKAT data via CASA MeasurementSet.
-    Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy.
+    Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy.
     support@ilifu.ac.za
 
     This program is free software: you can redistribute it and/or modify
