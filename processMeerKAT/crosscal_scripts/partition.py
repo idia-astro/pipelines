@@ -7,6 +7,11 @@ Runs partition on the input MS
 import sys
 import os
 
+# Adapt PYTHONPATH to include processMeerKAT
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+
 import config_parser
 from config_parser import validate_args as va
 import read_ms
@@ -47,6 +52,13 @@ def main(args,taskvals):
     include_crosshand = va(taskvals, 'run', 'dopol', bool, default=False)
     createmms = va(taskvals, 'crosscal', 'createmms', bool, default=True)
 
+    # HPC Specific Configuration
+    known_hpc_path = os.path.dirname(SCRIPT_DIR)+"/known_hpc.cfg"
+    KNOWN_HPCS, HPC_CONFIG = config_parser.parse_config(known_hpc_path)
+    HPC_NAME = taskvals["run"]["hpc"]
+    HPC_NAME = HPC_NAME if HPC_NAME in KNOWN_HPCS.keys() else "unknown"
+    CPUS_PER_NODE_LIMIT = va(KNOWN_HPCS, HPC_NAME, "CPUS_PER_NODE_LIMIT".lower(), dtype=int)
+
     if nspw > 1:
         casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_ARRAY_JOB_ID}_{SLURM_ARRAY_TASK_ID}.casa'.format(**os.environ))
     else:
@@ -64,7 +76,7 @@ def main(args,taskvals):
 
     if not include_crosshand and npol == 4:
         npol = 2
-    CPUs = npol if tasks*npol <= processMeerKAT.CPUS_PER_NODE_LIMIT else 1 #hard-code for number of polarisations
+    CPUs = npol if tasks*npol <= CPUS_PER_NODE_LIMIT else 1 #hard-code for number of polarisations
 
     mvis = do_partition(visname, spw, preavg, CPUs, include_crosshand, createmms, spwname)
     mvis = "'{0}'".format(mvis)
