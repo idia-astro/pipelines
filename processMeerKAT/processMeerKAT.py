@@ -149,7 +149,7 @@ def parse_args():
 
 
 
-    parser.add_argument("--hpc",metavar='name', required=False, type=str, default="unkown", help="Name of hpc facility being used. If not known to processMeerKAT/known_hpc.cfg slurm limits are functionally removed [default: ilifu].")
+    parser.add_argument("--hpc",metavar='name', required=False, type=str, default="unknown", help="Name of hpc facility being used. If not known to processMeerKAT/known_hpc.cfg slurm limits are functionally removed [default: ilifu].")
 
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
