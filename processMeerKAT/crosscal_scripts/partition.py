@@ -69,7 +69,7 @@ def main(args,taskvals):
         low,high,unit,dirs = config_parser.parse_spw(args['config'])
         spwname = '{0:.0f}~{1:.0f}MHz'.format(min(low),max(high))
     else:
-        spwname = spw.replace('0:','')
+        spwname = spw.replace('*:','')
 
     msmd.open(visname)
     npol = msmd.ncorrforpol()[0]

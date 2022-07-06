@@ -109,7 +109,7 @@ def parse_spw(filename):
         lowest = min(low)
         highest = max(high)
 
-        # Uncomment to use e.g. '*MHz'
+        # Uncomment to simply use e.g. '*MHz'
         # if all([i == unit[0] for i in unit]):
         #     unit = unit[0]
         #     dirs = '*{0}'.format(unit)

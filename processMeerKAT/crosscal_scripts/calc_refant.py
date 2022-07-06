@@ -18,8 +18,9 @@ import bookkeeping
 from casatasks import *
 logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
-from casatools import msmetadata
+from casatools import msmetadata,table
 msmd = msmetadata()
+tb = table()
 
 import logging
 from time import gmtime
@@ -30,6 +31,8 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 def get_ref_ant(visname, fluxfield):
 
     msmd.open(visname)
+    if type(fluxfield) is str:
+        fluxfield = msmd.fieldsforname(fluxfield)[0]
     fluxscans = msmd.scansforfield(int(fluxfield))
     logger.info("Flux field scan no: %d" % fluxscans[0])
     antennas = msmd.antennasforscan(fluxscans[0])
@@ -41,7 +44,7 @@ def get_ref_ant(visname, fluxfield):
     tb.open(visname)
 
     fptr = open('ant_stats.txt', 'w')
-    fptr.write(header)
+    fptr.write(header + '\n')
 
     antflags = []
     for ant in antennas:
@@ -50,12 +53,13 @@ def get_ref_ant(visname, fluxfield):
         if antdat.size == 0:
             flags = 1
             fptr.write('{0: <3} {1:.4f}\n'.format(ant, np.nan))
+            logger.info('{0: <3} {1:.4f}'.format(ant, np.nan))
             antflags.append(flags)
             continue
 
         flags = np.count_nonzero(antdat)/float(antdat.size)
 
-        fptr.write('\n{0: <3} {1:.4f}'.format(ant, flags))
+        fptr.write('{0: <3} {1:.4f}\n'.format(ant, flags))
         logger.info('{0: <3} {1:.4f}'.format(ant, flags))
         antflags.append(flags)
 

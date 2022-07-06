@@ -149,49 +149,35 @@ def parse_args():
 
 
 
-    parser.add_argument("--hpc",metavar='name', required=False, type=str, default="ilifu", help="Name of hpc facility being used. If not known to processMeerKAT/known_hpc.cfg slurm limits are functionally removed [default: ilifu].")
-    # Read in parser default values according to --cluster parameter
-    args, unknown = parser.parse_known_args()
-    HPC_NAME = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() else "unknown"
-    HPC_DEFAULTS = KNOWN_HPCS[HPC_NAME]
+    parser.add_argument("--hpc",metavar='name', required=False, type=str, default="unknown", help="Name of hpc facility being used. If not known to processMeerKAT/known_hpc.cfg slurm limits are functionally removed [default: ilifu].")
+
 
     parser.add_argument("-M","--MS",metavar="path", required=False, type=str, help="Path to MeasurementSet.")
-    parser.add_argument("-C","--config",metavar="config", default=HPC_DEFAULTS['CONFIG'.lower()], required=False, type=str, help="Relative (not absolute) path to config file.")
-
-    args, unknown = parser.parse_known_args()
-    # Extract hpc name used during build and warn if not the same as CLI hpc
-    config_dict, config = config_parser.parse_config(args.config)
-    if config.has_option('run', 'hpc'):
-        config_hpc_name = config['run']['hpc'].strip("'")
-    else:
-        config_hpc_name = HPC_NAME
-    if HPC_NAME != config_hpc_name:
-        msg = "Entered hpc ({HPC_NAME}) is not the same as was used to build this pipeline instance! '{config_hpc_name}' was used. Pipeline may not function as expected. Please consider rebuilding pipeline with correct hpc selection."
-        logger.warning(msg.format(HPC_NAME=HPC_NAME, config_hpc_name=config_hpc_name))
+    parser.add_argument("-C","--config",metavar="config", default=None, required=False, type=str, help="Relative (not absolute) path to config file.")
 
     # Parse in remaining arguments
-    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=1,
-                        help="Use this number of nodes [default: 1; max: {0}].".format(HPC_DEFAULTS['TOTAL_NODES_LIMIT'.lower()]))
-    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=8,
-                        help="Use this number of tasks (per node) [default: 16; max: {0}].".format(HPC_DEFAULTS['NTASKS_PER_NODE_LIMIT'.lower()]))
+    parser.add_argument("-N","--nodes",metavar="num", required=False, type=int, default=None,
+                        help="Use this number of nodes [default: 1].")
+    parser.add_argument("-t","--ntasks-per-node", metavar="num", required=False, type=int, default=None,
+                        help="Use this number of tasks (per node) [default: 8]")
     parser.add_argument("-D","--plane", metavar="num", required=False, type=int, default=1,
                             help="Distribute tasks of this block size before moving onto next node [default: 1; max: ntasks-per-node].")
-    parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()],
-                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].".format(HPC_DEFAULTS['MEM_PER_NODE_GB_LIMIT'.lower()]))
-    parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default=HPC_DEFAULTS['PARTITION'.lower()], help="SLURM partition to use [default: 'Main'].")
+    parser.add_argument("-m","--mem", metavar="num", required=False, type=int, default=None,
+                        help="Use this many GB of memory (per node) for threadsafe scripts [default: {0}; max: {0}].")
+    parser.add_argument("-p","--partition", metavar="name", required=False, type=str, default=None, help="SLURM partition to use [default: 'Main'].")
     parser.add_argument("-T","--time", metavar="time", required=False, type=str, default="12:00:00", help="Time limit to use for all jobs, in the form d-hh:mm:ss [default: '12:00:00'].")
-    parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['SCRIPTS'.lower()],
+    parser.add_argument("-S","--scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=None,
                         help="Run pipeline with these scripts, in this order, using these containers (3rd value - empty string to default to [-c --container]). Is it threadsafe (2nd value)?")
-    parser.add_argument("-b","--precal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['PRECAL_SCRIPTS'.lower()], help="Same as [-S --scripts], but run before calibration.")
-    parser.add_argument("-a","--postcal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=HPC_DEFAULTS['POSTCAL_SCRIPTS'.lower()], help="Same as [-S --scripts], but run after calibration.")
-    parser.add_argument("--modules", nargs='*', metavar='module', required=False, default=HPC_DEFAULTS['MODULES'.lower()], help="Load these modules within each sbatch script.")
-    parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=HPC_DEFAULTS['MPI_WRAPPER'.lower()],
-                        help="Use this mpi wrapper when calling threadsafe scripts [default: '{0}'].".format(HPC_DEFAULTS['MPI_WRAPPER'.lower()]))
-    parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=HPC_DEFAULTS['CONTAINER'.lower()], help="Use this container when calling scripts [default: '{0}'].".format(HPC_DEFAULTS['CONTAINER'.lower()]))
+    parser.add_argument("-b","--precal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=None, help="Same as [-S --scripts], but run before calibration.")
+    parser.add_argument("-a","--postcal_scripts", action='append', nargs=3, metavar=('script','threadsafe','container'), required=False, type=parse_scripts, default=None, help="Same as [-S --scripts], but run after calibration.")
+    parser.add_argument("--modules", nargs='*', metavar='module', required=False, default=None, help="Load these modules within each sbatch script.")
+    parser.add_argument("-w","--mpi_wrapper", metavar="path", required=False, type=str, default=None,
+                        help="Use this mpi wrapper when calling threadsafe scripts [default: ].")
+    parser.add_argument("-c","--container", metavar="path", required=False, type=str, default=None, help="Use this container when calling scripts [default:].")
     parser.add_argument("-n","--name", metavar="unique", required=False, type=str, default='', help="Unique name to give this pipeline run (e.g. 'run1_'), appended to the start of all job names. [default: ''].")
     parser.add_argument("-d","--dependencies", metavar="list", required=False, type=str, default='', help="Comma-separated list (without spaces) of SLURM job dependencies (only used when nspw=1). [default: ''].")
     parser.add_argument("-e","--exclude", metavar="nodes", required=False, type=str, default='', help="SLURM worker nodes to exclude [default: ''].")
-    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default=HPC_DEFAULTS['ACCOUNTS'.lower()][0], help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
+    parser.add_argument("-A","--account", metavar="group", required=False, type=str, default=None, help="SLURM accounting group to use (e.g. 'b05-pipelines-ag' - check 'sacctmgr show user $USER cluster=ilifu-slurm20 -s format=account%%30,cluster%%15') [default: 'b03-idia-ag'].")
     parser.add_argument("-r","--reservation", metavar="name", required=False, type=str, default='', help="SLURM reservation to use. [default: ''].")
 
     parser.add_argument("-l","--local", action="store_true", required=False, default=False, help="Build config file locally (i.e. without calling srun) [default: False].")
@@ -212,6 +198,37 @@ def parse_args():
     run_args.add_argument("-L","--license", action="store_true", required=False, default=False, help="Display this program's license and quit.")
 
     args, unknown = parser.parse_known_args()
+
+    HPC_NAME = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() else "unknown"
+    logger.info(HPC_NAME)
+    HPC_DEFAULTS = KNOWN_HPCS[HPC_NAME]
+    # Hash table to lookup in config file
+    arg_hash = {
+        "nodes": "total_nodes_limit",
+        "ntasks_per_node": "ntasks_per_node_limit",
+        "mem": "mem_per_node_gb_limit",
+        "account": "accounts"
+    }
+    # Set arg values from config
+    for arg, val in vars(args).items():
+        if val is None:
+            if arg in HPC_DEFAULTS.keys():
+                hpc_val = HPC_DEFAULTS[arg]
+                logger.info(f"Setting option '{arg}' to '{hpc_val}' from HPC '{HPC_NAME}' config.")
+                vars(args)[arg] = hpc_val
+            elif arg in arg_hash.keys():
+                hpc_val = HPC_DEFAULTS[arg_hash[arg]][0] if arg=="account" else HPC_DEFAULTS[arg_hash[arg]]
+                logger.info(f"Setting option '{arg}' to '{hpc_val}' from HPC '{HPC_NAME}' config.")
+                vars(args)[arg] = hpc_val
+    # Extract hpc name used during build and warn if not the same as CLI hpc
+    config_dict, config = config_parser.parse_config(args.config)
+    if config.has_option('run', 'hpc'):
+        config_hpc_name = config['run']['hpc'].strip("'")
+    else:
+        config_hpc_name = HPC_NAME
+    if HPC_NAME != config_hpc_name:
+        msg = "Entered hpc ({HPC_NAME}) is not the same as was used to build this pipeline instance! '{config_hpc_name}' was used. Pipeline may not function as expected. Please consider rebuilding pipeline with correct hpc selection."
+        logger.warning(msg.format(HPC_NAME=HPC_NAME, config_hpc_name=config_hpc_name))
 
     if len(unknown) > 0:
         parser.error('Unknown input argument(s) present - {0}'.format(unknown))
@@ -414,7 +431,7 @@ def write_command(script,args,mpi_wrapper,container,name='job',casa_script=False
         arr=($SPWs)
         cd ${arr[SLURM_ARRAY_TASK_ID]}
 
-        """ % SPWs.replace(',',' ').replace('0:','')
+        """ % SPWs.replace(',',' ').replace(HPC_DEFAULTS["SPW_PREFIX".lower()],'')
 
     command += "{mpi_wrapper} singularity exec {path_binding}{container} {plot_call} {casa_call} {script} {args}{argument_calls}".format(**params)
 
@@ -582,7 +599,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
 
     master = open(filename,'w')
     master.write('#!/bin/bash\n')
-    SPWs = SPWs.replace('0:','')
+    SPWs = SPWs.replace(HPC_DEFAULTS["SPW_PREFIX".lower()],'')
     toplevel = len(precal_scripts + postcal_scripts) > 0
 
     scripts = precal_scripts[:]
@@ -643,7 +660,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
         argument_calls += " --quiet"
 
     for i,spw in enumerate(SPWs.split(',')):
-        master.write('echo Running pipeline in directory "{0}" for spectral window 0:{0}\n'.format(spw))
+        master.write('echo Running pipeline in directory "{1}" for spectral window {0}{1}\n'.format(HPC_DEFAULTS["SPW_PREFIX".lower()], spw))
         master.write('cd {0}\n'.format(spw))
         master.write('output=$({0} --config ./{config} --run --submit --justrun {argument_calls}'.format(os.path.split(THIS_PROG)[1], config=config, argument_calls=argument_calls))
         if partition:
@@ -780,7 +797,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
         logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
     else:
-        logger.info('Master script "{0}" written, but will not run.'.format(filename))
+        logger.info('Master script "{0}" written in CWD, but will not run.'.format(filename))
 
 
 def write_master(filename,config,args,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
@@ -958,7 +975,7 @@ def write_bash_job_script(master,filename,extn,do,purpose,dir='jobScripts',echo=
     master.write('\n#Create {0}.sh file, make executable and symlink to current version\n'.format(filename))
     master.write('echo "#!/bin/bash" > {0}\n'.format(fname))
     master.write('{0}{1}>> {2}\n'.format(do,do2,fname))
-    master.write('chmod u+x {0}\n'.format(fname))
+    master.write('chmod +x {0}\n'.format(fname))
     master.write('ln -f -s {0} {1}.sh\n'.format(fname,filename))
     if echo:
         master.write('echo Run ./{0}.sh to {1}.\n'.format(filename,purpose))
@@ -1242,7 +1259,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
     SLURM_CONFIG_KEYS = HPC_DEFAULTS['SLURM_CONFIG_KEYS_BASE'.lower()]+HPC_DEFAULTS['SLURM_CONFIG_STR_KEYS'.lower()]
     kwargs = get_config_kwargs(config,'slurm',SLURM_CONFIG_KEYS)
     data_kwargs = get_config_kwargs(config,'data',['vis'])
-    get_config_kwargs(config, 'fields', HPC_DEFAULTS['FIELDS_CONFIG_KEYS'.lower()])
+    field_kwargs = get_config_kwargs(config, 'fields', HPC_DEFAULTS['FIELDS_CONFIG_KEYS'.lower()])
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', HPC_DEFAULTS['CROSSCAL_CONFIG_KEYS'.lower()])
 
     #Force submit=True if user has requested it during [-R --run]
@@ -1271,8 +1288,12 @@ def format_args(config,submit,quiet,dependencies,justrun):
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
         #Find RACS outliers
         elif ((nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']])) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+                if selfcal_kwargs['outlier_radius'] != '' and selfcal_kwargs['outlier_radius'] != 0.0:
+                    txt = 'within {0} degrees'.format(selfcal_kwargs['outlier_radius'])
+                else:
+                    txt = 'within calculated search radius'
                 logger.info('Populating sky model for selfcal using outlier_threshold={0}'.format(selfcal_kwargs['outlier_threshold']))
-                logger.info('Querying Rapid ASAKP Continuum Survey (RACS) catalog within 2 degrees of target phase centre. Please allow a moment for this.')
+                logger.info('Querying Rapid ASAKP Continuum Survey (RACS) catalog around the target phase centre to identify outliers {0}. Please allow a moment for this.'.format(txt))
                 sky_model_kwargs = deepcopy(kwargs)
                 sky_model_kwargs['partition'] = 'Devel'
                 mpi_wrapper = srun(sky_model_kwargs, qos=True, time=2, mem=0)
@@ -1347,7 +1368,7 @@ def format_args(config,submit,quiet,dependencies,justrun):
         #Write timestamp to this pipeline run
         kwargs['timestamp'] = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         config_parser.overwrite_config(config, conf_dict={'timestamp' : "'{0}'".format(kwargs['timestamp'])}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
-        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition, createmms = crosscal_kwargs['createmms'])
+        nspw = spw_split(spw, nspw, config, mem, crosscal_kwargs['badfreqranges'],kwargs['MS'],includes_partition, createmms = crosscal_kwargs['createmms'], fields=field_kwargs)
         config_parser.overwrite_config(config, conf_dict={'nspw' : "{0}".format(nspw)}, conf_sec='crosscal')
 
     #Pop script to calculate reference antenna if calcrefant=False. Assume it won't be in postcal scripts
@@ -1421,21 +1442,13 @@ def get_spw_bounds(spw):
 
         if unit != 'MHz':
             logger.warning('Please use SPW unit "MHz", to ensure the best performance (e.g. not processing entirely flagged frequency ranges).')
-        # Can only do when using CASA
-        # if unit == '':
-        #     msmd.open(MS)
-        #     low_MHz = msmd.chanfreqs(0)[low] / 1e6
-        #     high_MHz = msmd.chanfreqs(0)[high] / 1e6
-        #     msmd.done()
-        # else:
-        #     low_MHz=qa.convertfreq('{0}{1}'.format(low,unit),'MHz')['value']
-        #     high_MHz=qa.convertfreq('{0}{1}'.format(high,unit),'MHz')['value']
+
     else:
         return None
 
     return low,high,unit,func
 
-def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remove=True):
+def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remove=True,fields={}):
 
     """Split into N SPWs, placing an instance of the pipeline into N directories, each with 1 Nth of the bandwidth.
 
@@ -1459,6 +1472,8 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
         Create MMS as output?
     remove : bool, optional
         Remove SPWs completely encompassed by bad frequency ranges?
+    fields : dict, optional
+        Field names, so we can do some visname renaming hackery!
 
     Returns:
     --------
@@ -1475,7 +1490,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
 
         #Remove SPWs entirely encompassed by bad frequency ranges (only for MHz unit)
         for i in range(len(lo)):
-            SPWs.append('0:{0}~{1}{2}'.format(func(lo[i]),func(hi[i]),unit))
+            SPWs.append('{0}{1}~{2}{3}'.format(HPC_DEFAULTS["SPW_PREFIX".lower()], func(lo[i]),func(hi[i]),unit))
 
     elif ',' in spw:
         SPWs = spw.split(',')
@@ -1494,9 +1509,9 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
         low,high = get_spw_bounds(SPWs[i])[0:2]
         if unit == 'MHz' and remove:
             for freq in badfreqranges:
-                bad_low,bad_high = get_spw_bounds('0:{0}'.format(freq))[0:2]
+                bad_low,bad_high = get_spw_bounds('{0}{1}'.format(HPC_DEFAULTS["SPW_PREFIX".lower()],freq))[0:2]
                 if low >= bad_low and high <= bad_high:
-                    logger.info("Won't process spw '0:{0}~{1}{2}', since it's completely encompassed by bad frequency range '{3}'.".format(low,high,unit,freq))
+                    logger.info("Won't process spw '{0}{1}~{2}{3}', since it's completely encompassed by bad frequency range '{3}'.".format(HPC_DEFAULTS["SPW_PREFIX".lower()],low,high,unit,freq))
                     badfreq = True
                     break
         if badfreq:
@@ -1511,9 +1526,9 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
     #Create each spw as directory and place config in there
     logger.info("Making {0} directories for SPWs ({1}) and copying '{2}' to each of them.".format(nspw,SPWs,config))
     for spw in SPWs:
-        spw_config = '{0}/{1}'.format(spw.replace('0:',''),config)
-        if not os.path.exists(spw.replace('0:','')):
-            os.mkdir(spw.replace('0:',''))
+        spw_config = '{0}/{1}'.format(spw.replace(HPC_DEFAULTS["SPW_PREFIX".lower()],''),config)
+        if not os.path.exists(spw.replace(HPC_DEFAULTS["SPW_PREFIX".lower()],'')):
+            os.mkdir(spw.replace(HPC_DEFAULTS["SPW_PREFIX".lower()],''))
         copyfile(config, spw_config)
         config_parser.overwrite_config(spw_config, conf_dict={'spw' : "'{0}'".format(spw)}, conf_sec='crosscal')
         config_parser.overwrite_config(spw_config, conf_dict={'nspw' : 1}, conf_sec='crosscal')
@@ -1528,7 +1543,14 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
             basename, ext = os.path.splitext(MS.rstrip('/ '))
             filebase = os.path.split(basename)[1]
             extn = 'mms' if createmms else 'ms'
-            vis = '{0}.{1}.{2}'.format(filebase,spw.replace('0:',''),extn)
+
+            #Hack to rename vis if setting as specific field (e.g. as target field when running selfcal)
+            prefix,suffix = os.path.splitext(filebase)
+            if suffix[1:] != '' and suffix[1:] in fields.values():
+                extn = '{0}.{1}'.format(suffix[1:],extn)
+                filebase = prefix
+
+            vis = '{0}.{1}.{2}'.format(filebase,spw.replace(HPC_DEFAULTS["SPW_PREFIX".lower()],''),extn)
             logger.warning("Since script with 'partition' in its name isn't present in '{0}', assuming partition has already been done, and setting vis='{1}' in '{2}'. If '{1}' doesn't exist, please update '{2}', as the pipeline will not launch successfully.".format(config,vis,spw_config))
             orig_vis = config_parser.get_key(spw_config, 'data', 'vis')
             config_parser.overwrite_config(spw_config, conf_dict={'orig_vis' : "'{0}'".format(orig_vis)}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')

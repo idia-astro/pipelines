@@ -10,7 +10,7 @@ import processMeerKAT
 import config_parser
 
 from casatasks import *
-from casatools import msmetadata,table,measures
+from casatools import msmetadata,table,measures,quanta
 
 logger = processMeerKAT.logger
 
@@ -18,6 +18,7 @@ logger = processMeerKAT.logger
 msmd = msmetadata()
 tb = table()
 me = measures()
+qa = quanta()
 
 def get_fields(MS):
 
@@ -232,7 +233,7 @@ def check_scans(MS,nodes,tasks,dopol):
     threads = {'nodes' : nodes, 'ntasks_per_node' : tasks}
     return threads
 
-def check_spw(config):
+def check_spw(config,msmd):
 
     """Check SPW bounds are within the SPW bounds of the MS. If not, output a warning and update the SPW.
 
@@ -247,26 +248,41 @@ def check_spw(config):
 
     update = False
     low,high,unit,dirs = config_parser.parse_spw(config)
-    if type(low) is list:
-        low = low[0]
-    if type(high) is list:
-        high = high[-1]
+    lowest = np.min(low)
+    highest = np.max(high)
     nspw = msmd.nspw()
 
-    if nspw > 1:
-        logger.warning("Expected 1 SPW but found nspw={0}. Please manually edit 'spw' in '{1}'.".format(nspw,config))
+    # if nspw > 1:
+    #     logger.warning("Expected 1 SPW but found nspw={0}. Please manually edit 'spw' in '{1}'.".format(nspw,config))
 
+    #Check SPW bounds overlap with MS, and convert to MHz explicitly, assuming first and last SPW contain lowest and highest frequencies
     ms_low = msmd.chanfreqs(0)[0] / 1e6
     ms_high = msmd.chanfreqs(nspw-1)[-1] / 1e6
 
-    if low < ms_low - 1:
-        low = int(round(ms_low+0.5))
+    if type(unit) is list:
+        low_unit = unit[low.index(lowest)]
+        high_unit = unit[high.index(highest)]
+    else:
+        low_unit = unit
+        high_unit = unit
+
+    #i.e. channel number
+    if low_unit == '':
+        low_MHz = msmd.chanfreqs(0)[low] / 1e6
+    if high_unit == '':
+        high_MHz = msmd.chanfreqs(nspw-1)[high] / 1e6
+    else:
+        low_MHz=qa.convertfreq('{0}{1}'.format(lowest,low_unit),'MHz')['value']
+        high_MHz=qa.convertfreq('{0}{1}'.format(highest,high_unit),'MHz')['value']
+
+    if low_MHz < ms_low - 1:
+        low_MHz = int(ms_low)
         update = True
-    if high > ms_high + 1:
-        high = int(round(ms_high-0.5))
+    if high_MHz > ms_high + 1:
+        high_MHz = int(round(ms_high+0.5))
         update = True
 
-    SPW = '0:{0}~{1}MHz'.format(low,high)
+    SPW = '*:{0}~{1}MHz'.format(low_MHz,high_MHz)
 
     if update:
         logger.warning('Default SPW outside SPW of input MS ({0}~{1}MHz). Forcing SPW={2}'.format(ms_low,ms_high,SPW))
@@ -404,7 +420,7 @@ def main():
 
     check_refant(args.MS, refant, args.config, warn=True)
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node,dopol)
-    SPW = check_spw(args.config)
+    SPW = check_spw(args.config,msmd)
 
     config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')

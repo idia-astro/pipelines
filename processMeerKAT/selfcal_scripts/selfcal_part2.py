@@ -6,6 +6,7 @@ import glob
 import shutil
 import os
 import re
+import numpy as np
 
 # Adapt PYTHONPATH to include processMeerKAT
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,9 +38,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
 
 def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange,
-                  nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag):
+                  nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, outlier_radius, flag):
 
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='predict')
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step='predict')
 
     if calmode[loop] != '':
         if os.path.exists(caltable):
@@ -83,7 +84,7 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
 
     # Write out island mask and FITS catalog
     img.export_image(outfile=maskfile, img_type='island_mask', img_format='casa', clobber=True)
-    img.write_catalog(outfile=cat, format='fits', clobber=True, catalog_type='srl')
+    img.write_catalog(outfile=cat, format='fits', clobber=True, catalog_type='gaul')
 
     if write_all:
         regionfile = imbase % loop + ".casabox"
@@ -91,23 +92,23 @@ def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,w
 
         #Write out catalogs
         img.write_catalog(outfile=regionfile, format='casabox', clobber=True, catalog_type='srl')
-        img.write_catalog(outfile=ascii, format='ascii', clobber=True, catalog_type='srl')
+        img.write_catalog(outfile=ascii, format='ascii', clobber=True, catalog_type='gaul')
 
         # Write out RMS image
         img.export_image(outfile=rmsfile, img_type='rms', img_format='casa', clobber=True)
 
-def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange,
-                  nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, step):
+def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange, nterms,
+                  gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, outlier_radius, flag, step):
 
     local = locals()
     local.pop('step')
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step=step)
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,targetfield,sky_model_radius = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step)
     cat = imagename + ".catalog.fits"
     outlierfile_all = 'outliers.txt'
     fitsname = imagename + '.fits'
     outlier_imsize = 128
     outlier_snr = 5
-    sky_model_radius = 2 #degrees
+    outlier_min_flux = 1e-3 # 1 mJy
 
     if step != 'sky':
         pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
@@ -119,16 +120,17 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
         #Take sky positions from RACS
         if step == 'sky':
-            from astroquery.utils.tap.core import TapPlus
-            from astropy.table import vstack
+            #from astroquery.utils.tap.core import TapPlus
+            #from astropy.table import vstack
 
             #Open MS and extract first target centre; use first sub-MS for speed if MMS
             if os.path.exists('{0}/SUBMSS'.format(vis)):
                 tmpvis = glob.glob('{0}/SUBMSS/*'.format(vis))[0]
             else:
                 tmpvis = vis
+
             msmd.open(tmpvis)
-            dir=msmd.sourcedirs()[str(msmd.fieldsforintent('TARGET')[0])]
+            dir=msmd.sourcedirs()[str(targetfield)]
             ra=qa.convert(dir['m0'],'deg')['value']
             dec=qa.convert(dir['m1'],'deg')['value']
             if ra < 0:
@@ -141,26 +143,26 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             efluxcol = 'e_total_flux_source'
             racol = 'ra'
             deccol = 'dec'
-            outlier_threshold *= 1e3 #convert from mJy to Jy
+            outlier_threshold *= 1e3 #convert from Jy to mJy
 
             #Extract RACS positions within sky_model_radius
-            try:
-                casdatap = TapPlus(url="https://casda.csiro.au/casda_vo_tools/tap")
-                query = "SELECT * FROM  AS110.racs_dr1_sources_galacticcut_v2021_08_v01 where 1=CONTAINS(POINT('ICRS', ra, dec),CIRCLE('ICRS',{0},{1},{2}))".format(ra,dec,sky_model_radius)
-                job = casdatap.launch_job_async(query)
-                galcut = job.get_results()
-                job = casdatap.launch_job_async(query.replace('cut','region'))
-                galregion = job.get_results()
-                RACS = vstack([galcut,galregion],join_type='exact')
-                RACS.write(cat,overwrite=True)
-            except:
-                RACS = '{0}/RACS.fits.gz'.format(processMeerKAT.SCRIPT_DIR)
-                tmp = fits.open(RACS)
-                all_positions = SkyCoord(ra=tmp[1].data[racol],dec=tmp[1].data[deccol],unit='deg,deg')
-                tmp[1].data = tmp[1].data[phasecenter.separation(all_positions) < Quantity(sky_model_radius,'deg')]
-                tmp.writeto(cat,overwrite=True)
-                tmp.close()
-                del all_positions #Don't store millions of positions beyond here
+            # try:
+            #     casdatap = TapPlus(url="https://casda.csiro.au/casda_vo_tools/tap")
+            #     query = "SELECT * FROM  AS110.racs_dr1_sources_galacticcut_v2021_08_v01 where 1=CONTAINS(POINT('ICRS', ra, dec),CIRCLE('ICRS',{0},{1},{2}))".format(ra,dec,sky_model_radius)
+            #     job = casdatap.launch_job_async(query)
+            #     galcut = job.get_results()
+            #     job = casdatap.launch_job_async(query.replace('cut','region'))
+            #     galregion = job.get_results()
+            #     RACS = vstack([galcut,galregion],join_type='exact')
+            #     RACS.write(cat,overwrite=True)
+            # except:
+            RACS = '{0}/RACS.fits.gz'.format(processMeerKAT.SCRIPT_DIR)
+            tmp = fits.open(RACS)
+            all_positions = SkyCoord(ra=tmp[1].data[racol],dec=tmp[1].data[deccol],unit='deg,deg')
+            tmp[1].data = tmp[1].data[phasecenter.separation(all_positions) < Quantity(sky_model_radius,'deg')]
+            tmp.writeto(cat,overwrite=True)
+            tmp.close()
+            del all_positions #Don't store millions of positions beyond here
 
             index = loop
 
@@ -194,9 +196,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 imsize=[{2},{2}]
                 cell=[1.0arcsec,1.0arcsec]
                 phasecenter={3}
-                nterms=3
+                nterms={4}
                 gridder=standard
-                {4}\n""".format(imbase%(index),i,outlier_imsize,position,mask))
+                {5}\n""".format(imbase%(index),i,outlier_imsize,position,nterms[loop],mask))
 
             out.close()
 
@@ -206,7 +208,10 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 logger.error("Outlier file '{0}' doesn't exist, so sky model build went wrong. Will terminate process.".format(outlierfile_all))
                 sys.exit(1)
 
-        #Write outlier file specific to this loop
+        #Write outlier file specific to this loop, looking up from SPW directory where relevant
+        if not os.path.exists(outlierfile_all) and os.path.exists('../{0}'.format(outlierfile_all)):
+            logger.warning('Using outliers from ../{0}'.format(outlierfile_all))
+            outlierfile_all = '../{0}'.format(outlierfile_all)
         outliers=open(outlierfile_all).read()
         out = open(outlierfile,'w')
 
@@ -255,6 +260,10 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
             if axis in head.keys():
                 head.pop(head.index(axis))
 
+        #Shrink image by 1% to include outliers on edge of main images
+        head['NAXIS1'] = int(head['NAXIS1']*0.99)
+        head['NAXIS2'] = int(head['NAXIS2']*0.99)
+
         w = WCS(head)
         r=re.compile(r'phasecenter=J2000 (?P<ra>.*?) (?P<dec>.*?)\n')
         positions=[m.groupdict() for m in r.finditer(outliers)]
@@ -296,26 +305,35 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
                     mask = 'mask={0}'.format(outlier_pixmask)
 
-                    #If catalog written, take new PyBDSF position closest to previous position
+                    #If catalog written, take new PyBDSF position as brightest Gaussian component, or otherwise, closest to previous position
+                    brightest = True
                     if os.path.exists(outlier_cat):
                         tab=fits.open(outlier_cat)
                         data = tab[1].data
                         tab.close()
+                        if np.sum(data['Total_flux']) < outlier_min_flux:
+                            logger.warning('Total flux in catalogue for "{0}_outlier{1}" < {2} Jy. Excluding outlier.'.format(imbase%(index),i,outlier_min_flux))
+                            continue
                         cat_positions = SkyCoord(ra=data['RA'],dec=data['Dec'],unit='deg,deg')
-                        row,_,_ = pos.match_to_catalog_sky(cat_positions)
+                        if brightest:
+                            row = np.where(data['Total_flux'] == np.max(data['Total_flux']))[0][0]
+                        else:
+                            row,_,_ = pos.match_to_catalog_sky(cat_positions)
                         phasecenter = 'J2000 {0}'.format(cat_positions[row].to_string('hmsdms'))
                     else:
-                        logger.warning("PyBDSF catalogue '{0}' not created. Using old position and mask.".format(outlier_cat))
-                        mask = 'mask={0}'.format(pixmask)
+                        logger.warning("PyBDSF catalogue '{0}' not created. Excluding outlier.".format(outlier_cat))
+                        continue
+                        #Using old position and mask.".format(outlier_cat))
+                        #mask = 'mask={0}'.format(pixmask)
 
                 out.write("""
                 imagename={0}_outlier{1}
                 imsize=[{2},{2}]
                 cell=[1.0arcsec,1.0arcsec]
                 phasecenter={3}
-                nterms=3
+                nterms={4}
                 gridder=standard
-                {4}\n""".format(imbase%(index),i,outlier_imsize,phasecenter,mask))
+                {5}\n""".format(imbase%(index),i,outlier_imsize,phasecenter,nterms[loop],mask))
 
             else:
                 logger.info('Excluding "{0}", as it lies within the image footprint.'.format(outlier_bases[i]))
@@ -334,9 +352,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     return rmsfile,outlierfile
 
 def mask_image(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojplanes, niter, threshold, uvrange, nterms, gridder,
-                  deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, flag, outlier_base='', outlier_image=''):
+                  deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, outlier_radius, flag, outlier_base='', outlier_image=''):
 
-    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,threshold,step='mask')
+    imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,thresh,maskfile,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step='mask')
 
     if outlier_base != '':
         maskfile = outlier_base + '.islmask'

@@ -13,7 +13,7 @@ import traceback
 
 import matplotlib
 # Agg doesn't need X - matplotlib doesn't work with xvfb
-matplotlib.use('Agg', warn=False)
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
