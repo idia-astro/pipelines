@@ -141,7 +141,7 @@ def parse_args():
 
     # Begin parsing
     parser = argparse.ArgumentParser(prog=THIS_PROG,description='Process MeerKAT data via CASA MeasurementSet. Version: {0}'.format(__version__))
-    
+
     if os.path.isfile(known_hpc_path):
         KNOWN_HPCS, HPC_CONFIG = config_parser.parse_config(known_hpc_path)
     else:
@@ -199,7 +199,16 @@ def parse_args():
 
     args, unknown = parser.parse_known_args()
 
-    HPC_NAME = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() else "unknown"
+    # Check for HPC in config file
+    config_dict, config = config_parser.parse_config(args.config)
+    if "run" in config_dict:
+        if "hpc" in config_dict["run"]:
+            config_hpc = config_dict["run"]["hpc"]
+            logger.info("Found HPC in config file: {}".format(config_hpc))
+    else:
+        config_hpc = "unknown"
+
+    HPC_NAME = args.hpc.lower() if args.hpc in KNOWN_HPCS.keys() and args.hpc.lower() != "unknown" else config_hpc
     logger.info(HPC_NAME)
     HPC_DEFAULTS = KNOWN_HPCS[HPC_NAME]
     # Hash table to lookup in config file
@@ -297,8 +306,8 @@ def validate_args(args,config,parser=None):
         raise_error(config, msg, parser)
 
     if HPC_NAME=="unknown":
-        msg = "HPC facility [--hpc] is not in 'known_hpc.cfg', reverting to 'unknown' HPC. You input {0}. Pipeline will rely entirely on the specified arguemnts. No upper limits will be set. HPC specific selections within your config may cause pipeline runs to fail!"
-        logger.warning(msg.format(args['hpc']))
+        msg = f"HPC facility is not in 'known_hpc.cfg', reverting to 'unknown' HPC. You input {0}. Pipeline will rely entirely on the specified arguemnts. No upper limits will be set. HPC specific selections within your config may cause pipeline runs to fail!"
+        logger.warning(msg)
 
     else:
         if args['ntasks_per_node'] > HPC_DEFAULTS['NTASKS_PER_NODE_LIMIT'.lower()]:
