@@ -275,12 +275,12 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 phasecenter = 'J2000 {0}'.format(pos.to_string('hmsdms'))
 
                 if step == 'bdsf':
-                    base = outlier_bases[i]
+                    base = outlier_bases[i].replace('im_0','im_{0}'.format(index-1))
                     im = base + '.image'
                     outlier_cat = base + ".catalog.fits"
                     outlier_mask = '{0}.islmask'.format(base)
 
-                    if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
+                    if deconvolver[loop] == 'mtmfs':
                         im += '.tt0'
 
                     if os.path.exists(im):
@@ -295,6 +295,12 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                         delta = outlier_imsize/2
                         trim_box = (x-delta,x+delta,y-delta,y+delta)
                         ia.close()
+
+                        if x < 0 or x > imsize[0] or y < 0 or y > imsize[1]:
+                            logger.warning("Image '{0}' doesn't exist. Position is outside main image so assuming outlier was dropped and skipping again.".format(im))
+                            continue
+                        else:
+                            logger.warning("Image '{0}' doesn't exist. Assuming source exists inside main image, so running PyBDSF on '{1}' using {2}x{2} pixel trim box.".format(im,outimage,outlier_imsize))
 
                         pybdsf(imbase,rmsfile,imagename,outimage,outlier_snr,outlier_mask,outlier_cat,trim_box=trim_box,write_all=False)
                         outlier_pixmask = mask_image(**local,outlier_base=base)

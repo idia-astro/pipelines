@@ -195,6 +195,7 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     msmd.open(tmpvis)
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
+    visbase = re.sub('\.\d+\.*\d*\~\d+\.*\d*[a-z,A-Z]?[Hz,hz,hZ,HZ]*\.','.',visbase) # Strip any SPWs from basename (when running outlier imaging separately per SPW)
     targetfields = config_parser.get_key(config_parser.parse_args()['config'], 'fields', 'targetfields')
 
     #Force taking first target field (relevant for writing outliers.txt at beginning of pipeline)
@@ -210,8 +211,10 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     except ValueError: # It's not an int, but a str
         targetfield = msmd.fieldsforname(targetfield)[0]
 
-    if '.ms' in visbase and str(targetfield) not in visbase:
-        basename = visbase.replace('.ms','.{0}'.format(msmd.namesforfields(targetfield)[0]))
+    target_str = msmd.namesforfields(targetfield)[0]
+
+    if '.ms' in visbase and target_str not in visbase:
+        basename = visbase.replace('.ms','.{0}'.format(target_str))
     else:
         basename = visbase.replace('.mms', '')
 
@@ -226,7 +229,7 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     cfcache = basename + '.cf'
     thresh = 10
 
-    if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
+    if deconvolver[loop] == 'mtmfs':
         outimage += '.tt0'
 
     if step not in ['tclean','sky'] and not os.path.exists(outimage):
@@ -254,7 +257,7 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
             outlierfile = 'outliers_loop{0}.txt'.format(loop+1)
 
         #Derive sky model radius for outliers, assuming channel 0 (of SPW 0) is lowest frequency and therefore largest FWHM
-        if outlier_radius == 0.0 or outlier_radius == '':
+        if outlier_radius == 0.0 or outlier_radius == '' and step == 'sky':
             SPW = check_spw(config_parser.parse_args()['config'],msmd)
             low_freq = float(SPW.replace('*:','').split('~')[0]) * 1e6 #MHz to Hz
             rads=1.025*qa.constants(v='c')['value']/low_freq/ msmd.antennadiameter()['0']['value']
@@ -262,7 +265,8 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
             sky_model_radius = 1.5*FWHM #degrees
             logger.warning('Using calculated search radius of {0:.1f} degrees.'.format(sky_model_radius))
         else:
-            logger.info('Using preset search radius of {0} degrees'.format(outlier_radius))
+            if step == 'sky':
+                logger.info('Using preset search radius of {0} degrees'.format(outlier_radius))
             sky_model_radius = outlier_radius
     else:
         outlierfile = ''

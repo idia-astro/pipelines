@@ -712,7 +712,7 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
         logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
     else:
-        logger.info('Master script "{0}" written in CWD, but will not run.'.format(filename))
+        logger.info('Master script "{0}" written in "{1}", but will not run.'.format(filename,os.path.split(os.getcwd())[1]))
 
 
 def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
@@ -1187,13 +1187,24 @@ def format_args(config,submit,quiet,dependencies,justrun):
         nspw = 1
 
     #Check selfcal params
-    if config_parser.has_section(config,'selfcal'):
+    if config_parser.has_section(config,'selfcal') and ('selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']] or 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']]):
         selfcal_kwargs = get_config_kwargs(config, 'selfcal', SELFCAL_CONFIG_KEYS)
         params = bookkeeping.get_selfcal_params()
         if selfcal_kwargs['loop'] > 0:
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
         #Find RACS outliers
-        elif ((nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']])) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+        elif selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+            outlierfile = 'outliers.txt'
+            outliers_loop0 = 'outliers_loop0.txt'
+            CWD = os.path.split(os.getcwd())[1]
+            if os.path.exists(outlierfile) and os.path.exists(outliers_loop0):
+                logger.warning("Using existing outlier files '{0}' and '{1}' from '{2}'. Remove one of these files to derive outliers again.".format(outlierfile,outliers_loop0,CWD))
+            elif os.path.exists('../{0}'.format(outlierfile)) and os.path.exists('../{0}'.format(outliers_loop0)):
+                logger.warning("Assuming you're runnnig outlier imaging separately over several SPWs, so using one set of outliers by copying outlier file from '../{0}' and '../{1}' to '{2}'.".format(outlierfile,outliers_loop0,CWD))
+                logger.warning("If these outlier files are irrelevant, please rename/remove one of them and run this step again.")
+                copyfile('../{0}'.format(outlierfile), outlierfile)
+                copyfile('../{0}'.format(outliers_loop0), outliers_loop0)
+            else:
                 if selfcal_kwargs['outlier_radius'] != '' and selfcal_kwargs['outlier_radius'] != 0.0:
                     txt = 'within {0} degrees'.format(selfcal_kwargs['outlier_radius'])
                 else:

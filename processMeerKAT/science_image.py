@@ -111,9 +111,9 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
         threshold=threshold, nterms=nterms, calcpsf=True, mask=mask, outlierfile=outlierfile,
         pblimit=-1, restoringbeam=restoringbeam, parallel = True)
 
-    if nterms > 1:
+    if deconvolver == 'mtmfs':
         imname = imagename + '.image.tt0'
-    elif nterms == 1:
+    else:
         imname = imagename + '.image'
 
     do_pb_corr(imname, pbthreshold)
