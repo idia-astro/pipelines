@@ -350,6 +350,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
         if num_outliers > 10:
             logger.warning('The number of outliers written to "{0}" is > 10. As this will take some time to image, you may want to set a higher outlier_threshold than {1}, and/or increase your imsize beyond {2}.'.format(outlierfile,orig_threshold,imsize))
+        elif num_outliers == 0:
+            logger.warning("No outliers identified. Setting outlierfile=''.")
+            outlierfile = ''
 
     return rmsfile,outlierfile
 
