@@ -12,20 +12,26 @@ logfile=casalog.logfile()
 casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 import casampi
 
+import logging
+logging.Formatter.converter = gmtime
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s")
+
 import shutil
 from katbeam import JimBeam
 from casatools import image
 ia = image()
 
 
-def do_pb_corr(inpimage, pbthreshold=0):
+def do_pb_corr(inpimage, pbthreshold=0, pbband='LBand'):
     """
     Given the input CASA image, outputs a katbeam corrected image, optionally
     cutoff at a specified threshold.
 
     Inputs:
-    inpimage    Input CASA image name, str
-    threshold   Cutoff threshold to mask the PB, float
+    inpimage        Input CASA image name, str
+    pbthreshold     Cutoff threshold to mask the PB, float
+    pbband          Band at which to generate the PB
 
     Outputs:
     None
@@ -33,8 +39,6 @@ def do_pb_corr(inpimage, pbthreshold=0):
 
     pbcorimage = inpimage.replace('.image', '.katbeam_pbcor.image')
     pbimage = inpimage.replace('.image', '.katbeam.pb')
-
-    LBandBeam = JimBeam('MKAT-AA-L-JIM-2020')
 
     ia.open(inpimage)
     csys = ia.coordsys().torecord()
@@ -59,6 +63,15 @@ def do_pb_corr(inpimage, pbthreshold=0):
     except KeyError:
         freq = csys['spectral2']['wcs']['crval']/1e6
 
+    if pbband == 'LBand':
+        PBeam = JimBeam('MKAT-AA-L-JIM-2020')
+    elif pbband == 'SBand':
+        PBeam = JimBeam('MKAT-AA-S-JIM-2020')
+    elif pbband == 'UHF':
+        PBeam = JimBeam('MKAT-AA-UHF-JIM-2020')
+    else:
+        logger.error('Input pbband not recognized. Must be one of LBand, SBand or UHF. Defaulting to LBand.')
+        PBeam = JimBeam('MKAT-AA-L-JIM-2020')
 
     x = np.linspace(-cx, cx+1, shape[0])
     y = np.linspace(-cy, cy+1, shape[1])
@@ -70,7 +83,7 @@ def do_pb_corr(inpimage, pbthreshold=0):
     yy *= cdelt
 
     # Generate the 2D PB image
-    beam_I = LBandBeam.I(xx, yy, freq)
+    beam_I = PBeam.I(xx, yy, freq)
 
     # Match shape with image data for PB correction
     if len(shape) == 4:
@@ -94,7 +107,7 @@ def do_pb_corr(inpimage, pbthreshold=0):
     ia.close()
 
 
-def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap, outlierfile, keepmms, pbthreshold):
+def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap, outlierfile, keepmms, pbthreshold, pbband):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     extn = '.ms' if keepmms==False else '.mms'
@@ -116,7 +129,7 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
     else:
         imname = imagename + '.image'
 
-    do_pb_corr(imname, pbthreshold)
+    do_pb_corr(imname, pbthreshold, pbband)
 
 if __name__ == '__main__':
 

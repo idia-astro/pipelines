@@ -59,7 +59,7 @@ SPW_PREFIX = '*:'
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
 SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_nloops','gaintype','outlier_threshold','flag','outlier_radius']
-IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap','outlierfile', 'pbthreshold']
+IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap','outlierfile', 'pbthreshold', 'pbband']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose','modules'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-6.5.0-modular.sif'
@@ -1220,6 +1220,10 @@ def format_args(config,submit,quiet,dependencies,justrun):
 
     if config_parser.has_section(config,'image'):
         imaging_kwargs = get_config_kwargs(config, 'image', IMAGING_CONFIG_KEYS)
+
+        valid_pbbands = ['LBand', 'SBand', 'UHF']
+        if not any([pb.lower() in imaging_kwargs['pbband'].lower() for pb in valid_pbbands]):
+            logger.warning('Invalid pbband found. Must be one of {}. If not fixed, will default to LBand.'.format(valid_pbbands))
 
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
