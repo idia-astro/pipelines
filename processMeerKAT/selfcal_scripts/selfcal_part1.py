@@ -47,6 +47,9 @@ def selfcal_part1(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step='tclean')
     calcpsf = True
 
+    if os.path.exists(outlierfile) and open(outlierfile).read() == '':
+        outlierfile = ''
+
     #Add model column with MPI rather than in selfcal_part2 without MPI.
     #Assumes you've split out your corrected data from crosscal
     if loop == 0:

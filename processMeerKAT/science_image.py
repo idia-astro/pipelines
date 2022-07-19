@@ -113,6 +113,9 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
     extn = '.ms' if keepmms==False else '.mms'
     imagename = visbase.replace(extn, '.science_image') # Images will be produced in $CWD
 
+    if os.path.exists(outlierfile) and open(outlierfile).read() == '':
+        outlierfile = ''
+
     if not (type(threshold) is str and 'Jy' in threshold) and threshold > 1 and os.path.exists(rmsmap):
         stats = imstat(imagename=rmsmap)
         threshold *= stats['min'][0]

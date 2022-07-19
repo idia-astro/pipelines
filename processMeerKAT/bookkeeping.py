@@ -168,11 +168,11 @@ def get_selfcal_params():
     for arg in other_params:
         #By this point params[arg] will be a list
         if arg in gaincal_args and len(params[arg]) != params['nloops']:
-            logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']-1))
+            logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']))
             exit = True
 
         elif arg not in gaincal_args and len(params[arg]) != params['nloops'] + 1:
-            logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' + 1 ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']+2))
+            logger.error("Parameter '{0}' in '{1}' is the wrong length. It is {2} long but must be 'nloops' + 1 ({3}) long or a single value (not a list).".format(arg,args['config'],len(params[arg]),params['nloops']+1))
             exit = True
 
     if exit:

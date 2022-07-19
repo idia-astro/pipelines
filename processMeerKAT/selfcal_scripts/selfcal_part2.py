@@ -37,6 +37,8 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                   nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, outlier_radius, flag):
 
     imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step='predict')
+    if os.path.exists(outlierfile) and open(outlierfile).read() == '':
+        outlierfile = ''
 
     if calmode[loop] != '':
         if os.path.exists(caltable):
@@ -204,10 +206,6 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 logger.error("Outlier file '{0}' doesn't exist, so sky model build went wrong. Will terminate process.".format(outlierfile_all))
                 sys.exit(1)
 
-        #Write outlier file specific to this loop, looking up from SPW directory where relevant
-        if not os.path.exists(outlierfile_all) and os.path.exists('../{0}'.format(outlierfile_all)):
-            logger.warning('Using outliers from ../{0}'.format(outlierfile_all))
-            outlierfile_all = '../{0}'.format(outlierfile_all)
         outliers=open(outlierfile_all).read()
         out = open(outlierfile,'w')
 
