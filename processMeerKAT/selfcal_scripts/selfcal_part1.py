@@ -33,7 +33,7 @@ def symlink_psf(imagenames,loop):
             for fname in products:
                 name, ext = os.path.splitext(fname)
                 # Will not have e.g. .tt0 if nterms < 2
-                if ext == product:
+                if ext[1:] == product:
                     ext = ''
                 symlink = '{0}.{1}{2}'.format(imagename,product,ext)
                 if not os.path.exists(symlink):
