@@ -14,11 +14,15 @@ This pipeline is designed to run on the Ilifu cluster, making use of SLURM and M
 
 **Note: It is not necessary to copy the raw data (i.e. the MS) to your working directory. The first step of the pipeline does this for you by creating an MMS or MS, and does not attempt to manipulate the raw data (e.g. stored in `/idia/projects` - see [data format](https://idia-pipelines.github.io/docs/processMeerKAT/Example-Use-Cases/#data-format)).**
 
-### 1. In order to use the `processMeerKAT.py` script, source the `setup.sh` file:
+## 1. Setup the pipeline in your environment
+
+**Please note : These docs are for an upcoming release of the pipeline. At the time of writing (July 2022) please use the CASA6 branch of the pipeline, which is the pre-release version. The master branch will be updated at the time of release.**
+
+In order to use the `processMeerKAT.py` script, source the `setup.sh` file, which can be done on [ilifu](https://docs.ilifu.ac.za/#/) as
 
         source /idia/software/pipelines/master/setup.sh
 
-which will add the correct paths to your `$PATH` and `$PYTHONPATH` in order to correctly use the pipeline. We recommend you add this to your `~/.profile`, for future use.
+which will add the correct paths to your `$PATH` and `$PYTHONPATH` in order to correctly use the pipeline. You could consider adding this to your `~/.profile` or `~/.bashrc` for future use.
 
 ### 2. Build a config file:
 
@@ -46,7 +50,12 @@ This defines several variables that are read by the pipeline while calibrating t
 
 This will create `submit_pipeline.sh`, which you can then run with `./submit_pipeline.sh` to submit all pipeline jobs to the SLURM queue.
 
-Other convenient scripts are also created that allow you to monitor and (if necessary) kill the jobs. `summary.sh` provides a brief overview of the status of the jobs in the pipeline, `findErrors.sh` checks the log files for commonly reported errors (after the jobs have run), and `killJobs.sh` kills all the jobs from the current run of the pipeline, ignoring any other (unrelated) jobs you might have running.
+Other convenience scripts are also created that allow you to monitor and (if necessary) kill the jobs.
+
+* `summary.sh` provides a brief overview of the status of the jobs in the pipeline
+* `findErrors.sh` checks the log files for commonly reported errors (after the jobs have run)
+* `killJobs.sh` kills all the jobs from the current run of the pipeline, ignoring any other (unrelated) jobs you might have running.
+* `cleanup.sh` wipes all the intermediate data products created by the pipeline. This is intended to be launched after the pipeline has run and the output is verified to be good.
 
 For help, run `processMeerKAT.py -h`, which provides a brief description of all the [command line options](https://idia-pipelines.github.io/docs/processMeerKAT/using-the-pipeline#command-line-options).
 

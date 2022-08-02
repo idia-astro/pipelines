@@ -108,7 +108,7 @@ def do_pb_corr(inpimage, pbthreshold=0, pbband='LBand'):
     ia.close()
 
 
-def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, specmode, stokes, mask, rmsmap, outlierfile, keepmms, pbthreshold, pbband):
+def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, restoringbeam, stokes, mask, rmsmap, outlierfile, keepmms, pbthreshold, pbband):
 
     visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     extn = '.ms' if keepmms==False else '.mms'
@@ -122,7 +122,7 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
         threshold *= stats['min'][0]
 
     tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
-        imsize=imsize, cell=cell, stokes=stokes, gridder=gridder, specmode=specmode,
+        imsize=imsize, cell=cell, stokes=stokes, gridder=gridder, specmode='mfs',
         wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
         weighting='briggs', robust = robust, niter=niter, scales=multiscale,
         threshold=threshold, nterms=nterms, calcpsf=True, mask=mask, outlierfile=outlierfile,

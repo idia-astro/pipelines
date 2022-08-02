@@ -59,7 +59,7 @@ SPW_PREFIX = '*:'
 FIELDS_CONFIG_KEYS = ['fluxfield','bpassfield','phasecalfield','targetfields','extrafields']
 CROSSCAL_CONFIG_KEYS = ['minbaselines','chanbin','width','timeavg','createmms','keepmms','spw','nspw','calcrefant','refant','standard','badants','badfreqranges']
 SELFCAL_CONFIG_KEYS = ['nloops','loop','cell','robust','imsize','wprojplanes','niter','threshold','uvrange','nterms','gridder','deconvolver','solint','calmode','discard_nloops','gaintype','outlier_threshold','flag','outlier_radius']
-IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'specmode', 'stokes', 'mask', 'rmsmap','outlierfile', 'pbthreshold', 'pbband']
+IMAGING_CONFIG_KEYS = ['cell', 'robust', 'imsize', 'wprojplanes', 'niter', 'threshold', 'multiscale', 'nterms', 'gridder', 'deconvolver', 'restoringbeam', 'stokes', 'mask', 'rmsmap','outlierfile', 'pbthreshold', 'pbband']
 SLURM_CONFIG_STR_KEYS = ['container','mpi_wrapper','partition','time','name','dependencies','exclude','account','reservation']
 SLURM_CONFIG_KEYS = ['nodes','ntasks_per_node','mem','plane','submit','precal_scripts','postcal_scripts','scripts','verbose','modules'] + SLURM_CONFIG_STR_KEYS
 CONTAINER = '/idia/software/containers/casa-6.5.0-modular.sif'
@@ -641,12 +641,12 @@ def write_spw_master(filename,config,SPWs,precal_scripts,postcal_scripts,submit,
 
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
-        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
         start_loop = config_parser.get_key(config, 'selfcal', 'loop')
+        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops') - start_loop
         idx = scripts.index('selfcal_part2.sbatch')
 
         #check that we're doing nloops in order, otherwise don't duplicate scripts
-        if start_loop == 0 and idx == scripts.index('selfcal_part1.sbatch') + 1:
+        if idx == scripts.index('selfcal_part1.sbatch') + 1:
             init_scripts = scripts[:idx+1]
             final_scripts = scripts[idx+1:]
             init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops-1))
@@ -756,12 +756,12 @@ def write_master(filename,config,scripts=[],submit=False,dir='jobScripts',pad_le
 
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
-        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
         start_loop = config_parser.get_key(config, 'selfcal', 'loop')
+        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops') - start_loop
         idx = scripts.index('selfcal_part2.sbatch')
 
         #check that we're doing nloops in order, otherwise don't duplicate scripts
-        if start_loop == 0 and idx == scripts.index('selfcal_part1.sbatch') + 1:
+        if idx == scripts.index('selfcal_part1.sbatch') + 1:
             init_scripts = scripts[:idx+1]
             final_scripts = scripts[idx+1:]
             init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops-1))
