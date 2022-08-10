@@ -95,7 +95,7 @@ def do_pb_corr(inpimage, pbthreshold=0, pbband='LBand'):
     # Mask below the threshold
     if pbthreshold > 0:
         pbcor_imgdata[beam_I < pbthreshold] = np.nan
-        beam_I[beam_I < pbthreshold] = np.nan
+        #beam_I[beam_I < pbthreshold] = np.nan
 
     shutil.copytree(inpimage, pbimage)
     ia.open(pbimage)
@@ -121,19 +121,32 @@ def science_image(vis, cell, robust, imsize, wprojplanes, niter, threshold, mult
         stats = imstat(imagename=rmsmap)
         threshold *= stats['min'][0]
 
-    tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
-        imsize=imsize, cell=cell, stokes=stokes, gridder=gridder, specmode='mfs',
-        wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
-        weighting='briggs', robust = robust, niter=niter, scales=multiscale,
-        threshold=threshold, nterms=nterms, calcpsf=True, mask=mask, outlierfile=outlierfile,
-        pblimit=-1, restoringbeam=restoringbeam, parallel = True)
-
     if deconvolver == 'mtmfs':
         imname = imagename + '.image.tt0'
     else:
         imname = imagename + '.image'
 
-    do_pb_corr(imname, pbthreshold, pbband)
+    if not os.path.exists(imname):
+
+        tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,
+            imsize=imsize, cell=cell, stokes=stokes, gridder=gridder, specmode='mfs',
+            wprojplanes = wprojplanes, deconvolver = deconvolver, restoration=True,
+            weighting='briggs', robust = robust, niter=niter, scales=multiscale,
+            threshold=threshold, nterms=nterms, calcpsf=True, mask=mask, outlierfile=outlierfile,
+            pblimit=-1, restoringbeam=restoringbeam, parallel = True)
+
+    else:
+        logger.warning('Output image "{0}" already exists. Skipping tclean step and applying pb correction.'.format(imname))
+
+    if len(stokes) > 1 and 'I' in stokes.upper():
+        logger.warning('Output image "{0}" includes multiple Stokes, but katbeam only applicable to Stokes I. Selecting Stokes I and applying PB correction.'.format(imname))
+        stokesI = imname + '.StokesI'
+        if not os.path.exists(stokesI):
+            imsubimage(imagename=imname, outfile=stokesI, stokes='I')
+        imname = stokesI
+
+    if 'I' in stokes.upper():
+        do_pb_corr(imname, pbthreshold, pbband)
 
 if __name__ == '__main__':
 
