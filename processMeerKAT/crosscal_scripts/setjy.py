@@ -1,15 +1,21 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import os, sys, shutil
 
-import config_parser
 import bookkeeping
 from config_parser import validate_args as va
 import numpy as np
 import logging
 from time import gmtime
 logging.Formatter.converter = gmtime
+
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata
+import casampi
+msmd = msmetadata()
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=logging.INFO)
@@ -31,7 +37,10 @@ def do_setjy(visname, spw, fields, standard, dopol=False, createmms=True):
     ismms = createmms
 
     msmd.open(visname)
-    fnames = msmd.namesforfields([int(ff) for ff in fields.fluxfield.split(",")])
+    fnames = fields.fluxfield.split(",")
+    for fname in fnames:
+        if fname.isdigit():
+            fname = msmd.namesforfields(int(fname))
 
     do_manual = False
     for ff in fluxlist:
@@ -162,4 +171,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

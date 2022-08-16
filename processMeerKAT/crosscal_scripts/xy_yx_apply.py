@@ -1,4 +1,4 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import sys
@@ -8,7 +8,11 @@ import shutil
 import config_parser
 import bookkeeping, read_ms
 from config_parser import validate_args as va
-from recipes.almapolhelpers import *
+
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+import casampi
 
 import logging
 from time import gmtime
@@ -19,7 +23,10 @@ logging.basicConfig(format="%(asctime)-15s %(levelname)s: %(message)s", level=lo
 
 def do_cross_cal_apply(visname, fields, calfiles, caldir):
 
-    fluxfile = calfiles.fluxfile
+    if len(fields.gainfields.split(',')) > 1:
+        fluxfile = calfiles.fluxfile
+    else:
+        fluxfile = calfiles.gainfile
 
     polfield = bookkeeping.polfield_name(visname)
     if polfield == '':
@@ -29,11 +36,11 @@ def do_cross_cal_apply(visname, fields, calfiles, caldir):
     xy0ambpfile = os.path.join(caldir, base+'.xyambcal')
     xy0pfile    = os.path.join(caldir, base+'.xycal')
 
-    if polfield == fields.secondaryfield:
-        # Cannot resolve XY ambiguity so write into final file directly
-        xyfile = xy0pfile
-    else:
-        xyfile = xy0ambpfile
+    #if polfield == fields.secondaryfield:
+    #    # Cannot resolve XY ambiguity so write into final file directly
+    #    xyfile = xy0ambpfile
+
+    xyfile = xy0pfile
 
     calfiles = calfiles._replace(xpolfile=xyfile)
 
@@ -69,4 +76,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

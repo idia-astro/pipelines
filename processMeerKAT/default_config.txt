@@ -17,15 +17,16 @@ partition = 'Main'                # SLURM partition to use
 exclude = ''                      # SLURM nodes to exclude
 time = '12:00:00'
 submit = False
-container = '/idia/software/containers/casa-stable-5.7.0.simg'
-mpi_wrapper = '/idia/software/pipelines/casa-pipeline-release-5.6.1-8.el7/bin/mpicasa'
+container = '/idia/software/containers/casa-6.5.0-modular.sif'
+mpi_wrapper = 'mpirun'
 name = ''
 dependencies = ''
 account = 'b03-idia-ag'
 reservation = ''
+modules = ['openmpi/4.0.3']
 verbose = False
 precal_scripts = [('calc_refant.py',False,''), ('partition.py',True,'')]
-postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('run_bdsf.py', False, ''), ('make_pixmask.py', False, '')]
+postcal_scripts = [('concat.py',False,''), ('plotcal_spw.py', False, ''), ('selfcal_part1.py',True,''), ('selfcal_part2.py',False,''), ('science_image.py', True, '')]
 scripts = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -36,8 +37,7 @@ scripts = [ ('validate_input.py',False,''),
             ('xx_yy_solve.py',False,''),
             ('xx_yy_apply.py',True,''),
             ('split.py',True,''),
-            ('quick_tclean.py',True,''),
-            ('plot_solutions.py',False,'')]
+            ('quick_tclean.py',True,'')]
 
 [crosscal]
 minbaselines = 4                  # Minimum number of baselines to use while calibrating
@@ -46,8 +46,8 @@ width = 1                         # Number of channels to (further) average afte
 timeavg = '8s'                    # Time interval to average after calibration (during split)
 createmms = True                  # Create MMS (True) or MS (False) for cross-calibration during partition
 keepmms = True                    # Output MMS (True) or MS (False) during split
-spw = '0:880~1680MHz'             # Spectral window / frequencies to extract for MMS
-nspw = 16                         # Number of spectral windows to split into
+spw = '*:880~933MHz,*:960~1010MHz,*:1010~1060MHz,*:1060~1110MHz,*:1110~1163MHz,*:1299~1350MHz,*:1350~1400MHz,*:1400~1450MHz,*:1450~1500MHz,*:1500~1524MHz,*:1630~1680MHz' # Spectral window / frequencies to extract for MMS
+nspw = 11                         # Number of spectral windows to split into
 calcrefant = False                # Calculate reference antenna in program (overwrites 'refant')
 refant = 'm059'                   # Reference antenna name / number
 standard = 'Stevens-Reynolds 2016'# Flux density standard for setjy
@@ -57,21 +57,45 @@ badfreqranges = [ '933~960MHz',   # List of bad frequency ranges (to flag)
                   '1524~1630MHz']
 
 [selfcal]
-nloops = 4                        # Number of clean + bdsf + self-cal loops.
-restart_no = 0                    # If nonzero, adds this number to nloops to name images
-cell = '2.0arcsec'
+nloops = 2                        # Number of clean + bdsf loops.
+loop = 0                          # If nonzero, adds this number to nloops to name images or continue previous run
+cell = '1.5arcsec'
 robust = -0.5
-imsize = [5120, 5120]
-wprojplanes = 128
-niter = [8000, 11000, 14000, 15000, 200000]
-threshold = [100e-6, 50e-6, 20e-6, 10e-6, 4e-6] # In units of Jy
-multiscale = []
+imsize = [6144, 6144]
+wprojplanes = 512
+niter = [10000, 50000, 50000]
+threshold = ['0.5mJy', 10, 10]    # After loop 0, S/N values if >= 1.0, otherwise Jy
 nterms = 2                        # Number of taylor terms
 gridder = 'wproject'
 deconvolver = 'mtmfs'
-solint = ['10min','5min','2min','1min']
-calmode = 'p'
-atrous = False                     # Source find for diffuse emission (see PyBDSF docs)
+calmode = ['','p']                # '' to skip solving (will also exclude mask for this loop), 'p' for phase-only and 'ap' for amplitude and phase
+solint = ['','1min']
+uvrange = ''                      # uv range cutoff for gaincal
+flag = True                       # Flag residual column after selfcal?
+gaintype = 'G'                    # Use 'T' for polarisation on linear feeds (e.g. MeerKAT)
+discard_nloops = 0                # Discard this many selfcal solutions (e.g. from quick and dirty image) during subsequent loops (only considers when calmode !='')
+outlier_threshold = 0.0           # S/N values if >= 1.0, otherwise Jy
+outlier_radius = 0.0              # Radius in degrees for identifying outliers in RACS
+
+[image]
+cell = '1.5arcsec'
+robust = -0.5
+imsize = [6144, 6144]
+wprojplanes = 512
+niter = 50000
+threshold = 10                    # S/N value if >= 1.0 and rmsmap != '', otherwise Jy
+multiscale = [0, 5, 10, 15]
+nterms = 2                        # Number of taylor terms
+gridder = 'wproject'
+deconvolver = 'mtmfs'
+restoringbeam = ''
+stokes = 'I'
+pbthreshold = 0.1                 # Threshold below which to mask the PB for PB correction
+pbband = 'LBand'                  # Which band to use to generate the PB - one of "LBand" "SBand" or "UHF"
+mask = ''
+rmsmap = ''
+outlierfile = ''
 
 [run]                             # Internal variables for pipeline execution
 continue = True
+dopol = False

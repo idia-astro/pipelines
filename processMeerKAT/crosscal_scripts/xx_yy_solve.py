@@ -1,4 +1,4 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import sys
@@ -8,6 +8,10 @@ import shutil
 import config_parser
 import bookkeeping
 from config_parser import validate_args as va
+
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
 
 import logging
 from time import gmtime
@@ -51,7 +55,7 @@ def do_parallel_cal(visname, fields, calfiles, referenceant, caldir,
     bookkeeping.check_file(calfiles.gainfile)
 
     # Only run fluxscale if bootstrapping
-    if len(fields.gainfields) > 1:
+    if len(fields.gainfields.split(',')) > 1:
         fluxscale(vis=visname, caltable=calfiles.gainfile,
                 reference=[fields.fluxfield], transfer='',
                 fluxtable=calfiles.fluxfile, append=False, display=False,
@@ -73,4 +77,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

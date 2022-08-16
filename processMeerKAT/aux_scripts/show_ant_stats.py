@@ -1,7 +1,7 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import sys, os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,7 +14,7 @@ bins = 20
 if len(args) > 1:
     if sys.argv[1] == '-h':
         print('Usage: {0} filename bins'.format(os.path.split(sys.argv[0])[1]))
-    else:
+    elif sys.argv[1] != '--config':
         fname = sys.argv[1]
         bins = int(sys.argv[2])
 

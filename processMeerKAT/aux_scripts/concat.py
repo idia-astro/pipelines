@@ -1,4 +1,4 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import os
@@ -9,6 +9,13 @@ from shutil import copytree
 import config_parser
 from config_parser import validate_args as va
 import bookkeeping
+
+from casatasks import *
+logfile=casalog.logfile()
+casalog.setlogfile('logs/{SLURM_JOB_NAME}-{SLURM_JOB_ID}.casa'.format(**os.environ))
+from casatools import msmetadata,image
+msmd = msmetadata()
+ia = image()
 
 import logging
 from time import gmtime
@@ -25,10 +32,10 @@ def check_output(fname,files,pattern,out,job='concat',filetype='image'):
         logger.info('Output file "{0}" already exists. Skipping {1}.'.format(out,job))
         return None
     elif len(files) == 0:
-        logger.warn("Didn't find any {0}s with '{1}'".format(filetype,pattern))
+        logger.warning("Didn't find any {0}s with '{1}'".format(filetype,pattern))
         return None
     elif len(files) == 1:
-        logger.warn("Only found 1 {0} with '{1}'. Will copy to this directory.".format(filetype,pattern))
+        logger.warning("Only found 1 {0} with '{1}'. Will copy to this directory.".format(filetype,pattern))
         copytree(files[0], out)
         return None
     return files
@@ -71,11 +78,12 @@ def do_concat(visname, fields, dirs='*MHz'):
 
     for field in [fields.targetfield,fields.gainfields,fields.extrafields]:
         if field != '':
-            for target in field.split(','):
-                fname = msmd.namesforfields(int(target))[0]
+            for fname in field.split(','):
+                if fname.isdigit():
+                    fname = msmd.namesforfields(int(fname))[0]
 
                 #Concat tt0 images (into continuum cube)
-                suffix = 'images/*{0}*image.tt0'.format(fname)
+                suffix = 'images/*.{0}*image.tt0'.format(fname)
                 files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.contcube'.format(filebase,fname)
                 images = check_output(fname,files,pattern,out,job='imageconcat',filetype='image')
@@ -92,7 +100,7 @@ def do_concat(visname, fields, dirs='*MHz'):
                         logger.error("Output image '{0}' attempted to write but was not written.".format(out))
 
                 #Concat images (into continuum cube)
-                suffix = 'images/*{0}*image'.format(fname)
+                suffix = 'images/*.{0}*image'.format(fname)
                 files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.contcube'.format(filebase,fname)
                 images = check_output(fname,files,pattern,out,job='imageconcat',filetype='image')
@@ -109,7 +117,7 @@ def do_concat(visname, fields, dirs='*MHz'):
                         logger.error("Output image '{0}' attempted to write but was not written.".format(out))
 
                 #Concat MSs
-                suffix = '*{0}*.ms'.format(fname)
+                suffix = '*.{0}*.ms'.format(fname)
                 files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.ms'.format(filebase,fname)
                 MSs = check_output(fname,files,pattern,out,job='concat',filetype='MS')
@@ -118,14 +126,14 @@ def do_concat(visname, fields, dirs='*MHz'):
                     logger.info('Concatenating MSs with following command:')
                     logger.info('concat(vis={0}, concatvis={1})'.format(MSs,out))
                     concat(vis=MSs, concatvis=out)
-                    if target == fields.targetfield.split(',')[0]:
+                    if fname == fields.targetfield.split(',')[0]:
                         newvis = out
 
                     if not os.path.exists(out):
                         logger.error("Output MS '{0}' attempted to write but was not written.".format(out))
 
                 #Concat MMSs
-                suffix = '*{0}*.mms'.format(fname)
+                suffix = '*.{0}*.mms'.format(fname)
                 files,pattern = get_infiles(dirs,suffix)
                 out = '{0}.{1}.mms'.format(filebase,fname)
                 MMSs = check_output(fname,files,pattern,out,job='virtualconcat',filetype='MMS')
@@ -134,7 +142,7 @@ def do_concat(visname, fields, dirs='*MHz'):
                     logger.info('Concatenating MMSs with following command:')
                     logger.info('virtualconcat(vis={0}, concatvis={1})'.format(MMSs,out))
                     virtualconcat(vis=MMSs, concatvis=out)
-                    if target == fields.targetfield.split(',')[0]:
+                    if fname == fields.targetfield.split(',')[0]:
                         newvis = out
 
                     if not os.path.exists(out):
@@ -162,4 +170,4 @@ def main(args,taskvals):
 
 if __name__ == '__main__':
 
-    bookkeeping.run_script(main)
+    bookkeeping.run_script(main,logfile)

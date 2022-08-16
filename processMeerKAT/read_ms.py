@@ -1,7 +1,7 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import sys
 import os
 import numpy as np
@@ -9,13 +9,16 @@ import numpy as np
 import processMeerKAT
 import config_parser
 
+from casatasks import *
+from casatools import msmetadata,table,measures,quanta
+
 logger = processMeerKAT.logger
 
-# Get access to the msmd module for read_ms.py
-import casac
-msmd = casac.casac.msmetadata()
-tb = casac.casac.table()
-me = casac.casac.measures()
+# Get access to the msmd module
+msmd = msmetadata()
+tb = table()
+me = measures()
+qa = quanta()
 
 def get_fields(MS):
 
@@ -61,7 +64,21 @@ def get_fields(MS):
     fieldIDs['phasecalfield'] = get_field(MS,phasecal_intent,'phasecalfield',extra_fields,default=default)
     fieldIDs['targetfields'] = get_field(MS,'TARGET','targetfields',extra_fields,default=default,multiple=True)
 
-    #Put any extra fields in target fields
+    if 'UNKNOWN' in intents:
+        err_msg = "Intent 'UNKNOWN' present in MS but couldn't find any fields with this intent. Please append any extra field manually."
+        if len(msmd.fieldsforintent('UNKNOWN')) > 0:
+            try:
+                polfields = np.array(msmd.namesforfields(msmd.fieldsforintent('UNKNOWN'))) #bogus MeerKAT mislabelling during conversion to MS
+                for polfield in polfields:
+                    if polfield not in extra_fields:
+                        extra_fields.append(polfield)
+            except RuntimeError as e:
+                logger.warning(err_msg)
+        else:
+            logger.warning(err_msg)
+
+
+    #Put any extra fields in extra_fields
     if len(extra_fields) > 0:
         fieldIDs['extrafields'] = "'{0}'".format(','.join([str(extra_fields[i]) for i in range(len(extra_fields))]))
 
@@ -93,10 +110,10 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
     fieldIDs : str
         Extracted field ID(s), comma-seperated for multiple fields."""
 
-    fields = msmd.fieldsforintent(intent)
+    fields = np.array(msmd.namesforfields(msmd.fieldsforintent(intent)))
 
     if fields.size == 0:
-        logger.warn('Intent "{0}" not found in dataset "{1}". Setting to "{2}"'.format(intent,MS,default))
+        logger.warning('Intent "{0}" not found in dataset "{1}". Setting to "{2}"'.format(intent,MS,default))
         fieldIDs = "'{0}'".format(default)
     elif fields.size == 1:
         fieldIDs = "'{0}'".format(fields[0])
@@ -115,13 +132,13 @@ def get_field(MS,intent,fieldname,extra_fields,default=0,multiple=False):
                     maxscan = len(ss)
                     maxfield = fields[ind]
 
-            logger.warn('Only using field "{0}" for "{1}", which has the most scans ({2}).'.format(maxfield,fieldname,maxscan))
+            logger.warning('Only using field "{0}" for "{1}", which has the most scans ({2}).'.format(maxfield,fieldname,maxscan))
             fieldIDs = "'{0}'".format(maxfield)
 
-            #Put any extra fields with intent CALIBRATE_BANDPASS in target field
+            #Put any extra fields with the same intent in extra fields
             extras = list(set(fields) - set(extra_fields) - set([maxfield]))
             if len(extras) > 0:
-               logger.warn('Putting extra fields with intent "{0}" in "extrafields" - {1}'.format(intent,extras))
+               logger.warning('Putting extra fields with intent "{0}" in "extrafields" - {1}'.format(intent,extras))
                extra_fields += extras
 
     return fieldIDs
@@ -141,6 +158,11 @@ def check_refant(MS,refant,config,warn=True):
     warn : bool, optional
         Warn the user? If False, raise ValueError."""
 
+    try:
+        refant = int(refant)
+    except ValueError: # It's not an int, but a str
+        pass
+
     msmd.open(MS)
     if type(refant) is str:
         ants = msmd.antennanames()
@@ -150,7 +172,7 @@ def check_refant(MS,refant,config,warn=True):
     if refant not in ants:
         err = "Reference antenna '{0}' isn't present in input dataset '{1}'. Antennas present are: {2}. Try 'm052' or 'm005' if present, or ensure 'calcrefant=True' and 'calc_refant.py' script present in '{3}'.".format(refant,MS,ants,config)
         if warn:
-            logger.warn(err)
+            logger.warning(err)
         else:
             raise ValueError(err)
     else:
@@ -184,7 +206,7 @@ def check_scans(MS,nodes,tasks,dopol):
     limit = int(nscans/2)
 
     if abs(nodes * tasks - limit) > 0.1*limit:
-        logger.warn('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
+        logger.warning('The number of threads ({0} node(s) x {1} task(s) = {2}) is not ideal compared to the number of scans ({3}) for "{4}".'.format(nodes,tasks,nodes*tasks,nscans,MS))
 
         #Start with 8/16 tasks on one node, and increase count of nodes (and then tasks per node) until limit reached
         nodes = 1
@@ -201,17 +223,17 @@ def check_scans(MS,nodes,tasks,dopol):
             else:
                 break
 
-        logger.warn('Config file has been updated to use {0} node(s) and {1} task(s) per node.'.format(nodes,tasks))
+        logger.warning('Config file has been updated to use {0} node(s) and {1} task(s) per node.'.format(nodes,tasks))
         if nodes*tasks != limit:
             logger.info('For the best results, update your config file so that nodes x tasks per node = {0}.'.format(limit))
 
     if nodes > 4:
-        logger.warn("Large allocation of {0} nodes found. Please consider setting 'createmms=False' in config file, if using large number of SPWs.".format(nodes))
+        logger.warning("Large allocation of {0} nodes found. Please consider setting 'createmms=False' in config file, if using large number of SPWs.".format(nodes))
 
     threads = {'nodes' : nodes, 'ntasks_per_node' : tasks}
     return threads
 
-def check_spw(config):
+def check_spw(config,msmd):
 
     """Check SPW bounds are within the SPW bounds of the MS. If not, output a warning and update the SPW.
 
@@ -226,29 +248,44 @@ def check_spw(config):
 
     update = False
     low,high,unit,dirs = config_parser.parse_spw(config)
-    if type(low) is list:
-        low = low[0]
-    if type(high) is list:
-        high = high[-1]
+    lowest = np.min(low)
+    highest = np.max(high)
     nspw = msmd.nspw()
 
-    if nspw > 1:
-        logger.warn("Expected 1 SPW but found nspw={0}. Please manually edit 'spw' in '{1}'.".format(nspw,config))
+    # if nspw > 1:
+    #     logger.warning("Expected 1 SPW but found nspw={0}. Please manually edit 'spw' in '{1}'.".format(nspw,config))
 
+    #Check SPW bounds overlap with MS, and convert to MHz explicitly, assuming first and last SPW contain lowest and highest frequencies
     ms_low = msmd.chanfreqs(0)[0] / 1e6
     ms_high = msmd.chanfreqs(nspw-1)[-1] / 1e6
 
-    if low < ms_low - 1:
-        low = int(round(ms_low+0.5))
+    if type(unit) is list:
+        low_unit = unit[low.index(lowest)]
+        high_unit = unit[high.index(highest)]
+    else:
+        low_unit = unit
+        high_unit = unit
+
+    #i.e. channel number
+    if low_unit == '':
+        low_MHz = msmd.chanfreqs(0)[low] / 1e6
+    if high_unit == '':
+        high_MHz = msmd.chanfreqs(nspw-1)[high] / 1e6
+    else:
+        low_MHz=qa.convertfreq('{0}{1}'.format(lowest,low_unit),'MHz')['value']
+        high_MHz=qa.convertfreq('{0}{1}'.format(highest,high_unit),'MHz')['value']
+
+    if low_MHz < ms_low - 1:
+        low_MHz = int(ms_low)
         update = True
-    if high > ms_high + 1:
-        high = int(round(ms_high-0.5))
+    if high_MHz > ms_high + 1:
+        high_MHz = int(round(ms_high+0.5))
         update = True
 
-    SPW = '0:{0}~{1}MHz'.format(low,high)
+    SPW = '*:{0}~{1}MHz'.format(low_MHz,high_MHz)
 
     if update:
-        logger.warn('Default SPW outside SPW of input MS ({0}~{1}MHz). Forcing SPW={2}'.format(ms_low,ms_high,SPW))
+        logger.warning('Default SPW outside SPW of input MS ({0}~{1}MHz). Forcing SPW={2}'.format(ms_low,ms_high,SPW))
 
     return SPW
 
@@ -359,18 +396,19 @@ def main():
     npol = msmd.ncorrforpol()[0]
     parang = 0
     if 'phasecalfield' in fields:
-        parang = parang_coverage(args.MS, int(fields['phasecalfield'][1:-1])) #remove '' from field
+        calfield = msmd.fieldsforname(fields['phasecalfield'][1:-1])[0] #remove '' from field and convert to int
+        parang = parang_coverage(args.MS, calfield)
 
     if npol < 4:
-        logger.warn("Only {0} polarisations present in '{1}'. Any attempted polarisation calibration will fail, so setting dopol=False in [run] section of '{2}'.".format(npol,args.MS,args.config))
+        logger.warning("Only {0} polarisations present in '{1}'. Any attempted polarisation calibration will fail, so setting dopol=False in [run] section of '{2}'.".format(npol,args.MS,args.config))
         dopol = False
     elif 0 < parang < 30:
-        logger.warn("Parallactic angle coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
+        logger.warning("Parallactic angle coverage is < 30 deg. Polarisation calibration will most likely fail, so setting dopol=False in [run] section of '{0}'.".format(args.config))
         dopol = False
 
     check_refant(args.MS, refant, args.config, warn=True)
     threads = check_scans(args.MS,args.nodes,args.ntasks_per_node,dopol)
-    SPW = check_spw(args.config)
+    SPW = check_spw(args.config,msmd)
 
     config_parser.overwrite_config(args.config, conf_dict={'dopol' : dopol}, conf_sec='run', sec_comment='# Internal variables for pipeline execution')
     config_parser.overwrite_config(args.config, conf_dict=threads, conf_sec='slurm')
