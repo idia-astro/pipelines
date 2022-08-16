@@ -16,8 +16,6 @@ This pipeline is designed to run on the Ilifu cluster, making use of SLURM and M
 
 ## 1. Setup the pipeline in your environment
 
-**Please note : These docs are for an upcoming release of the pipeline. At the time of writing (July 2022) please use the CASA6 branch of the pipeline, which is the pre-release version. The master branch will be updated at the time of release.**
-
 In order to use the `processMeerKAT.py` script, source the `setup.sh` file, which can be done on [ilifu](https://docs.ilifu.ac.za/#/) as
 
         source /idia/software/pipelines/master/setup.sh
