@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-__version__ = '1.1'
+__version__ = '2.0'
 
 license = """
     Process MeerKAT data via CASA MeasurementSet.
-    Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy.
+    Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy.
     support@ilifu.ac.za
 
     This program is free software: you can redistribute it and/or modify
@@ -691,12 +691,12 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
 
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
-        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
         start_loop = config_parser.get_key(config, 'selfcal', 'loop')
+        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops') - start_loop
         idx = scripts.index('selfcal_part2.sbatch')
 
         #check that we're doing nloops in order, otherwise don't duplicate scripts
-        if start_loop == 0 and idx == scripts.index('selfcal_part1.sbatch') + 1:
+        if idx == scripts.index('selfcal_part1.sbatch') + 1:
             init_scripts = scripts[:idx+1]
             final_scripts = scripts[idx+1:]
             init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops-1))
@@ -806,7 +806,7 @@ def write_spw_master(filename,config,args,SPWs,precal_scripts,postcal_scripts,su
         logger.info('Running master script "{0}"'.format(filename))
         os.system('./{0}'.format(filename))
     else:
-        logger.info('Master script "{0}" written in CWD, but will not run.'.format(filename))
+        logger.info('Master script "{0}" written in "{1}", but will not run.'.format(filename,os.path.split(os.getcwd())[1]))
 
 
 def write_master(filename,config,args,scripts=[],submit=False,dir='jobScripts',pad_length=5,verbose=False, echo=True, dependencies='',slurm_kwargs={}):
@@ -850,12 +850,12 @@ def write_master(filename,config,args,scripts=[],submit=False,dir='jobScripts',p
 
     #Hack to perform correct number of selfcal loops
     if config_parser.has_section(config,'selfcal') and 'selfcal_part1.sbatch' in scripts and 'selfcal_part2.sbatch' in scripts:
-        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops')
         start_loop = config_parser.get_key(config, 'selfcal', 'loop')
+        selfcal_loops = config_parser.get_key(config, 'selfcal', 'nloops') - start_loop
         idx = scripts.index('selfcal_part2.sbatch')
 
         #check that we're doing nloops in order, otherwise don't duplicate scripts
-        if start_loop == 0 and idx == scripts.index('selfcal_part1.sbatch') + 1:
+        if idx == scripts.index('selfcal_part1.sbatch') + 1:
             init_scripts = scripts[:idx+1]
             final_scripts = scripts[idx+1:]
             init_scripts.extend(['selfcal_part1.sbatch','selfcal_part2.sbatch']*(selfcal_loops-1))
@@ -1296,7 +1296,18 @@ def format_args(config,submit,quiet,dependencies,justrun):
         if selfcal_kwargs['loop'] > 0:
             logger.warning("Starting with loop={0}, which is only valid if previous loops were successfully run in this directory.".format(selfcal_kwargs['loop']))
         #Find RACS outliers
-        elif ((nspw > 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['postcal_scripts']]) or (nspw == 1 and 'selfcal_part1.py' in [i[0] for i in kwargs['scripts']])) and selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+        elif selfcal_kwargs['outlier_threshold'] != 0 and selfcal_kwargs['outlier_threshold'] != '':
+            outlierfile = 'outliers.txt'
+            outliers_loop0 = 'outliers_loop0.txt'
+            CWD = os.path.split(os.getcwd())[1]
+            if os.path.exists(outlierfile) and os.path.exists(outliers_loop0):
+                logger.warning("Using existing outlier files '{0}' and '{1}' from '{2}'. Remove one of these files to derive outliers again.".format(outlierfile,outliers_loop0,CWD))
+            elif os.path.exists('../{0}'.format(outlierfile)) and os.path.exists('../{0}'.format(outliers_loop0)):
+                logger.warning("Assuming you're runnnig outlier imaging separately over several SPWs, so using one set of outliers by copying outlier file from '../{0}' and '../{1}' to '{2}'.".format(outlierfile,outliers_loop0,CWD))
+                logger.warning("If these outlier files are irrelevant, please rename/remove one of them and run this step again.")
+                copyfile('../{0}'.format(outlierfile), outlierfile)
+                copyfile('../{0}'.format(outliers_loop0), outliers_loop0)
+            else:
                 if selfcal_kwargs['outlier_radius'] != '' and selfcal_kwargs['outlier_radius'] != 0.0:
                     txt = 'within {0} degrees'.format(selfcal_kwargs['outlier_radius'])
                 else:
@@ -1312,6 +1323,10 @@ def format_args(config,submit,quiet,dependencies,justrun):
 
     if config_parser.has_section(config,'image'):
         imaging_kwargs = get_config_kwargs(config, 'image', HPC_DEFAULTS['IMAGING_CONFIG_KEYS'.lower()])
+
+        valid_pbbands = ['LBand', 'SBand', 'UHF']
+        if not any([pb.lower() in imaging_kwargs['pbband'].lower() for pb in valid_pbbands]):
+            logger.warning('Invalid pbband found. Must be one of {}. If not fixed, will default to LBand.'.format(valid_pbbands))
 
     #If nspw = 1 and precal or postcal scripts present, overwrite config and reload
     if nspw == 1:
