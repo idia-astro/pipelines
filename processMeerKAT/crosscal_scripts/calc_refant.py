@@ -102,7 +102,7 @@ def main(args,taskvals):
         #Replace reference antenna in each SPW config
         if nspw > 1:
             for SPW in spw.split(','):
-                spw_config = '{0}/{1}'.format(SPW.replace('0:',''),args['config'])
+                spw_config = '{0}/{1}'.format(SPW.replace('*:',''),args['config'])
                 # Overwrite config file with new refant
                 config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'refant' : "'{0}'".format(refant)})
                 config_parser.overwrite_config(spw_config, conf_sec='crosscal', conf_dict={'badants' : badants})

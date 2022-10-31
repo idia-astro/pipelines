@@ -484,9 +484,7 @@ def write_sbatch(script,args,nodes=1,tasks=16,mem=MEM_PER_NODE_GB_LIMIT,name="jo
 
     #Use xvfb for plotting scripts
     plot = ('plot' in script)
-    if 'plot_solutions' in script:
-        casa_script = True
-    elif script == 'validate_input.py':
+    if script == 'validate_input.py':
         casa_script = False
         casacore = True
     elif 'bdsf' in script or 'column' in script: #hack for 'add_MS_column' and 'copy_MS_column' scripts
