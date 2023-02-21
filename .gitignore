@@ -4,3 +4,6 @@
 
 build/
 dist/
+venv/
+.vscode/settings.json
+processMeerKAT/workspace.code-workspace

@@ -2,7 +2,13 @@
 #See processMeerKAT.py for license details.
 
 #!/usr/bin/env python3
+import sys
 import os
+
+# Adapt PYTHONPATH to include processMeerKAT
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 import bookkeeping
 import config_parser
 from selfcal_scripts.selfcal_part2 import find_outliers

@@ -3,6 +3,10 @@
 
 import os, sys, shutil
 
+# Adapt PYTHONPATH to include processMeerKAT
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 import bookkeeping
 from config_parser import validate_args as va
 import numpy as np
