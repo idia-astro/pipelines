@@ -1,4 +1,4 @@
-#Copyright (C) 2020 Inter-University Institute for Data Intensive Astronomy
+#Copyright (C) 2022 Inter-University Institute for Data Intensive Astronomy
 #See processMeerKAT.py for license details.
 
 import sys
@@ -41,6 +41,8 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                   nterms, gridder, deconvolver, solint, calmode, discard_nloops, gaintype, outlier_threshold, outlier_radius, flag):
 
     imbase,imagename,outimage,pixmask,rmsfile,caltable,prev_caltables,threshold,outlierfile,cfcache,_,_,_,_ = bookkeeping.get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,outlier_threshold,outlier_radius,threshold,step='predict')
+    if os.path.exists(outlierfile) and open(outlierfile).read() == '':
+        outlierfile = ''
 
     if calmode[loop] != '':
         if os.path.exists(caltable):
@@ -208,10 +210,6 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 logger.error("Outlier file '{0}' doesn't exist, so sky model build went wrong. Will terminate process.".format(outlierfile_all))
                 sys.exit(1)
 
-        #Write outlier file specific to this loop, looking up from SPW directory where relevant
-        if not os.path.exists(outlierfile_all) and os.path.exists('../{0}'.format(outlierfile_all)):
-            logger.warning('Using outliers from ../{0}'.format(outlierfile_all))
-            outlierfile_all = '../{0}'.format(outlierfile_all)
         outliers=open(outlierfile_all).read()
         out = open(outlierfile,'w')
 
@@ -279,12 +277,12 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                 phasecenter = 'J2000 {0}'.format(pos.to_string('hmsdms'))
 
                 if step == 'bdsf':
-                    base = outlier_bases[i]
+                    base = outlier_bases[i].replace('im_0','im_{0}'.format(index-1))
                     im = base + '.image'
                     outlier_cat = base + ".catalog.fits"
                     outlier_mask = '{0}.islmask'.format(base)
 
-                    if nterms[loop] > 1 and deconvolver[loop] == 'mtmfs':
+                    if deconvolver[loop] == 'mtmfs':
                         im += '.tt0'
 
                     if os.path.exists(im):
@@ -299,6 +297,12 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                         delta = outlier_imsize/2
                         trim_box = (x-delta,x+delta,y-delta,y+delta)
                         ia.close()
+
+                        if x < 0 or x > imsize[0] or y < 0 or y > imsize[1]:
+                            logger.warning("Image '{0}' doesn't exist. Position is outside main image so assuming outlier was dropped and skipping again.".format(im))
+                            continue
+                        else:
+                            logger.warning("Image '{0}' doesn't exist. Assuming source exists inside main image, so running PyBDSF on '{1}' using {2}x{2} pixel trim box.".format(im,outimage,outlier_imsize))
 
                         pybdsf(imbase,rmsfile,imagename,outimage,outlier_snr,outlier_mask,outlier_cat,trim_box=trim_box,write_all=False)
                         outlier_pixmask = mask_image(**local,outlier_base=base)
@@ -348,6 +352,9 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
         if num_outliers > 10:
             logger.warning('The number of outliers written to "{0}" is > 10. As this will take some time to image, you may want to set a higher outlier_threshold than {1}, and/or increase your imsize beyond {2}.'.format(outlierfile,orig_threshold,imsize))
+        elif num_outliers == 0:
+            logger.warning("No outliers identified. Setting outlierfile=''.")
+            outlierfile = ''
 
     return rmsfile,outlierfile
 
