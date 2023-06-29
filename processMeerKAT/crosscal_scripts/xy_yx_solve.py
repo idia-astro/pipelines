@@ -40,9 +40,9 @@ def qu_polfield(polfield, visname):
         pa_polcal = np.array([33.0,33.0,33.0])
     elif polfield in ["3C138", "0518+165", "0521+166", "J0521+1638"]:
         #f_coeff=[1.0332,-0.5608,-0.1197,0.041]    # coefficients for model Stokes I spectrum from Perley and Butler 2013
-        perley_frac = np.array([0.056,0.075,0.084])
-        perley_f = np.array([1050,1450,1640])
-        pa_polcal = np.array([-14.0,-11.0,-10.0])
+        perley_frac = np.array([0.056,0.075,0.084,0.09,0.104,0.107,0.10])
+        perley_f = np.array([1050,1450,1640,1950,2450,2950,3250])
+        pa_polcal = np.array([-14.0,-11.0,-10.0,-10.0,-10.0,-10.0,-10.0])
     elif polfield in ["3C48", "0134+329", "0137+331", "J0137+3309"]:
         perley_frac = np.array([0.003, 0.005, 0.007])
         perley_f = np.array([1050,1450,1640])
