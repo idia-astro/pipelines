@@ -103,7 +103,11 @@ def do_pb_corr(inpimage, pbthreshold=0, pbband='LBand'):
 
 def science_image(vis, spw, cell, robust, imsize, wprojplanes, niter, threshold, multiscale, nterms, gridder, deconvolver, specmode, uvtaper, restfreq, restoringbeam, stokes, mask, rmsmap, outlierfile, keepmms, pbthreshold, pbband, fitspw):
 
-    visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
+    if ',' in vis:           #currently setting visbase to the CWD in the case of combining tracks
+        vis = vis.split(',')
+        visbase = os.getcwd().split('/')[-1]
+    else:
+        visbase = os.path.split(vis.rstrip('/ '))[1] # Get only vis name, not entire path
     extn = '.ms' if keepmms==False else '.mms'
     imagename = visbase.replace(extn, '.science_image') # Images will be produced in $CWD
 
@@ -125,7 +129,9 @@ def science_image(vis, spw, cell, robust, imsize, wprojplanes, niter, threshold,
         parallel = False
         if fitspw != '':
             spw = fitspw
-
+            if isinstance(vis,list): #in the case of combining tracks, need a list equal to the number of MSs. Why? I don't know, but it didn't work with a single value
+                spw = [spw]*len(vis)
+                
     if not os.path.exists(imname):
 
         tclean(vis=vis, selectdata=False, datacolumn='corrected', imagename=imagename,

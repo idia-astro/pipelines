@@ -187,6 +187,12 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
     msmd = msmetadata()
     qa = quanta()
 
+    if ',' in vis:                 #detect if we are combining tracks
+        vis = vis.split(',')[0]
+        combTracks = True
+    else:
+        combTracks = False
+    
     if os.path.exists('{0}/SUBMSS'.format(vis)):
         tmpvis = glob.glob('{0}/SUBMSS/*'.format(vis))[0]
     else:
@@ -212,6 +218,9 @@ def get_selfcal_args(vis,loop,nloops,nterms,deconvolver,discard_nloops,calmode,o
         targetfield = msmd.fieldsforname(targetfield)[0]
 
     target_str = msmd.namesforfields(targetfield)[0]
+
+    if combTracks:                           #currently setting visbase to the CWD in the case of combining tracks
+        visbase = os.getcwd().split('/')[-1]
 
     if '.ms' in visbase and target_str not in visbase:
         basename = visbase.replace('.ms','.{0}'.format(target_str))

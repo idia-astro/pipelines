@@ -51,6 +51,7 @@ CALIB_SCRIPTS_DIR = 'crosscal_scripts'
 AUX_SCRIPTS_DIR = 'aux_scripts'
 SELFCAL_SCRIPTS_DIR = 'selfcal_scripts'
 CONFIG = 'default_config.txt'
+CONFIG_COMB = 'default_config_comb.txt'
 TMP_CONFIG = '.config.tmp'
 MASTER_SCRIPT = 'submit_pipeline.sh'
 SPW_PREFIX = '*:'
@@ -66,6 +67,7 @@ CONTAINER = '/idia/software/containers/casa-6.6.0-modular.sif'
 MPI_WRAPPER = 'mpirun'
 PRECAL_SCRIPTS = [('calc_refant.py',False,''),('partition.py',True,'')] #Scripts run before calibration at top level directory when nspw > 1
 POSTCAL_SCRIPTS = [('concat.py',False,''),('plotcal_spw.py', False, ''),('selfcal_part1.py',True,''),('selfcal_part2.py',False,''),('science_image.py', True, '')] #Scripts run after calibration at top level directory when nspw > 1
+POSTCAL_SCRIPTS_COMB = [('prepareTracks.py',True,''),('science_image.py',True,'')]  
 SCRIPTS = [ ('validate_input.py',False,''),
             ('flag_round_1.py',True,''),
             ('calc_refant.py',False,''),
@@ -212,6 +214,7 @@ def parse_args():
     #add mutually exclusive group - don't want to build config, run pipeline, or display version at same time
     run_args = parser.add_mutually_exclusive_group(required=True)
     run_args.add_argument("-B","--build", action="store_true", required=False, default=False, help="Build config file using input MS.")
+    run_args.add_argument("-BC","--combtracks", action="store_true",required=False, default=False, help="Build config file to image multiple tracks")
     run_args.add_argument("-R","--run", action="store_true", required=False, default=False, help="Run pipeline with input config file.")
     run_args.add_argument("-V","--version", action="store_true", required=False, default=False, help="Display the version of this pipeline and quit.")
     run_args.add_argument("-L","--license", action="store_true", required=False, default=False, help="Display this program's license and quit.")
@@ -221,6 +224,11 @@ def parse_args():
     if len(unknown) > 0:
         parser.error('Unknown input argument(s) present - {0}'.format(unknown))
 
+    #force inclusion of selfcal and imaging parameters when combining tracks
+    if args.combtracks: 
+        args.do2GC = True
+        args.science_image = True
+    
     if args.run:
         if args.config is None:
             parser.error("You must input a config file [--config] to run the pipeline.")
@@ -279,8 +287,13 @@ def validate_args(args,config,parser=None):
         if args['MS'] not in [None,'None'] and not os.path.isdir(args['MS']):
             msg = "Input MS '{0}' not found.".format(args['MS'])
             raise_error(config, msg, parser)
-
-    if parser is not None and not args['build'] and args['MS']:
+            
+    if parser is None or args['combtracks']:
+        if args['MS'] is None and not args['nofields']:
+            msg = "You must input the calibrated MS directories as a single comma-separated string into MS [-M --MS] to build the config file."
+            raise_error(config, msg, parser)
+            
+    if parser is not None and not args['build'] and not args['combtracks'] and args['MS']:
         msg = "Only input an MS [-M --MS] during [-B --build] step. Otherwise input is ignored."
         raise_error(config, msg, parser)
 
@@ -923,8 +936,9 @@ def srun(arg_dict,qos=True,time=10,mem=4):
     return call
 
 def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scripts=0, mpi_wrapper=MPI_WRAPPER, nodes=8, ntasks_per_node=4, mem=MEM_PER_NODE_GB_LIMIT,plane=1, partition='Main',
-               time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', modules=[], timestamp='', justrun=False):
+               time='12:00:00', submit=False, name='', verbose=False, quiet=False, dependencies='', exclude='', account='b03-idia-ag', reservation='', modules=[], timestamp='', justrun=False, combTracks=False):
 
+    
     """Write a series of sbatch job files to calibrate a CASA MeasurementSet.
 
     Arguments:
@@ -973,8 +987,10 @@ def write_jobs(config, scripts=[], threadsafe=[], containers=[], num_precal_scri
         Modules to load upon execution of sbatch script.
     timestamp : str, optional
         Timestamp to put on this run and related runs in SPW directories.
-    justrun : bool, optionall
-        Just run the pipeline without rebuilding each job script (if it exists)."""
+    justrun : bool, optional
+        Just run the pipeline without rebuilding each job script (if it exists)
+    combTracks : bool, optional
+        Combining multiple tracks."""
 
     kwargs = locals()
     crosscal_kwargs = get_config_kwargs(config, 'crosscal', CROSSCAL_CONFIG_KEYS)
@@ -1093,6 +1109,41 @@ def default_config(arg_dict):
 
     logger.info('Config "{0}" generated.'.format(filename))
 
+def default_config_comb(arg_dict):
+
+    """Generate default config file in current directory, pointing to MS, with fields and SLURM parameters set.
+
+    Arguments:
+    ----------
+    arg_dict : dict
+        Dictionary of arguments passed into this script, which is inserted into the config file under various sections."""
+
+    filename = arg_dict['config']
+    MS = arg_dict['MS']
+
+    #Copy default config to current location
+    copyfile('{0}/{1}'.format(SCRIPT_DIR,CONFIG_COMB),filename)
+
+    #Add SLURM CL arguments to config file under section [slurm]
+    slurm_dict = get_slurm_dict(arg_dict,SLURM_CONFIG_KEYS)
+    for key in SLURM_CONFIG_STR_KEYS:
+        if key in slurm_dict.keys(): slurm_dict[key] = "'{0}'".format(slurm_dict[key])
+
+    slurm_dict['postcal_scripts'] = POSTCAL_SCRIPTS_COMB
+    slurm_dict['precal_scripts'] = []
+    slurm_dict['scripts'] = []
+    arg_dict['scripts'] = []
+          
+    #Overwrite CL parameters in config under section [slurm]
+    config_parser.overwrite_config(filename, conf_dict=slurm_dict, conf_sec='slurm')
+
+    #Add MS to config file under section [data] and dopol under section [run]
+    config_parser.overwrite_config(filename, conf_dict={'vis' : "'{0}'".format(MS)}, conf_sec='data')
+   
+    config_parser.overwrite_config(filename, conf_dict={'scripts' : arg_dict['scripts']}, conf_sec='slurm')
+
+    logger.info('Config "{0}" generated.'.format(filename))
+    
 def get_slurm_dict(arg_dict,slurm_config_keys):
 
     """Build a slurm dictionary to be inserted into config file, using specified keys.
@@ -1244,9 +1295,16 @@ def format_args(config,submit,quiet,dependencies,justrun):
 
     kwargs['num_precal_scripts'] = len(kwargs['precal_scripts'])
 
-    # Validate kwargs along with MS
-    kwargs['MS'] = data_kwargs['vis']
-    validate_args(kwargs,config)
+    # Validate kwargs along with MS, and validate each MS individually in the case of combining tracks
+    if ',' in data_kwargs['vis']:            #a comma indicates this is a list of MSs
+        MSs = data_kwargs['vis'].split(',')
+        for MS in MSs:
+            kwargs['MS'] = MS
+            validate_args(kwargs,config)
+        kwargs['MS'] = MSs   
+    else:
+        kwargs['MS'] = data_kwargs['vis']
+        validate_args(kwargs,config)
 
     #Reformat scripts tuple/list, to extract scripts, threadsafe, and containers as parallel lists
     #Check that path to each script and container exists or is ''
@@ -1441,7 +1499,7 @@ def spw_split(spw,nspw,config,mem,badfreqranges,MS,partition,createmms=True,remo
     #Create each spw as directory and place config in there
     logger.info("Making {0} directories for SPWs ({1}) and copying '{2}' to each of them.".format(nspw,SPWs,config))
     for spw in SPWs:
-        spw_config = '{0}/{1}'.format(spw.replace(SPW_PREFIX,''),config)
+        spw_config = '{0}/{1}'.format(spw.replace(SPW_PREFIX,''),config.split('/')[-1]) #fixes a bug where the leading slash causes a file error
         if not os.path.exists(spw.replace(SPW_PREFIX,'')):
             os.mkdir(spw.replace(SPW_PREFIX,''))
         copyfile(config, spw_config)
@@ -1544,6 +1602,8 @@ def main():
         logger.info(license)
     if args.build:
         default_config(vars(args))
+    if args.combtracks:
+        default_config_comb(vars(args))
     if args.run:
         kwargs = format_args(args.config,args.submit,args.quiet,args.dependencies,args.justrun)
         write_jobs(args.config, **kwargs)

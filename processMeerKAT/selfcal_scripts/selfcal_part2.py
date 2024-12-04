@@ -64,7 +64,7 @@ def selfcal_part2(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     else:
         logger.warning("Skipping selfcal loop {0} since calmode == ''.".format(loop))
 
-def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,trim_box=None,write_all=True):
+def pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,loop,trim_box=None,write_all=True):
 
     fitsname = outimage
 
@@ -109,7 +109,7 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
     outlier_min_flux = 1e-3 # 1 mJy
 
     if step != 'sky':
-        pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat)
+        pybdsf(imbase,rmsfile,imagename,outimage,thresh,maskfile,cat,loop)
 
     #Store before potentially updating to mJy
     orig_threshold = outlier_threshold
@@ -283,7 +283,7 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
 
                     if os.path.exists(im):
                         #Run PyBDSF on outlier and update mask
-                        pybdsf(imbase,rmsfile,base,im,outlier_snr,outlier_mask,outlier_cat,write_all=False)
+                        pybdsf(imbase,rmsfile,base,im,outlier_snr,outlier_mask,outlier_cat,loop,write_all=False)
                         outlier_pixmask = mask_image(**local,outlier_base=base,outlier_image=im)
                     else:
                         #Use main image, run PyBDSF on box around outlier, and update mask
@@ -300,7 +300,7 @@ def find_outliers(vis, refant, dopol, nloops, loop, cell, robust, imsize, wprojp
                         else:
                             logger.warning("Image '{0}' doesn't exist. Assuming source exists inside main image, so running PyBDSF on '{1}' using {2}x{2} pixel trim box.".format(im,outimage,outlier_imsize))
 
-                        pybdsf(imbase,rmsfile,imagename,outimage,outlier_snr,outlier_mask,outlier_cat,trim_box=trim_box,write_all=False)
+                        pybdsf(imbase,rmsfile,imagename,outimage,outlier_snr,outlier_mask,outlier_cat,loop,trim_box=trim_box,write_all=False)
                         outlier_pixmask = mask_image(**local,outlier_base=base)
 
                     mask = 'mask={0}'.format(outlier_pixmask)

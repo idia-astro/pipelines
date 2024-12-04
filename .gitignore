@@ -2,5 +2,7 @@
 *.egg-info
 *.swp # vim swap files
 
+.ipynb_checkpoints
+
 build/
 dist/
