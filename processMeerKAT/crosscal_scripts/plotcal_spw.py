@@ -59,6 +59,7 @@ def plotcal(plotstr, field_id, dirs, caldir, table_ext, title, outname, xlim=Non
 
     tables = []
     cwd = os.getcwd()
+    if len(dirs) == 0: dirs=['.'] #Fix issue with NSPW=1 
     for dd in dirs:
         tmpdir = os.path.join(dd, caldir)
         if not os.path.exists(tmpdir):
